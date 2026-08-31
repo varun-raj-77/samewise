@@ -1,0 +1,35 @@
+[project]
+name = "samewise-matcher"
+version = "0.0.0"
+description = "Samewise matcher process boundary"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "pydantic>=2.11.7,<3",
+]
+
+[project.scripts]
+samewise-matcher = "samewise_matcher.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4.1,<9",
+  "ruff>=0.12.11,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/samewise_matcher"]

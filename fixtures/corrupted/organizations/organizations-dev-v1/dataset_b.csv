@@ -1,0 +1,23 @@
+organization_ref,organization,telephone,email_address,address_line_1,locality,region,postal_code,domain,status,outstanding_balance,last_updated
+B000001,Keystone Analytics Incorporated,555-010-8719,accounts@keystoneanalyticsincorpo27.example,481 Commerce Avenue,Columbus,OH,43215,keystoneanalyticsincorpo27.example,inactive,290.75,2025-04-29T22:00:00Z
+B000002,Blue Ridge Analytics Incorporated,555.016.4471,ACCOUNTS@blueridgeanalyticsincorp23.example,334 Market St,Raleigh,NC,27601,blueridgeanalyticsincorp23.example,active,229.28,2026-07-14T23:00:00Z
+B000003,Harbor Dental Incorporated,555.019.8143,,816 Oak Ave,Denver,CO,80202,harbordentalincorporated36.example,on_hold,388.61,2025-09-25T19:00:00Z
+B000004,Green Valley Food Services Limited,555-015-5300,ACCOUNTS@greenvalleyfoodserwicesl22.example,295 Industrial,Portland,ME,04101,greenvalleyfoodservicesl22.example,on_hold,198.93,2026-09-06T21:00:00Z
+B000005,WESTFIELD ANALYTICS INCORPORATED,555.015.3639,accounts@westfieldanalyticsincorp32.example,657 Main Street,Richmond,VA,23219,westfieldanalyticsincorp32.example,on_hold,366.86,2025-05-18T15:00:00Z
+B000006,Northstar Medical Group Incorporated,+1 555-010-1539,accounts@northstarmedicalgroupinc17.example,114 Market St,Albany,NY,12207,northstarmedicalgroupinc17.example,inactive,196.87,2025-08-03T17:00:00Z
+B000007,Harbor AnalyticsIncorporated,555-019-1060,ACCOUNTS@harboranalyticsincorpora26.example,445 Main Street,Austin,TX,78701,harboranalyticsincorpora26.example,active,323.67,2026-06-09T04:00:00Z
+B000008,RedwoodAnalytics Incorporated,555.013.5037,ACCOUNTS@redwoodanalyticsincorpor30.example,596 Oak Ave,Portland,ME,04101,redwoodanalyticsincorpor30.example,inactive,330.26,2026-10-20T13:00:00Z
+B000009,Cedar Dental Incorporated,555-017-9755,,742 Industrial Road,Austin,TX,78701,cedardentalincorporated34.example,inactive,428.67,2025-02-23T17:00:00Z
+B000010,Acme Industrial Services LLC,555.013.6856,ACCOUNTS@acmeindustrialservicesll20.example,219 Main Street,Denver,CO,80202,acmeindustrialservicesll20.example,active,183.42,2026-07-03T15:00:00Z
+B000011,Acme Industrial Services LLC,555.013.6856,accounts@acmeindustrialservicesll20.example,219 Main Street,Denver,CO,80202,acmeindustrialservicesll20.example,inactive,197.67,2026-07-03T15:00:00Z
+B000012,Summit Analytics Inc,555-014-4396,accounts@summitanalyticsincorpora31.example,622 River Road,Raleigh,NC,27601,summitanalyticsincorpora31.example,on_hold,333.28,2026-01-03T14:00:00Z
+B000013,PIONEER DENTAL INCORPORATED,565.012.4670,accounts@pioneerdentalincorporate39.example,920 Commerce Avenue,Raleigh,NC,27601,pioneerdentalincorporate39.example,on_hold,513.36,2026-08-07T07:00:00Z
+B000014,Evergreen Bnalytics Incorporated,555-018-2280,accounts@evergreenanalyticsincorp25.example,410 River Road,Albany,NY,12207,evergreenanalyticsincorp25.example,on_hold,294.46,2025-09-14T23:00:00Z
+B000015,Green Valley Foods Limited,555.014.5817,accounts@greenvalleyfoodslimited21.example,254 Commerce Avenue,Madison,WI,53703,greenvalleyfoodslimited21.example,on_hold,232.40,2026-02-23T03:00:00Z
+B000016,Northstar Medical Supply Incorporated,555.011.9061,accounts@northstarmedicalsupplyin18.example,138 Oak Avenue,Austin,TX,78701,northstarmedicalsupplyin18.example,on_hold,228.37,2026-10-06T13:00:00Z
+B000017,Westfield Analytics Incorporated,555.015.3639,accounts@westfieldanalyticsincorp32.example,657 Main St,Richmond,VA,23219,westfieldanalyticsincorp32.example,active,352.61,2025-05-18T15:00:00Z
+B000018,Blue Ridgf Dental Incorporated,,accounts@blueridgedentalincorpora33.example,701 Commerce,Albany,NY,12207,blueridgedentalincorpora33.example,on_hold,345.61,2025-08-13T16:00:00Z
+B000019,Maple Dental Incorporated,555.011.5706,accounts@mapledentalincorporated38.example,886 Main Street,Portland,ME,04101-0000,mapledentalincorporated38.example,active,484.95,2025-07-25T21:00:00Z
+B000020,Acme Industrial LLC,+1 555-012-7866,ACCOUNTS@acmeindustrialllc19.example,178 River Rd,Columbus,OH,43215,acmeindustrialllc19.example,inactive,134.30,2026-07-22T14:00:00Z
+B000021,Pioneer Analytics Incorporated,555.012.6729,accounts@pioneeranalyticsincorpor29.example,552 Market St,Madison,WI,53703,pioneeranalyticsincorpor29.example,active,294.61,2026-11-07T12:00:00Z
+B000022,Cedar Analytics Incorporated,+1 555-017-3328,accounts@cedaranalyticsincorporat24.example,364 Oak Avenue,Richmond,VA,23219,cedaranalyticsincorporat24.example,inactive,272.67,2026-02-11T19:00:00Z

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.dev/contracts/health-response/1.0.0.json",
+  "title": "HealthResponse",
+  "description": "A process health response shared by Samewise services.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["service", "status", "contractVersion"],
+  "properties": {
+    "service": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "ok"
+    },
+    "contractVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    }
+  },
+  "x-contract-version": "1.0.0"
+}

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.dev/contracts/workflow/1.0.0.json",
+  "title": "SamewiseWorkflowBoundary",
+  "description": "Canonical SW-003 profile, mapping, matcher evidence, identity decision, conflict, and resolution shapes. Runtime implementations enforce the referenced definitions.",
+  "type": "object",
+  "x-contract-version": "1.0.0",
+  "$defs": {
+    "datasetSide": { "enum": ["A", "B"] },
+    "inferredType": { "enum": ["string", "integer", "number", "boolean", "date", "unknown"] },
+    "mappingRole": { "enum": ["identity", "comparison"] },
+    "normalizer": { "enum": ["text", "phone", "email", "number", "date"] },
+    "evidenceOutcome": { "enum": ["exact", "similar", "conflict", "missing_one", "missing_both"] },
+    "candidateBand": { "enum": ["proposed_match", "needs_review"] },
+    "humanDecision": { "enum": ["same_entity", "different_entity"] },
+    "resolutionAction": { "enum": ["use_a", "use_b"] },
+    "matcherVersion": { "const": "baseline-matcher-v0.1.0" },
+    "columnProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "inferredType", "nullCount", "nullRate", "distinctCount", "distinctRate", "samples"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "inferredType": { "$ref": "#/$defs/inferredType" },
+        "nullCount": { "type": "integer", "minimum": 0 },
+        "nullRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "distinctCount": { "type": "integer", "minimum": 0 },
+        "distinctRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "samples": { "type": "array", "maxItems": 3, "items": { "type": "string" } }
+      }
+    },
+    "manualMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mappingId", "label", "aColumn", "bColumn", "role", "normalizer"],
+      "properties": {
+        "mappingId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "aColumn": { "type": "string", "minLength": 1 },
+        "bColumn": { "type": "string", "minLength": 1 },
+        "role": { "$ref": "#/$defs/mappingRole" },
+        "normalizer": { "$ref": "#/$defs/normalizer" }
+      }
+    },
+    "fieldEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mappingId", "label", "aColumn", "bColumn", "aValue", "bValue", "normalizedA", "normalizedB", "outcome", "contribution", "explanation"],
+      "properties": {
+        "mappingId": { "type": "string" }, "label": { "type": "string" }, "aColumn": { "type": "string" }, "bColumn": { "type": "string" },
+        "aValue": { "type": "string" }, "bValue": { "type": "string" }, "normalizedA": { "type": "string" }, "normalizedB": { "type": "string" },
+        "outcome": { "$ref": "#/$defs/evidenceOutcome" }, "contribution": { "type": "number", "minimum": 0, "maximum": 1 }, "explanation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "datasetProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "datasetId", "side", "originalFilename", "sha256", "rowCount", "columns"],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" },
+        "datasetId": { "type": "string", "minLength": 1 },
+        "side": { "$ref": "#/$defs/datasetSide" },
+        "originalFilename": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "rowCount": { "type": "integer", "minimum": 0 },
+        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/columnProfile" } }
+      }
+    },
+    "rowRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rowId", "record"],
+      "properties": {
+        "rowId": { "type": "string", "minLength": 1 },
+        "record": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "candidatePair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateId", "aRowId", "bRowId", "aRecord", "bRecord", "rank", "baselineScore", "runnerUpMargin", "band", "collision", "evidence"],
+      "properties": {
+        "candidateId": { "type": "string", "minLength": 1 },
+        "aRowId": { "type": "string", "minLength": 1 },
+        "bRowId": { "type": "string", "minLength": 1 },
+        "aRecord": { "type": "object", "additionalProperties": { "type": "string" } },
+        "bRecord": { "type": "object", "additionalProperties": { "type": "string" } },
+        "rank": { "type": "integer", "minimum": 1 },
+        "baselineScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "runnerUpMargin": { "type": "number", "minimum": 0, "maximum": 1 },
+        "band": { "$ref": "#/$defs/candidateBand" },
+        "collision": { "type": "boolean" },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fieldEvidence" } }
+      }
+    },
+    "matcherResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "matcherVersion", "candidates", "onlyA", "onlyB"],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" },
+        "matcherVersion": { "$ref": "#/$defs/matcherVersion" },
+        "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidatePair" } },
+        "onlyA": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } },
+        "onlyB": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } }
+      }
+    },
+    "identityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "runId", "candidateId", "aRowId", "bRowId", "systemProposal", "humanDecision", "matcherVersion", "evidenceShown", "decidedAt"],
+      "properties": {
+        "decisionId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 },
+        "candidateId": { "type": "string", "minLength": 1 }, "aRowId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 },
+        "systemProposal": { "$ref": "#/$defs/candidateBand" }, "humanDecision": { "$ref": "#/$defs/humanDecision" },
+        "matcherVersion": { "$ref": "#/$defs/matcherVersion" },
+        "evidenceShown": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fieldEvidence" } },
+        "decidedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "fieldResolution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resolutionId", "chosenSource", "chosenValue", "action", "resolvedAt"],
+      "properties": {
+        "resolutionId": { "type": "string", "minLength": 1 }, "chosenSource": { "$ref": "#/$defs/datasetSide" },
+        "chosenValue": { "type": "string" }, "action": { "$ref": "#/$defs/resolutionAction" }, "resolvedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "fieldConflict": {
+      "type": "object", "additionalProperties": false,
+      "required": ["conflictId", "runId", "candidateId", "mappingId", "label", "aColumn", "bColumn", "aValue", "bValue", "resolution"],
+      "properties": {
+        "conflictId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 }, "candidateId": { "type": "string", "minLength": 1 },
+        "mappingId": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "aColumn": { "type": "string", "minLength": 1 }, "bColumn": { "type": "string", "minLength": 1 },
+        "aValue": { "type": "string" }, "bValue": { "type": "string" }, "resolution": { "oneOf": [{ "$ref": "#/$defs/fieldResolution" }, { "type": "null" }] }
+      }
+    },
+    "resultSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["matched", "needsReview", "onlyA", "onlyB"],
+      "properties": {
+        "matched": { "type": "integer", "minimum": 0 }, "needsReview": { "type": "integer", "minimum": 0 },
+        "onlyA": { "type": "integer", "minimum": 0 }, "onlyB": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "runView": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "runId", "stage", "datasets", "mappings", "matcherVersion", "summary", "candidates", "decisions", "conflicts", "onlyA", "onlyB"],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 },
+        "stage": { "enum": ["upload", "profile", "mapping", "results", "review", "resolution", "export"] },
+        "datasets": { "type": "object", "additionalProperties": false, "properties": { "A": { "$ref": "#/$defs/datasetProfile" }, "B": { "$ref": "#/$defs/datasetProfile" } } },
+        "mappings": { "type": "array", "items": { "$ref": "#/$defs/manualMapping" } },
+        "matcherVersion": { "oneOf": [{ "$ref": "#/$defs/matcherVersion" }, { "type": "null" }] },
+        "summary": { "oneOf": [{ "$ref": "#/$defs/resultSummary" }, { "type": "null" }] },
+        "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidatePair" } },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/identityDecision" } },
+        "conflicts": { "type": "array", "items": { "$ref": "#/$defs/fieldConflict" } },
+        "onlyA": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } },
+        "onlyB": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } }
+      }
+    },
+    "profileRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation", "datasetId", "side", "originalFilename", "sha256", "path"],
+      "properties": {
+        "operation": { "const": "profile" }, "datasetId": { "type": "string", "minLength": 1 },
+        "side": { "$ref": "#/$defs/datasetSide" }, "originalFilename": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "matchRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation", "aPath", "bPath", "mappings"],
+      "properties": {
+        "operation": { "const": "match" }, "aPath": { "type": "string", "minLength": 1 }, "bPath": { "type": "string", "minLength": 1 },
+        "mappings": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/manualMapping" } }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/datasetProfile" },
+    { "$ref": "#/$defs/matcherResult" },
+    { "$ref": "#/$defs/runView" },
+    { "$ref": "#/$defs/profileRequest" },
+    { "$ref": "#/$defs/matchRequest" }
+  ]
+}

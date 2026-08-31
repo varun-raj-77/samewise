@@ -1,0 +1,24 @@
+vendor_id,vendor_name,phone,contact_email,street,city,state,zip,website,account_status,balance,updated_at
+A000001,Pioneer Dental Incorporated,(555) 012-4670,ACCOUNTS@pioneerdentalincorporate39.example,920 Commerce Ave,Raleigh,NC,27601-0000,https://pioneerdentalincorporate39.example,inactive,499.11,2026-06-29T22:00:00Z
+A000002,EVERGREEN ANALYTICS INCORPORATED,555-018-2280,accounts@evergreenanalyticsincorp25.example,410 River Road,Albany,NY,12207-0000,https://evergreenanalyticsincorp25.example,inactive,308.71,2025-09-01T20:00:00Z
+A000003,Evergreen Dental Incorporated,(555) 018-9033,accounts@evergreendentalincorpora35.example,782 Market St,Columbus,OH,43215-0000,https://evergreendentalincorpora35.example,active,433.06,2025-02-11T00:00:00Z
+A000004,Pioneer Analytics Incorporated,+1 (555) 012-6729,,552 Market Street,Madison,WI,53703,https://pioneeranalyticsincorpor29.example,on_hold,308.86,2026-12-20T20:00:00Z
+A000005,Keystone Dental Incorporated,(555) 010-7351,ACCOUNTS@keystonedentalincorporat37.example,850 River Rd,Madison,WI,53703,https://keystonedentalincorporat37.example,on_hold,480.78,2025-03-05T01:00:00Z
+A000006,Green Valley Food Services Limited,555-015-5300,accounts@greenvalleyfoodservicesl22.example,295  Industrial Road,Portland,ME,04101,https://greenvalleyfoodservicesl22.example,active,261.93,2026-09-14T04:00:00Z
+A000007,Summit Analytics Inc,555-014-4396,accounts@summitanalyticsincorpora31.example,622 River Road,Raleigh,NC,27601,https://summitanalyticsincorpora31.example,active,305.78,2026-01-03T14:00:00Z
+A000008,Maple Analytics Inc,(555) 011-7165,accounts@mapleanalyticsincorporat28.example,514 Industrial Rd,Denver,CO,80202,https://mapleanalyticsincorporat28.example,on_hold,353.11,2026-04-05T03:00:00Z
+A000009,Green Valley Foods Limited,,accounts@greenvalleyfoodslimited21.example,254 Commerce Ave,Madison,WI,53703,https://greenvalleyfoodslimited21.example,on_hold,232.40,2026-02-03T01:00:00Z
+A000010,REDWOOD DENTAL INCORPORATED,555-013-3829,ACCOUNTS@redwooddentalincorporate40.example,952 Industrial,Richmond,VA,23219,https://redwooddentalincorporate40.example,on_hold,499.11,2025-11-04T00:00:00Z
+A000011,Acme Industrial LLC,(555) 012-7866,,178 River Road,Columbus,OH,43215,https://acmeindustrialllc19.example,on_hold,161.80,2026-07-22T14:00:00Z
+A000012,Westfield Analytics Incorporated,(555) 015-3639,accounts@westfieldanalyticsincorp32.example,657 Main Street,Richmond,VA,23219,https://westfieldanalyticsincorp32.example,active,352.61,2025-05-18T15:00:00Z
+A000013,Northstar Medical Group Incorporated,+1 (555) 010-1539,accounts@northstarmedicalgroupinc17.example,114 Market Street,Albany,NY,12207,https://northstarmedicalgroupinc17.example,active,133.87,2025-07-03T21:00:00Z
+A000014,Maple Dental Incorqorated,(555) 011-5706,accounts@mapledentalincorporated38.example,886 Main,Portland,ME,04101,https://mapledentalincorporated38.example,active,484.95,2025-08-09T06:00:00Z
+A000015,Acme Industrial Services LLC,,accounts@acmeindustrialservicesll20.example,219 Main St,Denver,CO,80202-0000,https://acmeindustrialservicesll20.example,active,183.42,2026-08-11T18:00:00Z
+A000016,Harbor Dental Jncorporated,(555) 019-8143,accounts@harbordentalincorporated36.example,816 Oak Avenue,Denver,CO,80202,https://harbordentalincorporated36.example,inactive,416.11,2025-09-20T19:00:00Z
+A000017,Keystone Analytics Incorporated,555-010-8719,accounts@keystoneanalyticsincorpo27.example,481 Commerce Avenue,Columbus,OH,43215,https://keystoneanalyticsincorpo27.example,inactive,290.75,2025-04-29T22:00:00Z
+A000018,Northstar Medical Supply Incorporated,+1 555-011-9061,accounts@northstarmedicalsupplyin18.example,138 Oak Avenue,Austin,TX,78701,https://northstarmedicalsupplyin18.example,inactive,214.12,2026-10-06T13:00:00Z
+A000019,Redwood Analytics Incorporated,555-113-5037,accounts@redwoodanalyticsincorpor30.example,596 Oak Ave,Portland,ME,04101-0000,https://redwoodanalyticsincorpor30.example,active,344.51,2026-10-20T13:00:00Z
+A000020,Green Valley Foods Limited,555-015-5817,accounts@greenvalleyfoodslimited21.example,254  Commerce Avenue,Madison,WI,53703,https://greenvalleyfoodslimited21.example,inactive,259.90,2026-03-06T01:00:00Z
+A000021,Northstar Medical Group Incorporated,(555) 010-1539,accounts@northstarmedicalgroupinc17.example,114 Market Street,Albany,NY,12207,https://northstarmedicalgroupinc17.example,active,133.87,2025-06-22T19:00:00Z
+A000022,CEDAR ANALYTICS INCORPORATED,(555) 017-3328,accounts@cedaranalyticsincorporat24.example,364 Oak Ave,Richmond,VA,23219,https://cedaranalyticsincorporat24.example,inactive,272.67,2026-02-26T04:00:00Z
+A000023,HARBOR ANALYTICS INCORPORATED,(555) 019-1060,accounts@harboranalyticsincorpora26.example,445 Main St,Austin,TX,78701,https://harboranalyticsincorpora26.example,inactive,296.17,2026-06-07T21:00:00Z

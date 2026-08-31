@@ -1,0 +1,232 @@
+{
+  "source_a": [
+    {
+      "canonical_entity_id": "entity_000023",
+      "occurrence": "primary",
+      "source_row_id": "A000001"
+    },
+    {
+      "canonical_entity_id": "entity_000009",
+      "occurrence": "primary",
+      "source_row_id": "A000002"
+    },
+    {
+      "canonical_entity_id": "entity_000019",
+      "occurrence": "primary",
+      "source_row_id": "A000003"
+    },
+    {
+      "canonical_entity_id": "entity_000013",
+      "occurrence": "primary",
+      "source_row_id": "A000004"
+    },
+    {
+      "canonical_entity_id": "entity_000021",
+      "occurrence": "primary",
+      "source_row_id": "A000005"
+    },
+    {
+      "canonical_entity_id": "entity_000006",
+      "occurrence": "primary",
+      "source_row_id": "A000006"
+    },
+    {
+      "canonical_entity_id": "entity_000015",
+      "occurrence": "primary",
+      "source_row_id": "A000007"
+    },
+    {
+      "canonical_entity_id": "entity_000012",
+      "occurrence": "primary",
+      "source_row_id": "A000008"
+    },
+    {
+      "canonical_entity_id": "entity_000005",
+      "occurrence": "duplicate",
+      "source_row_id": "A000009"
+    },
+    {
+      "canonical_entity_id": "entity_000024",
+      "occurrence": "primary",
+      "source_row_id": "A000010"
+    },
+    {
+      "canonical_entity_id": "entity_000003",
+      "occurrence": "primary",
+      "source_row_id": "A000011"
+    },
+    {
+      "canonical_entity_id": "entity_000016",
+      "occurrence": "primary",
+      "source_row_id": "A000012"
+    },
+    {
+      "canonical_entity_id": "entity_000001",
+      "occurrence": "duplicate",
+      "source_row_id": "A000013"
+    },
+    {
+      "canonical_entity_id": "entity_000022",
+      "occurrence": "primary",
+      "source_row_id": "A000014"
+    },
+    {
+      "canonical_entity_id": "entity_000004",
+      "occurrence": "primary",
+      "source_row_id": "A000015"
+    },
+    {
+      "canonical_entity_id": "entity_000020",
+      "occurrence": "primary",
+      "source_row_id": "A000016"
+    },
+    {
+      "canonical_entity_id": "entity_000011",
+      "occurrence": "primary",
+      "source_row_id": "A000017"
+    },
+    {
+      "canonical_entity_id": "entity_000002",
+      "occurrence": "primary",
+      "source_row_id": "A000018"
+    },
+    {
+      "canonical_entity_id": "entity_000014",
+      "occurrence": "primary",
+      "source_row_id": "A000019"
+    },
+    {
+      "canonical_entity_id": "entity_000005",
+      "occurrence": "primary",
+      "source_row_id": "A000020"
+    },
+    {
+      "canonical_entity_id": "entity_000001",
+      "occurrence": "primary",
+      "source_row_id": "A000021"
+    },
+    {
+      "canonical_entity_id": "entity_000008",
+      "occurrence": "primary",
+      "source_row_id": "A000022"
+    },
+    {
+      "canonical_entity_id": "entity_000010",
+      "occurrence": "primary",
+      "source_row_id": "A000023"
+    }
+  ],
+  "source_b": [
+    {
+      "canonical_entity_id": "entity_000011",
+      "occurrence": "primary",
+      "source_row_id": "B000001"
+    },
+    {
+      "canonical_entity_id": "entity_000007",
+      "occurrence": "primary",
+      "source_row_id": "B000002"
+    },
+    {
+      "canonical_entity_id": "entity_000020",
+      "occurrence": "primary",
+      "source_row_id": "B000003"
+    },
+    {
+      "canonical_entity_id": "entity_000006",
+      "occurrence": "primary",
+      "source_row_id": "B000004"
+    },
+    {
+      "canonical_entity_id": "entity_000016",
+      "occurrence": "duplicate",
+      "source_row_id": "B000005"
+    },
+    {
+      "canonical_entity_id": "entity_000001",
+      "occurrence": "primary",
+      "source_row_id": "B000006"
+    },
+    {
+      "canonical_entity_id": "entity_000010",
+      "occurrence": "primary",
+      "source_row_id": "B000007"
+    },
+    {
+      "canonical_entity_id": "entity_000014",
+      "occurrence": "primary",
+      "source_row_id": "B000008"
+    },
+    {
+      "canonical_entity_id": "entity_000018",
+      "occurrence": "primary",
+      "source_row_id": "B000009"
+    },
+    {
+      "canonical_entity_id": "entity_000004",
+      "occurrence": "duplicate",
+      "source_row_id": "B000010"
+    },
+    {
+      "canonical_entity_id": "entity_000004",
+      "occurrence": "primary",
+      "source_row_id": "B000011"
+    },
+    {
+      "canonical_entity_id": "entity_000015",
+      "occurrence": "primary",
+      "source_row_id": "B000012"
+    },
+    {
+      "canonical_entity_id": "entity_000023",
+      "occurrence": "primary",
+      "source_row_id": "B000013"
+    },
+    {
+      "canonical_entity_id": "entity_000009",
+      "occurrence": "primary",
+      "source_row_id": "B000014"
+    },
+    {
+      "canonical_entity_id": "entity_000005",
+      "occurrence": "primary",
+      "source_row_id": "B000015"
+    },
+    {
+      "canonical_entity_id": "entity_000002",
+      "occurrence": "primary",
+      "source_row_id": "B000016"
+    },
+    {
+      "canonical_entity_id": "entity_000016",
+      "occurrence": "primary",
+      "source_row_id": "B000017"
+    },
+    {
+      "canonical_entity_id": "entity_000017",
+      "occurrence": "primary",
+      "source_row_id": "B000018"
+    },
+    {
+      "canonical_entity_id": "entity_000022",
+      "occurrence": "primary",
+      "source_row_id": "B000019"
+    },
+    {
+      "canonical_entity_id": "entity_000003",
+      "occurrence": "primary",
+      "source_row_id": "B000020"
+    },
+    {
+      "canonical_entity_id": "entity_000013",
+      "occurrence": "primary",
+      "source_row_id": "B000021"
+    },
+    {
+      "canonical_entity_id": "entity_000008",
+      "occurrence": "primary",
+      "source_row_id": "B000022"
+    }
+  ],
+  "truth_format_version": "1.0.0"
+}

@@ -1,0 +1,54 @@
+{
+  "contractVersion": "1.0.0",
+  "manualMappings": {
+    "valid": [
+      {
+        "name": "identity text mapping",
+        "value": {
+          "mappingId": "organization-name",
+          "label": "Organization name",
+          "aColumn": "vendor_name",
+          "bColumn": "organization",
+          "role": "identity",
+          "normalizer": "text"
+        }
+      },
+      {
+        "name": "comparison numeric mapping",
+        "value": {
+          "mappingId": "balance",
+          "label": "Balance",
+          "aColumn": "balance",
+          "bColumn": "outstanding_balance",
+          "role": "comparison",
+          "normalizer": "number"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "unknown role",
+        "value": {
+          "mappingId": "status",
+          "label": "Status",
+          "aColumn": "status",
+          "bColumn": "status",
+          "role": "winner",
+          "normalizer": "text"
+        }
+      },
+      {
+        "name": "unexpected property",
+        "value": {
+          "mappingId": "name",
+          "label": "Name",
+          "aColumn": "name",
+          "bColumn": "name",
+          "role": "identity",
+          "normalizer": "text",
+          "weight": 10
+        }
+      }
+    ]
+  }
+}

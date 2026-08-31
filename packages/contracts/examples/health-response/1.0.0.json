@@ -1,0 +1,85 @@
+{
+  "contractVersion": "1.0.0",
+  "valid": [
+    {
+      "name": "api health",
+      "value": {
+        "service": "api",
+        "status": "ok",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "minimum non-empty service",
+      "value": {
+        "service": "x",
+        "status": "ok",
+        "contractVersion": "1.0.0"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "missing service",
+      "value": {
+        "status": "ok",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "empty service",
+      "value": {
+        "service": "",
+        "status": "ok",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "non-string service",
+      "value": {
+        "service": 42,
+        "status": "ok",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "missing status",
+      "value": {
+        "service": "api",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "wrong status",
+      "value": {
+        "service": "api",
+        "status": "unknown",
+        "contractVersion": "1.0.0"
+      }
+    },
+    {
+      "name": "missing contract version",
+      "value": {
+        "service": "api",
+        "status": "ok"
+      }
+    },
+    {
+      "name": "wrong contract version",
+      "value": {
+        "service": "api",
+        "status": "ok",
+        "contractVersion": "2.0.0"
+      }
+    },
+    {
+      "name": "additional property",
+      "value": {
+        "service": "api",
+        "status": "ok",
+        "contractVersion": "1.0.0",
+        "unchecked": true
+      }
+    }
+  ]
+}

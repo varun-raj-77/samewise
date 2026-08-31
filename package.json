@@ -1,0 +1,29 @@
+{
+  "name": "samewise",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @samewise/api --filter @samewise/web dev",
+    "lint": "pnpm exec eslint apps packages --max-warnings=0",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "python:lint": "uv run --project services/matcher ruff check services/matcher",
+    "python:test": "uv run --project services/matcher pytest services/matcher --basetemp .samewise-data/pytest-tmp",
+    "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm python:lint && pnpm python:test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^24.3.0",
+    "eslint": "^9.34.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0"
+  }
+}
