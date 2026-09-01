@@ -1,0 +1,53 @@
+.candidate-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 22px;
+  padding: 14px;
+  border: 1px solid #294159;
+  border-radius: 9px;
+  background: #0b1d2e;
+}
+
+.candidate-provenance strong {
+  width: 100%;
+  font-size: 12px;
+}
+
+.candidate-provenance span {
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #122b3f;
+  color: #8fb1c9;
+  font-size: 10px;
+}
+
+.evidence-table > div {
+  grid-template-columns: 1.2fr 1.4fr 1.4fr 70px;
+}
+
+.evidence-table small {
+  margin-top: 4px;
+  text-transform: none;
+}
+
+.evidence-table em {
+  display: block;
+  margin-top: 5px;
+  color: #8ca1b5;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.evidence-table > div > p {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: #718aa1;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .evidence-table > div {
+    grid-template-columns: 1fr;
+  }
+}

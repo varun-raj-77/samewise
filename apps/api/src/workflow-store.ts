@@ -4,6 +4,9 @@ import { basename, extname, resolve } from "node:path";
 
 import {
   MATCHER_VERSION,
+  SEMANTIC_MAPPING_CONTRACT_VERSION,
+  SEMANTIC_MAPPING_PROMPT_VERSION,
+  SEMANTIC_MAPPING_REQUEST_VERSION,
   WORKFLOW_CONTRACT_VERSION,
   type CandidatePair,
   type DatasetProfile,
@@ -12,10 +15,19 @@ import {
   type IdentityDecision,
   type ManualMapping,
   type MatcherResult,
+  type MappingSuggestionDecision,
+  type MappingSuggestionResponse,
   type RunView,
+  type SemanticMappingProposal,
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
+import {
+  buildMetadataFirstInput,
+  SemanticMapperError,
+  validateModelOutput,
+  type SemanticMapper,
+} from "./semantic-mapper.js";
 
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
 
@@ -32,6 +44,7 @@ interface RunState {
   result?: MatcherResult;
   decisions: Map<string, IdentityDecision>;
   conflicts: Map<string, FieldConflict>;
+  mappingProposal?: SemanticMappingProposal;
 }
 
 export class WorkflowError extends Error {
@@ -71,7 +84,11 @@ function comparisonConflicts(run: RunState, candidate: CandidatePair): FieldConf
 export class WorkflowStore {
   private readonly runs = new Map<string, RunState>();
 
-  constructor(private readonly dataRoot: string, private readonly matcher: MatcherRunner) {}
+  constructor(
+    private readonly dataRoot: string,
+    private readonly matcher: MatcherRunner,
+    private readonly semanticMapper: SemanticMapper,
+  ) {}
 
   createRun(): RunView {
     const run: RunState = {
@@ -150,6 +167,118 @@ export class WorkflowStore {
     return this.view(run);
   }
 
+  async generateMappingSuggestions(runId: string): Promise<MappingSuggestionResponse> {
+    const run = this.requireRun(runId);
+    const a = run.datasets.A?.profile;
+    const b = run.datasets.B?.profile;
+    if (!a || !b) throw new WorkflowError("datasets_required", "Upload both datasets before requesting mapping suggestions.");
+    const input = buildMetadataFirstInput(a, b);
+    try {
+      const result = await this.semanticMapper.propose(input);
+      const output = validateModelOutput(result.output, input);
+      const proposal: SemanticMappingProposal = {
+        contractVersion: SEMANTIC_MAPPING_CONTRACT_VERSION,
+        proposalId: `proposal-${randomUUID()}`,
+        runId,
+        provenance: {
+          provider: result.provider,
+          model: result.model,
+          promptVersion: SEMANTIC_MAPPING_PROMPT_VERSION,
+          schemaVersion: SEMANTIC_MAPPING_CONTRACT_VERSION,
+          requestVersion: SEMANTIC_MAPPING_REQUEST_VERSION,
+          responseId: result.responseId,
+        },
+        suggestions: output.mappings.map((mapping) => ({
+          suggestionId: `suggestion-${randomUUID()}`,
+          ...mapping,
+          status: "pending",
+          finalMapping: null,
+        })),
+        unmappedLeft: output.unmappedLeft,
+        unmappedRight: output.unmappedRight,
+        createdAt: new Date().toISOString(),
+      };
+      run.mappingProposal = proposal;
+      run.stage = "mapping";
+      return this.mappingResponse(run);
+    } catch (error) {
+      if (error instanceof SemanticMapperError) {
+        throw new WorkflowError(
+          `ai_${error.category}`,
+          "AI suggestions unavailable. You can continue mapping columns manually.",
+          503,
+        );
+      }
+      throw error;
+    }
+  }
+
+  decideMappingSuggestion(
+    runId: string,
+    suggestionId: string,
+    decision: MappingSuggestionDecision,
+  ): MappingSuggestionResponse {
+    const run = this.requireRun(runId);
+    const suggestion = run.mappingProposal?.suggestions.find((item) => item.suggestionId === suggestionId);
+    if (!suggestion || !run.mappingProposal) throw new WorkflowError("suggestion_not_found", "Mapping suggestion was not found.", 404);
+    if (suggestion.status !== "pending") throw new WorkflowError("suggestion_already_decided", "This mapping suggestion already has a decision.", 409);
+    if (decision.decision === "reject") {
+      suggestion.status = "rejected";
+      return this.mappingResponse(run);
+    }
+
+    const finalMapping = decision.decision === "remap"
+      ? decision.finalMapping!
+      : this.mappingFromSuggestion(run, suggestion);
+    this.validateConfirmedMapping(run, finalMapping);
+    run.mappings.push(finalMapping);
+    suggestion.status = decision.decision === "remap" ? "edited" : "accepted";
+    suggestion.finalMapping = finalMapping;
+    return this.mappingResponse(run);
+  }
+
+  private mappingFromSuggestion(run: RunState, suggestion: SemanticMappingProposal["suggestions"][number]): ManualMapping {
+    const aType = run.datasets.A?.profile.columns.find((column) => column.name === suggestion.leftColumn)?.inferredType;
+    const bType = run.datasets.B?.profile.columns.find((column) => column.name === suggestion.rightColumn)?.inferredType;
+    const normalizer = suggestion.normalizationHints.includes("phone_digits")
+      ? "phone"
+      : aType === "date" && bType === "date"
+        ? "date"
+        : ["integer", "number"].includes(aType ?? "") && ["integer", "number"].includes(bType ?? "")
+          ? "number"
+          : suggestion.leftColumn.toLowerCase().includes("email") && suggestion.rightColumn.toLowerCase().includes("email")
+            ? "email"
+            : "text";
+    return {
+      mappingId: `mapping-${suggestion.suggestionId}`,
+      label: suggestion.leftColumn.replaceAll("_", " "),
+      aColumn: suggestion.leftColumn,
+      bColumn: suggestion.rightColumn,
+      role: suggestion.role,
+      normalizer,
+    };
+  }
+
+  private validateConfirmedMapping(run: RunState, mapping: ManualMapping): void {
+    const aColumns = new Set(run.datasets.A?.profile.columns.map((column) => column.name) ?? []);
+    const bColumns = new Set(run.datasets.B?.profile.columns.map((column) => column.name) ?? []);
+    if (!aColumns.has(mapping.aColumn) || !bColumns.has(mapping.bColumn)) {
+      throw new WorkflowError("unknown_mapping_column", "Every mapping must reference an uploaded column.");
+    }
+    if (run.mappings.some((item) => item.mappingId === mapping.mappingId || (item.aColumn === mapping.aColumn && item.bColumn === mapping.bColumn))) {
+      throw new WorkflowError("duplicate_mapping", "Duplicate mapping IDs or column pairs are not allowed.");
+    }
+  }
+
+  private mappingResponse(run: RunState): MappingSuggestionResponse {
+    if (!run.mappingProposal) throw new WorkflowError("suggestions_unavailable", "No mapping proposal is available.", 404);
+    return {
+      contractVersion: SEMANTIC_MAPPING_CONTRACT_VERSION,
+      proposal: run.mappingProposal,
+      confirmedMappings: run.mappings,
+    };
+  }
+
   async match(runId: string): Promise<RunView> {
     const run = this.requireRun(runId);
     if (!run.datasets.A || !run.datasets.B || !run.mappings.some((mapping) => mapping.role === "identity")) {
@@ -162,7 +291,7 @@ export class WorkflowStore {
     });
     run.decisions.clear();
     run.conflicts.clear();
-    for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "proposed_match")) {
+    for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "auto_match")) {
       for (const conflict of comparisonConflicts(run, candidate)) run.conflicts.set(conflict.conflictId, conflict);
     }
     run.stage = "results";
@@ -238,7 +367,7 @@ export class WorkflowStore {
       }),
       ...candidates.filter((candidate) =>
         candidate.rank === 1
-        && candidate.band === "proposed_match"
+        && candidate.band === "auto_match"
         && !humanSameByA.has(candidate.aRowId)
         && !rejectedCandidates.has(candidate.candidateId)),
     ];
@@ -281,7 +410,17 @@ export class WorkflowStore {
         ...(run.datasets.B ? { B: run.datasets.B.profile } : {}),
       },
       mappings: run.mappings,
+      mappingVersion: "confirmed-mappings-v1",
+      semanticMappingProvenance: run.mappingProposal?.provenance ?? null,
       matcherVersion: result?.matcherVersion ?? null,
+      matcherProvenance: result ? {
+        matcherVersion: result.matcherVersion,
+        candidateEngineVersion: result.candidateEngineVersion,
+        blockingNormalizationVersion: result.blockingNormalizationVersion,
+        featurePipelineVersion: result.featurePipelineVersion,
+        matcherConfigVersion: result.matcherConfigVersion,
+        matcherConfig: result.matcherConfig,
+      } : null,
       summary: result ? { matched: matchedA.size, needsReview: reviewA.size, onlyA: onlyA.length, onlyB: onlyB.length } : null,
       candidates,
       decisions: [...run.decisions.values()],
@@ -310,11 +449,11 @@ export function exportRun(view: RunView): string {
   const rows: string[][] = [];
   const linkedA = new Set<string>();
   const linkedB = new Set<string>();
-  const primary = view.candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "proposed_match");
+  const primary = view.candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match");
   const humanSame = view.decisions.filter((decision) => decision.humanDecision === "same_entity");
   const links = [
     ...primary.filter((candidate) => !view.decisions.some((decision) => decision.candidateId === candidate.candidateId && decision.humanDecision === "different_entity"))
-      .map((candidate) => ({ candidate, source: "system_baseline" })),
+      .map((candidate) => ({ candidate, source: "system_matcher" })),
     ...humanSame.map((decision) => ({ candidate: view.candidates.find((candidate) => candidate.candidateId === decision.candidateId)!, source: "human" })),
   ].filter((link) => link.candidate);
   for (const { candidate, source } of links) {

@@ -1,0 +1,25 @@
+{
+  "candidateEngineVersion": "candidate-engine-v0.1.0",
+  "normalizationVersion": "blocking-normalization-v0.1.0",
+  "fixtureName": "organizations-dev-v1",
+  "fixtureGeneratorVersion": "fixture-generator-v0.1.0",
+  "fixtureSeed": 42,
+  "theoreticalPairs": 506,
+  "candidatePairs": 131,
+  "truePairsTotal": 21,
+  "truePairsRetained": 21,
+  "truePairsMissed": 0,
+  "candidateRecall": 1.0,
+  "candidatesByStrategy": {
+    "address_name_v1": 20,
+    "exact_strong_v1": 21,
+    "location_name_v1": 24,
+    "name_character_v1": 131,
+    "name_token_v1": 121
+  },
+  "uniqueCandidatesByStrategy": {
+    "name_character_v1": 9
+  },
+  "zeroCandidateARecords": 0,
+  "zeroCandidateBRecords": 0
+}

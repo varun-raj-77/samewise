@@ -1,0 +1,361 @@
+import math
+from pathlib import Path
+
+import pytest
+
+from samewise_matcher.explainable_matcher import (
+    MatcherConfig,
+    build_match_result,
+    compute_field_evidence,
+    match_csvs_explainable,
+    score_candidate,
+)
+from samewise_matcher.workflow_models import BlockingEvidenceView, ManualMapping
+
+
+def mapping(
+    mapping_id: str,
+    *,
+    role: str = "identity",
+    normalizer: str = "text",
+) -> ManualMapping:
+    return ManualMapping.model_validate(
+        {
+            "mappingId": mapping_id,
+            "label": mapping_id.replace("-", " "),
+            "aColumn": mapping_id,
+            "bColumn": mapping_id,
+            "role": role,
+            "normalizer": normalizer,
+        }
+    )
+
+
+BLOCKING = [BlockingEvidenceView(blockerId="name_token_v1", keyHash="0123456789abcdef")]
+
+
+def test_default_product_config_matches_frozen_versioned_file() -> None:
+    root = Path(__file__).resolve().parents[3]
+    frozen = MatcherConfig.model_validate_json(
+        (root / "evaluation/configs/matcher-v0.2.0.json").read_text()
+    )
+    assert MatcherConfig() == frozen
+    assert frozen.frozen
+    assert frozen.tunedOnFixture == "organizations-matcher-tune-1200-v1"
+
+
+@pytest.mark.parametrize(
+    ("item", "left", "right", "feature"),
+    [
+        (
+            mapping("phone", normalizer="phone"),
+            "+1 555-010-1000",
+            "5550101000",
+            "normalized_exact",
+        ),
+        (
+            mapping("email", normalizer="email"),
+            "A@Example.com",
+            "a@example.com",
+            "normalized_exact",
+        ),
+        (
+            mapping("website-domain"),
+            "https://www.acme.com/path",
+            "acme.com",
+            "normalized_host_exact",
+        ),
+        (mapping("city"), "New York", "new york", "normalized_exact"),
+        (mapping("region"), "NY", "ny", "normalized_exact"),
+        (mapping("postal"), "10001-1234", "10001", "normalized_exact"),
+    ],
+)
+def test_exact_strong_and_location_features_are_explicit(
+    item: ManualMapping, left: str, right: str, feature: str
+) -> None:
+    evidence = compute_field_evidence(item, left, right, MatcherConfig())
+    assert evidence.evidenceClass == "exact_agreement"
+    assert any(
+        value.name == feature and value.value == 1 for value in evidence.features
+    )
+    assert evidence.positiveContribution > 0
+
+
+def test_name_features_cover_fuzzy_reorder_and_corporate_suffix_variation() -> None:
+    item = mapping("organization-name")
+    reorder = compute_field_evidence(
+        item,
+        "Northstar Industrial Solutions LLC",
+        "Industrial Northstar Solutions",
+        MatcherConfig(),
+    )
+    suffix = compute_field_evidence(
+        item, "Acme Incorporated", "ACME Inc.", MatcherConfig()
+    )
+    assert reorder.evidenceClass == "partial_agreement"
+    assert (
+        next(
+            feature.value
+            for feature in reorder.features
+            if feature.name == "token_similarity"
+        )
+        == 1
+    )
+    assert suffix.evidenceClass == "exact_agreement"
+
+
+def test_address_partial_agreement_exposes_number_tokens_and_character_similarity() -> (
+    None
+):
+    evidence = compute_field_evidence(
+        mapping("street-address"),
+        "120 North Main Street",
+        "120 N Main St.",
+        MatcherConfig(),
+    )
+    values = {feature.name: feature.value for feature in evidence.features}
+    assert values["house_number_exact"] == 1
+    assert values["token_similarity"] > 0
+    assert values["character_similarity"] > 0
+    assert evidence.evidenceClass == "partial_agreement"
+
+
+@pytest.mark.parametrize(
+    ("item", "left", "right"),
+    [
+        (mapping("phone", normalizer="phone"), "5550101000", "5559999999"),
+        (mapping("email", normalizer="email"), "a@one.com", "b@two.com"),
+        (mapping("website-domain"), "one.com", "two.com"),
+    ],
+)
+def test_strong_nonempty_conflicts_are_negative_and_inspectable(
+    item: ManualMapping, left: str, right: str
+) -> None:
+    evidence = compute_field_evidence(item, left, right, MatcherConfig())
+    assert evidence.evidenceClass == "conflict"
+    assert evidence.conflictContribution > 0
+    assert evidence.contribution < evidence.positiveContribution
+
+
+def test_missing_left_right_and_both_are_neutral_and_bounded() -> None:
+    item = mapping("organization-name")
+    cases = [
+        ("", "Acme", "missing_left"),
+        ("Acme", "", "missing_right"),
+        ("", "", "missing_both"),
+    ]
+    for left, right, expected in cases:
+        evidence = compute_field_evidence(item, left, right, MatcherConfig())
+        assert evidence.evidenceClass == expected
+        assert evidence.contribution == 0
+        assert evidence.features == []
+    values = compute_field_evidence(
+        item, "Acme North", "North Acme", MatcherConfig()
+    ).features
+    assert all(0 <= feature.value <= 1 for feature in values)
+
+
+def test_comparison_mapping_is_rejected_by_identity_pipeline() -> None:
+    with pytest.raises(ValueError, match="Comparison mappings cannot enter"):
+        compute_field_evidence(
+            mapping("status", role="comparison"), "active", "inactive", MatcherConfig()
+        )
+
+
+def test_score_trace_reconciles_and_missing_cannot_inflate() -> None:
+    mappings = [mapping("organization-name"), mapping("phone", normalizer="phone")]
+    complete = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "Acme Inc", "phone": "5550101000"},
+        {"organization-name": "Acme", "phone": "5550101000"},
+        mappings,
+        BLOCKING,
+        MatcherConfig(),
+    )
+    missing = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "Acme Inc", "phone": ""},
+        {"organization-name": "Acme", "phone": ""},
+        mappings,
+        BLOCKING,
+        MatcherConfig(),
+    )
+    assert missing.matchScore <= complete.matchScore
+    assert complete.matchScore == round(
+        max(0, complete.positiveEvidence - complete.conflictEvidence)
+        / complete.totalWeight,
+        6,
+    )
+    assert math.isfinite(complete.matchScore)
+    assert 0 <= complete.matchScore <= 1
+
+
+def test_all_missing_identity_evidence_cannot_create_high_match() -> None:
+    result = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "", "phone": ""},
+        {"organization-name": "", "phone": ""},
+        [mapping("organization-name"), mapping("phone", normalizer="phone")],
+        BLOCKING,
+        MatcherConfig(),
+    )
+    assert result.matchScore == 0
+    assert result.agreementFields == 0
+
+
+def test_strong_multi_field_agreement_beats_weak_and_hard_negative() -> None:
+    mappings = [
+        mapping("organization-name"),
+        mapping("phone", normalizer="phone"),
+        mapping("street-address"),
+    ]
+    left = {
+        "organization-name": "Northstar Services",
+        "phone": "5550101000",
+        "street-address": "10 Main St",
+    }
+    true = {
+        "organization-name": "Northstar Service",
+        "phone": "5550101000",
+        "street-address": "10 Main Street",
+    }
+    hard = {
+        "organization-name": "Northstar Services Group",
+        "phone": "5559999999",
+        "street-address": "900 Other Road",
+    }
+    true_score = score_candidate(
+        "A1", "B1", left, true, mappings, BLOCKING, MatcherConfig()
+    )
+    hard_score = score_candidate(
+        "A1", "B2", left, hard, mappings, BLOCKING, MatcherConfig()
+    )
+    assert true_score.matchScore > hard_score.matchScore
+    assert hard_score.strongContradiction
+
+
+def _write(path: Path, value: str) -> None:
+    path.write_text(value, encoding="utf-8")
+
+
+def test_runtime_uses_only_identity_mappings_and_preserves_source_order_invariance(
+    tmp_path: Path,
+) -> None:
+    a_path, b_path = tmp_path / "a.csv", tmp_path / "b.csv"
+    _write(a_path, "id,organization-name,status\nA1,Acme,active\n")
+    _write(b_path, "id,organization-name,status\nB2,Other,inactive\nB1,Acme,inactive\n")
+    mappings = [mapping("organization-name"), mapping("status", role="comparison")]
+    first = match_csvs_explainable(a_path, b_path, mappings, candidate_mode="all_pairs")
+    _write(b_path, "id,organization-name,status\nB1,Acme,changed\nB2,Other,changed\n")
+    second = match_csvs_explainable(
+        a_path, b_path, mappings, candidate_mode="all_pairs"
+    )
+    assert first.candidates[0].bRowId == second.candidates[0].bRowId == "B1"
+    assert first.candidates[0].matchScore == second.candidates[0].matchScore
+    assert [item.mappingId for item in first.candidates[0].evidence] == [
+        "organization-name"
+    ]
+
+
+def test_decision_rules_route_margin_collision_contradiction_review_and_unmatched() -> (
+    None
+):
+    item = mapping("organization-name")
+    config = MatcherConfig().model_copy(
+        update={
+            "decisions": MatcherConfig().decisions.model_copy(
+                update={"minimumAutoAgreementFields": 1}
+            )
+        }
+    )
+    base = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "Acme"},
+        {"organization-name": "Acme"},
+        [item],
+        BLOCKING,
+        MatcherConfig(),
+    )
+    close = base.model_copy(update={"bRowId": "B2", "matchScore": 0.99})
+    ambiguous = build_match_result(
+        ["id", "organization-name"],
+        [{"id": "A1", "organization-name": "Acme"}],
+        ["id", "organization-name"],
+        [
+            {"id": "B1", "organization-name": "Acme"},
+            {"id": "B2", "organization-name": "Acme"},
+        ],
+        [base, close],
+        config,
+    )
+    assert ambiguous.candidates[0].band == "needs_review"
+
+    collision_pairs = [
+        base,
+        base.model_copy(update={"aRowId": "A2"}),
+    ]
+    collision = build_match_result(
+        ["id", "organization-name"],
+        [
+            {"id": "A1", "organization-name": "Acme"},
+            {"id": "A2", "organization-name": "Acme"},
+        ],
+        ["id", "organization-name"],
+        [{"id": "B1", "organization-name": "Acme"}],
+        collision_pairs,
+        config,
+    )
+    assert all(
+        item.collision and item.band == "needs_review" for item in collision.candidates
+    )
+
+    contradiction = base.model_copy(update={"strongContradiction": True})
+    contradicted = build_match_result(
+        ["id", "organization-name"],
+        [{"id": "A1", "organization-name": "Acme"}],
+        ["id", "organization-name"],
+        [{"id": "B1", "organization-name": "Acme"}],
+        [contradiction],
+        config,
+    )
+    assert contradicted.candidates[0].band == "needs_review"
+
+    below = base.model_copy(update={"matchScore": 0.1})
+    unmatched = build_match_result(
+        ["id", "organization-name"],
+        [{"id": "A1", "organization-name": "Acme"}],
+        ["id", "organization-name"],
+        [{"id": "B1", "organization-name": "Acme"}],
+        [below],
+        config,
+    )
+    assert unmatched.candidates == []
+    assert unmatched.onlyA[0]["rowId"] == "A1"
+
+
+def test_output_is_deterministic_and_candidate_provenance_survives() -> None:
+    item = mapping("organization-name")
+    pair = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "Acme"},
+        {"organization-name": "Acme"},
+        [item],
+        BLOCKING,
+        MatcherConfig(),
+    )
+    again = score_candidate(
+        "A1",
+        "B1",
+        {"organization-name": "Acme"},
+        {"organization-name": "Acme"},
+        [item],
+        BLOCKING,
+        MatcherConfig(),
+    )
+    assert pair == again
+    assert pair.blockingEvidence == BLOCKING

@@ -1,4 +1,12 @@
-import { RunViewSchema, type CandidatePair, type ManualMapping, type RunView } from "@samewise/contracts";
+import {
+  MappingSuggestionResponseSchema,
+  RunViewSchema,
+  type CandidatePair,
+  type ManualMapping,
+  type MappingSuggestionResponse,
+  type SemanticMappingProposal,
+  type RunView,
+} from "@samewise/contracts";
 import { useEffect, useMemo, useState } from "react";
 
 type Screen = "upload" | "profile" | "mapping" | "results" | "review" | "resolution" | "export";
@@ -19,12 +27,24 @@ async function parseRun(response: Response): Promise<RunView> {
   return RunViewSchema.parse(await response.json());
 }
 
+async function parseSuggestionResponse(response: Response): Promise<MappingSuggestionResponse> {
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(payload?.error?.message ?? "AI suggestions unavailable. You can continue mapping columns manually.");
+  }
+  return MappingSuggestionResponseSchema.parse(await response.json());
+}
+
 export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [run, setRun] = useState<RunView | null>(initialRun ? RunViewSchema.parse(initialRun) : null);
   const [screen, setScreen] = useState<Screen>(initialScreen ?? "upload");
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
   const [draftMappings, setDraftMappings] = useState<ManualMapping[]>(initialRun?.mappings ?? []);
+  const [mappingProposal, setMappingProposal] = useState<SemanticMappingProposal | null>(null);
+  const [suggestionEdits, setSuggestionEdits] = useState<Record<string, { bColumn: string; role: ManualMapping["role"] }>>({});
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionNotice, setSuggestionNotice] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [busy, setBusy] = useState(!initialRun);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +68,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     const rejected = new Set(run.decisions.filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId));
     const linkedA = new Set(humanSameA);
     for (const candidate of run.candidates) {
-      if (candidate.rank === 1 && candidate.band === "proposed_match" && !humanSameA.has(candidate.aRowId) && !rejected.has(candidate.candidateId)) linkedA.add(candidate.aRowId);
+      if (candidate.rank === 1 && candidate.band === "auto_match" && !humanSameA.has(candidate.aRowId) && !rejected.has(candidate.candidateId)) linkedA.add(candidate.aRowId);
     }
     return run.candidates.filter((candidate) => candidate.band === "needs_review" && !decided.has(candidate.candidateId) && !linkedA.has(candidate.aRowId));
   }, [run]);
@@ -77,6 +97,49 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     const bColumn = run.datasets.B.columns.find((column) => !draftMappings.some((mapping) => mapping.bColumn === column.name))?.name ?? run.datasets.B.columns[0]?.name;
     if (!aColumn || !bColumn) return;
     setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, role: "identity", normalizer: "text" }]);
+  }
+
+  async function requestSuggestions() {
+    if (!run) return;
+    setSuggestionsLoading(true); setSuggestionNotice(null);
+    try {
+      const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions`, { method: "POST" }));
+      setMappingProposal(response.proposal);
+      setDraftMappings(response.confirmedMappings);
+      setSuggestionEdits(Object.fromEntries(response.proposal.suggestions.map((suggestion) => [
+        suggestion.suggestionId,
+        { bColumn: suggestion.rightColumn, role: suggestion.role },
+      ])));
+    } catch (caught) {
+      setSuggestionNotice(caught instanceof Error ? caught.message : "AI suggestions unavailable. You can continue mapping columns manually.");
+    } finally { setSuggestionsLoading(false); }
+  }
+
+  async function reviewSuggestion(suggestionId: string, decision: "accept" | "reject" | "remap") {
+    if (!run || !mappingProposal) return;
+    const suggestion = mappingProposal.suggestions.find((item) => item.suggestionId === suggestionId);
+    if (!suggestion) return;
+    const edit = suggestionEdits[suggestionId] ?? { bColumn: suggestion.rightColumn, role: suggestion.role };
+    const finalMapping = decision === "remap" ? {
+      mappingId: `mapping-${crypto.randomUUID()}`,
+      label: suggestion.leftColumn.replaceAll("_", " "),
+      aColumn: suggestion.leftColumn,
+      bColumn: edit.bColumn,
+      role: edit.role,
+      normalizer: suggestion.normalizationHints.includes("phone_digits") ? "phone" as const : "text" as const,
+    } : undefined;
+    setSuggestionsLoading(true); setSuggestionNotice(null);
+    try {
+      const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, ...(finalMapping ? { finalMapping } : {}) }),
+      }));
+      setMappingProposal(response.proposal);
+      setDraftMappings(response.confirmedMappings);
+    } catch (caught) {
+      setSuggestionNotice(caught instanceof Error ? caught.message : "That suggestion decision could not be saved. Manual mapping is still available.");
+    } finally { setSuggestionsLoading(false); }
   }
 
   async function saveAndRun() {
@@ -117,9 +180,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
         {screen === "upload" && <section aria-labelledby="upload-title"><p className="eyebrow">Step 1 · Immutable sources</p><h1 id="upload-title">Start with two messy CSV files.</h1><p className="lede">Samewise fingerprints and profiles each source without rewriting it.</p><div className="upload-grid"><FilePicker side="A" file={fileA} onChange={setFileA} /><FilePicker side="B" file={fileB} onChange={setFileB} /></div><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile</button><p className="fine-print">CSV only · 2 MiB per file · source bytes remain unchanged</p></section>}
         {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">Step 2 · Source profile</p><h1 id="profile-title">Know what arrived.</h1><p className="lede">Profiles are derived in the matcher process. Samples are intentionally limited.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Map corresponding fields</button></section>}
-        {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title"><p className="eyebrow">Step 3 · Manual mapping</p><h1 id="mapping-title">Tell Samewise what corresponds.</h1><p className="lede">Identity evidence affects matching. Comparison fields are inspected only after identity is established.</p><div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index))} />)}</div><div className="actions"><button className="secondary" onClick={addMapping}>+ Add mapping</button><button className="primary" onClick={() => void saveAndRun()} disabled={busy}>Save mappings & run baseline</button></div></section>}
-        {screen === "results" && run?.summary && <section aria-labelledby="results-title"><p className="eyebrow">Step 4 · Baseline results</p><h1 id="results-title">A transparent first pass.</h1><p className="lede">Scores are deterministic baseline scores—not calibrated probabilities. Matched includes baseline-proposed and human-confirmed identity links; their source remains distinct in the export. Only B means no identity link is established, even when the row appears as a review alternative.</p><div className="summary-grid"><Metric label="Matched" value={run.summary.matched} /><Metric label="Needs review" value={run.summary.needsReview} accent /><Metric label="Only A" value={run.summary.onlyA} /><Metric label="Only B" value={run.summary.onlyB} /></div><div className="result-list"><h2>Review candidates</h2>{pendingReview.length ? pendingReview.slice(0, 8).map((candidate) => <button className="candidate-row" key={candidate.candidateId} onClick={() => review(candidate)}><span><strong>{candidate.aRowId}</strong> ↔ <strong>{candidate.bRowId}</strong><small>{candidate.rank > 1 ? `Alternative ${candidate.rank}` : candidate.collision ? "Shared preferred candidate" : "Human review required"}</small></span><b>{candidate.baselineScore.toFixed(3)}</b></button>) : <p className="empty">No pending candidates require review.</p>}</div><div className="actions"><button className="secondary" onClick={() => setScreen("resolution")}>View field conflicts ({unresolved.length})</button><button className="primary" onClick={() => setScreen("export")}>Prepare export</button></div></section>}
-        {screen === "review" && selectedCandidate && <section aria-labelledby="review-title"><p className="eyebrow">Step 5 · Identity decision</p><h1 id="review-title">Are these the same real-world entity?</h1><div className="decision-callout">This decision will not choose any conflicting field value.</div><div className="record-pair"><RecordCard title={`Dataset A · ${selectedCandidate.aRowId}`} record={selectedCandidate.aRecord} /><RecordCard title={`Dataset B · ${selectedCandidate.bRowId}`} record={selectedCandidate.bRecord} /></div><h2>Evidence shown</h2><div className="evidence-table">{selectedCandidate.evidence.map((item) => <div key={item.mappingId}><span>{item.label}<small>{item.outcome.replaceAll("_", " ")}</small></span><code>{item.aValue || "—"}</code><code>{item.bValue || "—"}</code><b>{item.contribution.toFixed(3)}</b></div>)}</div><div className="score-note">Baseline score <strong>{selectedCandidate.baselineScore.toFixed(3)}</strong> · matcher {run?.matcherVersion}</div><div className="decision-actions"><button className="different" onClick={() => void decide("different_entity")}>Different entity</button><button className="same" onClick={() => void decide("same_entity")}>Same entity</button></div></section>}
+        {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title"><p className="eyebrow">Step 3 · Human-confirmed mapping</p><h1 id="mapping-title">Review what corresponds.</h1><p className="lede">AI may propose schema mappings from metadata only. Nothing becomes active until you accept, reject, remap, or create it manually. Identity evidence affects matching; comparison fields are inspected only afterward.</p><div className="ai-mapping-panel"><header><div><small>Optional assistant</small><h2>Semantic mapping suggestions</h2></div><button className="secondary" onClick={() => void requestSuggestions()} disabled={suggestionsLoading}>{mappingProposal ? "Refresh suggestions" : "Request AI suggestions"}</button></header>{suggestionsLoading && <p className="ai-loading" aria-live="polite">Loading AI suggestions…</p>}{suggestionNotice && <div className="mapping-notice" role="status">{suggestionNotice}</div>}{mappingProposal && <><p className="proposal-note">Model {mappingProposal.provenance.model} · prompt {mappingProposal.provenance.promptVersion}. Confidence is advisory.</p><div className="suggestion-list">{mappingProposal.suggestions.map((suggestion) => { const edit = suggestionEdits[suggestion.suggestionId] ?? { bColumn: suggestion.rightColumn, role: suggestion.role }; return <article className={`suggestion-card ${suggestion.status}`} key={suggestion.suggestionId}><header><div className="suggestion-pair"><strong>{suggestion.leftColumn}</strong><span>↔</span><strong>{suggestion.rightColumn}</strong></div><span className="suggestion-status">{suggestion.status}</span></header><div className="suggestion-meta"><span>{suggestion.relation.replaceAll("_", " ")}</span><span>{suggestion.role === "identity" ? "Identity evidence" : "Post-identity comparison"}</span><span>Model confidence · {Math.round(suggestion.confidence * 100)}% (advisory)</span></div><p>{suggestion.reason}</p>{suggestion.status === "pending" ? <div className="suggestion-review"><label>Remap Dataset B<select aria-label={`Remap ${suggestion.leftColumn} Dataset B column`} value={edit.bColumn} onChange={(event) => setSuggestionEdits({ ...suggestionEdits, [suggestion.suggestionId]: { ...edit, bColumn: event.target.value } })}>{run.datasets.B!.columns.map((column) => <option key={column.name}>{column.name}</option>)}</select></label><label>Confirmed role<select aria-label={`Confirmed role for ${suggestion.leftColumn}`} value={edit.role} onChange={(event) => setSuggestionEdits({ ...suggestionEdits, [suggestion.suggestionId]: { ...edit, role: event.target.value as ManualMapping["role"] } })}><option value="identity">Identity evidence</option><option value="comparison">Post-identity comparison</option></select></label><div><button className="accept" onClick={() => void reviewSuggestion(suggestion.suggestionId, "accept")}>Accept</button><button className="reject" onClick={() => void reviewSuggestion(suggestion.suggestionId, "reject")}>Reject</button><button className="remap" onClick={() => void reviewSuggestion(suggestion.suggestionId, "remap")}>Remap</button></div></div> : suggestion.finalMapping && <p className="final-mapping">Confirmed: {suggestion.finalMapping.aColumn} ↔ {suggestion.finalMapping.bColumn} · {suggestion.finalMapping.role}</p>}</article>; })}</div>{(mappingProposal.unmappedLeft.length > 0 || mappingProposal.unmappedRight.length > 0) && <p className="unmapped-note">Left unmapped: {mappingProposal.unmappedLeft.join(", ") || "none"} · Right unmapped: {mappingProposal.unmappedRight.join(", ") || "none"}</p>}</>}</div><div className="manual-heading"><div><small>Manual fallback</small><h2>Confirmed mappings</h2></div><p>Add mappings the assistant missed, change any confirmed role, or continue entirely without AI.</p></div><div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index))} />)}</div><div className="actions"><button className="secondary" onClick={addMapping}>+ Add manual mapping</button><button className="primary" onClick={() => void saveAndRun()} disabled={busy || suggestionsLoading}>Save confirmed mappings & run matcher</button></div></section>}
+        {screen === "results" && run?.summary && <section aria-labelledby="results-title"><p className="eyebrow">Step 4 · Explainable matcher</p><h1 id="results-title">Evidence first, uncertainty visible.</h1><p className="lede">Match scores are deterministic evidence scores, not probabilities. Auto-matches remain system proposals; review and human confirmation stay distinct. Only B means no identity link is established, even when the row appears as an alternative.</p><div className="summary-grid"><Metric label="Matched" value={run.summary.matched} /><Metric label="Needs review" value={run.summary.needsReview} accent /><Metric label="Only A" value={run.summary.onlyA} /><Metric label="Only B" value={run.summary.onlyB} /></div><div className="result-list"><h2>Ranked review candidates</h2>{pendingReview.length ? pendingReview.slice(0, 8).map((candidate) => <button className="candidate-row" key={candidate.candidateId} onClick={() => review(candidate)}><span><strong>{candidate.aRowId}</strong> ↔ <strong>{candidate.bRowId}</strong><small>{candidate.rank > 1 ? `Alternative ${candidate.rank}` : candidate.collision ? "Shared preferred candidate" : candidate.strongContradiction ? "Strong identifier conflict" : "Human review required"}</small></span><b>{candidate.matchScore.toFixed(3)}</b></button>) : <p className="empty">No pending candidates require review.</p>}</div><div className="actions"><button className="secondary" onClick={() => setScreen("resolution")}>View field conflicts ({unresolved.length})</button><button className="primary" onClick={() => setScreen("export")}>Prepare export</button></div></section>}
+        {screen === "review" && selectedCandidate && <section aria-labelledby="review-title"><p className="eyebrow">Step 5 · Identity decision</p><h1 id="review-title">Are these the same real-world entity?</h1><div className="decision-callout">This decision will not choose any conflicting field value.</div><div className="record-pair"><RecordCard title={`Dataset A · ${selectedCandidate.aRowId}`} record={selectedCandidate.aRecord} /><RecordCard title={`Dataset B · ${selectedCandidate.bRowId}`} record={selectedCandidate.bRecord} /></div><div className="candidate-provenance"><strong>Why this became a candidate</strong>{selectedCandidate.blockingEvidence.map((item) => <span key={`${item.blockerId}-${item.keyHash}`}>{item.blockerId.replaceAll("_", " ")} · {item.keyHash}</span>)}</div><h2>Mapped identity evidence</h2><div className="evidence-table">{selectedCandidate.evidence.map((item) => <div key={item.mappingId}><span>{item.label}<small>{item.evidenceClass.replaceAll("_", " ")} · weight {item.weight.toFixed(2)}</small><em>{item.explanation}</em></span><code>{item.aValue || "—"}<small>{item.normalizedA || "not available"}</small></code><code>{item.bValue || "—"}<small>{item.normalizedB || "not available"}</small></code><b>{item.contribution >= 0 ? "+" : ""}{item.contribution.toFixed(3)}</b><p>{item.features.map((feature) => `${feature.name.replaceAll("_", " ")} ${feature.value.toFixed(3)}`).join(" · ") || "No feature value; missing evidence is neutral."}</p></div>)}</div><div className="score-note">Match score <strong>{selectedCandidate.matchScore.toFixed(3)}</strong> · positive {selectedCandidate.positiveEvidence.toFixed(3)} · conflict {selectedCandidate.conflictEvidence.toFixed(3)} · matcher {run?.matcherVersion}</div><div className="decision-actions"><button className="different" onClick={() => void decide("different_entity")}>Different entity</button><button className="same" onClick={() => void decide("same_entity")}>Same entity</button></div></section>}
         {screen === "resolution" && run && <section aria-labelledby="resolution-title"><p className="eyebrow">Step 6 · Field resolution</p><h1 id="resolution-title">Identity is settled. Values are not.</h1><p className="lede">Each choice below is a separate, provenance-retaining user action.</p><div className="conflicts">{run.conflicts.length ? run.conflicts.map((conflict) => <article className="conflict-card" key={conflict.conflictId}><header><div><small>Mapped field</small><h2>{conflict.label}</h2></div>{conflict.resolution && <span className="resolved">Resolved · use {conflict.resolution.chosenSource}</span>}</header><div className="conflict-values"><div><small>Dataset A</small><strong>{conflict.aValue || "Empty"}</strong><button disabled={!!conflict.resolution} onClick={() => void resolveConflict(conflict.conflictId, "use_a")}>Use A</button></div><div><small>Dataset B</small><strong>{conflict.bValue || "Empty"}</strong><button disabled={!!conflict.resolution} onClick={() => void resolveConflict(conflict.conflictId, "use_b")}>Use B</button></div></div></article>) : <p className="empty">No field conflicts are available. Confirm a same-entity review candidate first.</p>}</div><div className="actions"><button className="secondary" onClick={() => setScreen("results")}>Back to results</button><button className="primary" onClick={() => setScreen("export")}>Continue to export</button></div></section>}
         {screen === "export" && run?.summary && <section aria-labelledby="export-title"><p className="eyebrow">Step 7 · Reconciliation export</p><h1 id="export-title">Export without hiding uncertainty.</h1><p className="lede">A-only, B-only, identity source, matcher version, mapped values, and unresolved conflicts remain explicit.</p><div className="export-card"><div><small>Format</small><strong>CSV</strong></div><div><small>Unresolved conflicts</small><strong>{unresolved.length}</strong></div><div><small>Formula safety</small><strong>Enabled</strong></div></div>{unresolved.length > 0 && <div className="warning">The export will leave {unresolved.length} trusted value{unresolved.length === 1 ? "" : "s"} unresolved.</div>}<div className="actions"><button className="secondary" onClick={() => setScreen("resolution")}>Review conflicts</button><button className="primary" onClick={() => void downloadExport()} disabled={busy}>Download reconciliation CSV</button></div></section>}
       </section>

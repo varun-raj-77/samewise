@@ -2,18 +2,22 @@ import { resolve } from "node:path";
 
 import {
   ManualMappingSchema,
+  MappingSuggestionDecisionSchema,
+  MappingSuggestionResponseSchema,
   RunViewSchema,
   createHealthResponse,
 } from "@samewise/contracts";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
+import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
 import { exportRun, MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
 
 interface BuildAppOptions {
   dataRoot?: string;
   logger?: boolean;
   matcher?: MatcherRunner;
+  semanticMapper?: SemanticMapper;
 }
 
 function objectBody(value: unknown): Record<string, unknown> {
@@ -32,6 +36,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const store = new WorkflowStore(
     options.dataRoot ?? resolve(process.cwd(), ".samewise-data"),
     options.matcher ?? createMatcherRunner(),
+    options.semanticMapper ?? createSemanticMapperFromEnvironment(),
   );
 
   app.addContentTypeParser(
@@ -78,11 +83,35 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return view;
   });
 
+  app.post("/api/runs/:runId/mapping-suggestions", async (request, reply) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const response = MappingSuggestionResponseSchema.parse(await store.generateMappingSuggestions(runId));
+    app.log.info({
+      runId,
+      stage: "mapping_suggestions",
+      model: response.proposal.provenance.model,
+      promptVersion: response.proposal.provenance.promptVersion,
+      suggestionCount: response.proposal.suggestions.length,
+    }, "semantic mapping suggestions created");
+    reply.code(201);
+    return response;
+  });
+
+  app.patch("/api/runs/:runId/mapping-suggestions/:suggestionId", async (request) => {
+    const { runId, suggestionId } = routeParams(request.params);
+    if (!runId || !suggestionId) throw new WorkflowError("invalid_request", "Run ID and suggestion ID are required.");
+    const decision = MappingSuggestionDecisionSchema.parse(request.body);
+    const response = MappingSuggestionResponseSchema.parse(store.decideMappingSuggestion(runId, suggestionId, decision));
+    app.log.info({ runId, stage: "mapping_review", suggestionId, decision: decision.decision }, "mapping suggestion reviewed");
+    return response;
+  });
+
   app.post("/api/runs/:runId/match", async (request) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
     const view = RunViewSchema.parse(await store.match(runId));
-    app.log.info({ runId, stage: "results", matcherVersion: view.matcherVersion, ...view.summary }, "baseline match completed");
+    app.log.info({ runId, stage: "results", matcherVersion: view.matcherVersion, ...view.summary }, "match completed");
     return view;
   });
 

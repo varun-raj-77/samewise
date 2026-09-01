@@ -1,0 +1,143 @@
+{
+  "actual_counts": {
+    "a_only_entities": 180,
+    "b_only_entities": 180,
+    "canonical_entities": 1200,
+    "duplicate_rows_a": 24,
+    "duplicate_rows_b": 24,
+    "hard_negative_pairs": 3,
+    "overlapping_entities": 840,
+    "theoretical_cross_source_pairs": 1089936,
+    "true_cross_source_pairs": 879,
+    "visible_rows_a": 1044,
+    "visible_rows_b": 1044
+  },
+  "artifacts": {
+    "canonical_entities": {
+      "path": "fixtures/canonical/organizations/organizations-matcher-holdout-1200-v1/canonical_entities.jsonl",
+      "sha256": "13d1182c9258388dc66d593fcad86a0bd8874449ab6e4b208da044ceebae6838"
+    },
+    "config": {
+      "path": "evaluation/benchmarks/organizations-matcher-holdout-1200-v1/config.json",
+      "sha256": "4ddf3812a69a875cf3dddc2d147da0f6b6842521b497e2080c0284a14cda9c64"
+    },
+    "corruption_provenance": {
+      "path": "fixtures/ground-truth/organizations/organizations-matcher-holdout-1200-v1/corruption_provenance.jsonl",
+      "sha256": "c5ab8ca08b6737fe6b3cd6f8b0d1e1e7bedadbf355f8e12c13c1269067cd06aa"
+    },
+    "dataset_a": {
+      "path": "fixtures/corrupted/organizations/organizations-matcher-holdout-1200-v1/dataset_a.csv",
+      "sha256": "3d766768fdca30a4a072887e1743619b8e263bc527d51f3d7289ebc30bd7bb33"
+    },
+    "dataset_b": {
+      "path": "fixtures/corrupted/organizations/organizations-matcher-holdout-1200-v1/dataset_b.csv",
+      "sha256": "8b12bf2b4624dc3fc5cd735b5c084e692de4d838d5059ff7590c870d19e28958"
+    },
+    "hard_negatives": {
+      "path": "fixtures/adversarial/organizations/organizations-matcher-holdout-1200-v1/hard_negatives.json",
+      "sha256": "d9215986fbf35df8b493babc8c6ba04701143841f0827cde01b2683cc1cf7cd8"
+    },
+    "identity_truth": {
+      "path": "fixtures/ground-truth/organizations/organizations-matcher-holdout-1200-v1/identity_truth.json",
+      "sha256": "74d7bc0f3a2b31f13b718dcd71565c81add6b40fd123a24b94b5811ff1412b61"
+    },
+    "schema_mapping": {
+      "path": "fixtures/ground-truth/organizations/organizations-matcher-holdout-1200-v1/schema_mapping.json",
+      "sha256": "5fb87f959d890a6020f0baca9462e3b57dc94f2a86b39824668455b5f9c6d3c6"
+    },
+    "summary": {
+      "path": "evaluation/reports/organizations-matcher-holdout-1200-v1/summary.md",
+      "sha256": "104e6603b0f92811496556122a0d9d91bd2972e69a7c6c6e349620abc20f055a"
+    }
+  },
+  "base_generator_version": "fixture-generator-v0.1.0",
+  "corruption_counts_by_strategy": {
+    "abbreviation": 12,
+    "case_change": 367,
+    "corporate_suffix_variation": 311,
+    "country_code_added": 358,
+    "domain_typo": 85,
+    "extended_format": 201,
+    "format_change": 1148,
+    "incorrect_value": 55,
+    "local_part_case": 374,
+    "missing_street_type": 145,
+    "missing_value": 415,
+    "one_digit_error": 89,
+    "punctuation_spacing": 281,
+    "small_typo": 179,
+    "source_business_value": 1178,
+    "source_timestamp_shift": 1127,
+    "stale_address": 87,
+    "street_type_abbreviation": 586,
+    "token_deletion": 87,
+    "token_spacing": 102,
+    "weak_policy_digit_corruption": 764,
+    "weak_policy_format": 198,
+    "weak_policy_missing": 2650,
+    "weak_policy_stale": 831,
+    "weak_policy_typo": 772
+  },
+  "fixture_format_version": "1.0.0",
+  "fixture_name": "organizations-matcher-holdout-1200-v1",
+  "generator_version": "weak-identifier-fixture-generator-v0.1.0",
+  "hard_negative_patterns": [
+    "shared_name_tokens",
+    "service_line_extension",
+    "singular_related_service"
+  ],
+  "requested_config": {
+    "baseFixture": {
+      "a_only_rate": 0.15,
+      "b_only_rate": 0.15,
+      "canonical_entity_count": 1200,
+      "corruption": {
+        "address_abbreviation_rate": 0.3,
+        "address_format_rate": 0.14,
+        "address_missing_component_rate": 0.07,
+        "address_stale_rate": 0.04,
+        "business_conflict_rate": 0.28,
+        "email_case_rate": 0.18,
+        "email_missing_rate": 0.08,
+        "email_typo_rate": 0.035,
+        "name_abbreviation_rate": 0.08,
+        "name_case_rate": 0.18,
+        "name_punctuation_rate": 0.1,
+        "name_spacing_rate": 0.05,
+        "name_suffix_rate": 0.24,
+        "name_token_deletion_rate": 0.05,
+        "name_typo_rate": 0.08,
+        "phone_country_code_rate": 0.16,
+        "phone_digit_error_rate": 0.04,
+        "phone_format_rate": 0.55,
+        "phone_missing_rate": 0.08,
+        "postal_format_rate": 0.1,
+        "postal_incorrect_rate": 0.025,
+        "postal_missing_rate": 0.04,
+        "profile": "moderate",
+        "timestamp_shift_rate": 0.55
+      },
+      "duplicate_rows_a": 24,
+      "duplicate_rows_b": 24,
+      "fixture_name": "organizations-matcher-holdout-1200-v1",
+      "hard_negative_pairs": 3,
+      "overlap_rate": 0.7,
+      "seed": 7071
+    },
+    "fixtureGeneratorVersion": "weak-identifier-fixture-generator-v0.1.0",
+    "weakIdentifierPolicy": {
+      "domainFormatVariationRate": 0.1,
+      "domainMissingRate": 0.45,
+      "domainStaleRate": 0.4,
+      "emailMissingRate": 0.45,
+      "emailTypoRate": 0.4,
+      "phoneDigitCorruptionRate": 0.4,
+      "phoneMissingRate": 0.45,
+      "policyVersion": "weak-identifier-policy-v0.1.0",
+      "seed": 10071
+    }
+  },
+  "schema_mapping_version": "organizations-schema-v1",
+  "seed": 7071,
+  "weak_identifier_policy_version": "weak-identifier-policy-v0.1.0"
+}

@@ -1,17 +1,28 @@
 import csv
+import hashlib
 import re
 import unicodedata
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from difflib import SequenceMatcher
 from pathlib import Path
+from typing import Literal
 
+from samewise_matcher.blocking_normalization import NORMALIZATION_VERSION
+from samewise_matcher.candidate_engine import (
+    CANDIDATE_ENGINE_VERSION,
+    CandidateEngineConfig,
+    _mapping_kind,
+    generate_candidates,
+)
 from samewise_matcher.workflow_models import (
-    MATCHER_VERSION,
+    LEGACY_MATCHER_VERSION,
     WORKFLOW_CONTRACT_VERSION,
+    BlockingEvidenceView,
     CandidatePair,
     ColumnProfile,
     DatasetProfile,
+    FeatureValue,
     FieldEvidence,
     ManualMapping,
     MatcherResult,
@@ -184,8 +195,28 @@ def compare_field(mapping: ManualMapping, a_value: str, b_value: str) -> FieldEv
         bValue=b_value,
         normalizedA=a_normalized,
         normalizedB=b_normalized,
+        fieldKind=_mapping_kind(mapping),
+        featurePipelineVersion="baseline-feature-pipeline-v0.1.0",
+        features=[FeatureValue(name="legacy_similarity", value=contribution)],
         outcome=outcome,
+        evidenceClass=(
+            "exact_agreement"
+            if outcome == "exact"
+            else "partial_agreement"
+            if outcome == "similar"
+            else "missing_both"
+            if outcome == "missing_both"
+            else "missing_left"
+            if outcome == "missing_one" and not a_normalized
+            else "missing_right"
+            if outcome == "missing_one"
+            else "conflict"
+        ),
+        weight=1.0,
+        positiveContribution=contribution,
+        conflictContribution=0.0,
         contribution=contribution,
+        explanationCode=f"baseline_{outcome}",
         explanation=explanation,
     )
 
@@ -196,7 +227,12 @@ def _row_id(row: dict[str, str], headers: list[str], side: str, index: int) -> s
 
 
 def match_csvs(
-    a_path: Path, b_path: Path, mappings: list[ManualMapping]
+    a_path: Path,
+    b_path: Path,
+    mappings: list[ManualMapping],
+    *,
+    candidate_mode: Literal["candidate_engine", "all_pairs"] = "all_pairs",
+    candidate_config: CandidateEngineConfig | None = None,
 ) -> MatcherResult:
     a_headers, a_rows = read_csv(a_path)
     b_headers, b_rows = read_csv(b_path)
@@ -207,11 +243,52 @@ def match_csvs(
         if mapping.aColumn not in a_headers or mapping.bColumn not in b_headers:
             raise ValueError("A mapping references a column that does not exist")
 
+    candidate_b_by_a: dict[int, list[int]] = {
+        index: list(range(len(b_rows))) for index in range(len(a_rows))
+    }
+    blocking_by_pair: dict[tuple[int, int], list[BlockingEvidenceView]] = {}
+    if candidate_mode == "candidate_engine":
+        generated = generate_candidates(
+            a_headers,
+            a_rows,
+            b_headers,
+            b_rows,
+            mappings,
+            candidate_config,
+        )
+        a_id_to_index = {
+            _row_id(row, a_headers, "A", index): index
+            for index, row in enumerate(a_rows)
+        }
+        b_id_to_index = {
+            _row_id(row, b_headers, "B", index): index
+            for index, row in enumerate(b_rows)
+        }
+        candidate_b_by_a = {index: [] for index in range(len(a_rows))}
+        for candidate in generated.candidates:
+            a_index = a_id_to_index[candidate.aRowId]
+            b_index = b_id_to_index[candidate.bRowId]
+            candidate_b_by_a[a_index].append(b_index)
+            blocking_by_pair[(a_index, b_index)] = [
+                BlockingEvidenceView.model_validate(item.model_dump())
+                for item in candidate.blockingEvidence
+            ]
+    else:
+        for a_index in range(len(a_rows)):
+            for b_index in range(len(b_rows)):
+                key_hash = hashlib.sha256(
+                    f"all-pairs\0{a_index}\0{b_index}".encode()
+                ).hexdigest()[:16]
+                blocking_by_pair[(a_index, b_index)] = [
+                    BlockingEvidenceView(blockerId="all_pairs_oracle", keyHash=key_hash)
+                ]
+
     ranked_by_a: list[list[tuple[float, int, list[FieldEvidence]]]] = []
     preferred_b_counts: dict[int, int] = {}
-    for a_row in a_rows:
+    for a_index, a_row in enumerate(a_rows):
         ranked: list[tuple[float, int, list[FieldEvidence]]] = []
-        for b_index, b_row in enumerate(b_rows):
+        for b_index in candidate_b_by_a[a_index]:
+            b_row = b_rows[b_index]
             evidence = [
                 compare_field(mapping, a_row[mapping.aColumn], b_row[mapping.bColumn])
                 for mapping in identity
@@ -261,10 +338,17 @@ def match_csvs(
                     aRecord=a_row,
                     bRecord=b_row,
                     rank=rank,
-                    baselineScore=score,
+                    matchScore=score,
                     runnerUpMargin=margin if rank == 1 else 0,
-                    band="proposed_match" if rank == 1 and proposed else "needs_review",
+                    band="auto_match" if rank == 1 and proposed else "needs_review",
                     collision=collision if rank == 1 else False,
+                    strongContradiction=False,
+                    blockingEvidence=blocking_by_pair[(a_index, b_index)],
+                    positiveEvidence=round(
+                        sum(item.contribution for item in evidence), 6
+                    ),
+                    conflictEvidence=0.0,
+                    totalWeight=float(len(identity)),
                     evidence=evidence,
                 )
             )
@@ -276,7 +360,18 @@ def match_csvs(
     ]
     return MatcherResult(
         contractVersion=WORKFLOW_CONTRACT_VERSION,
-        matcherVersion=MATCHER_VERSION,
+        matcherVersion=LEGACY_MATCHER_VERSION,
+        candidateEngineVersion=CANDIDATE_ENGINE_VERSION,
+        blockingNormalizationVersion=NORMALIZATION_VERSION,
+        featurePipelineVersion="baseline-feature-pipeline-v0.1.0",
+        matcherConfigVersion="baseline-config-v0.1.0",
+        matcherConfig={
+            "highScoreThreshold": HIGH_SCORE_THRESHOLD,
+            "reviewScoreThreshold": REVIEW_SCORE_THRESHOLD,
+            "minimumMargin": HIGH_MARGIN_THRESHOLD,
+            "alternativeFloor": ALTERNATIVE_FLOOR,
+            "maxAlternatives": MAX_ALTERNATIVES,
+        },
         candidates=candidates,
         onlyA=only_a,
         onlyB=only_b,

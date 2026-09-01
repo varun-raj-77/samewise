@@ -1,0 +1,51 @@
+{
+  "baseFixture": {
+    "a_only_rate": 0.15,
+    "b_only_rate": 0.15,
+    "canonical_entity_count": 1200,
+    "corruption": {
+      "address_abbreviation_rate": 0.3,
+      "address_format_rate": 0.14,
+      "address_missing_component_rate": 0.07,
+      "address_stale_rate": 0.04,
+      "business_conflict_rate": 0.28,
+      "email_case_rate": 0.18,
+      "email_missing_rate": 0.08,
+      "email_typo_rate": 0.035,
+      "name_abbreviation_rate": 0.08,
+      "name_case_rate": 0.18,
+      "name_punctuation_rate": 0.1,
+      "name_spacing_rate": 0.05,
+      "name_suffix_rate": 0.24,
+      "name_token_deletion_rate": 0.05,
+      "name_typo_rate": 0.08,
+      "phone_country_code_rate": 0.16,
+      "phone_digit_error_rate": 0.04,
+      "phone_format_rate": 0.55,
+      "phone_missing_rate": 0.08,
+      "postal_format_rate": 0.1,
+      "postal_incorrect_rate": 0.025,
+      "postal_missing_rate": 0.04,
+      "profile": "moderate",
+      "timestamp_shift_rate": 0.55
+    },
+    "duplicate_rows_a": 24,
+    "duplicate_rows_b": 24,
+    "fixture_name": "organizations-matcher-holdout-1200-v1",
+    "hard_negative_pairs": 3,
+    "overlap_rate": 0.7,
+    "seed": 7071
+  },
+  "fixtureGeneratorVersion": "weak-identifier-fixture-generator-v0.1.0",
+  "weakIdentifierPolicy": {
+    "domainFormatVariationRate": 0.1,
+    "domainMissingRate": 0.45,
+    "domainStaleRate": 0.4,
+    "emailMissingRate": 0.45,
+    "emailTypoRate": 0.4,
+    "phoneDigitCorruptionRate": 0.4,
+    "phoneMissingRate": 0.45,
+    "policyVersion": "weak-identifier-policy-v0.1.0",
+    "seed": 10071
+  }
+}

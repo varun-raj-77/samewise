@@ -1,0 +1,41 @@
+{
+  "fixture": "organizations-dev-v1",
+  "checks": [
+    "real UI created a process-local run",
+    "both immutable CSVs were profiled",
+    "only eight confirmed identity mappings will score",
+    "three comparison mappings remain post-identity",
+    "candidate generation and matcher completed through the API",
+    "frozen matcher provenance is retained",
+    "dev result bands are factual",
+    "an obvious multi-field proposal exists",
+    "a visible missing-field case exists",
+    "a visible contradiction case exists",
+    "review shows deterministic candidate provenance",
+    "review shows real feature evidence",
+    "review presents score as match score, not probability",
+    "SAME records a separate human identity decision",
+    "comparison conflicts appear only after SAME",
+    "SAME creates zero automatic survivorship resolutions",
+    "source fixtures remained immutable"
+  ],
+  "runId": "run-9725919a-748d-472b-a14c-1aa4ecac991f",
+  "summary": {
+    "matched": 11,
+    "needsReview": 8,
+    "onlyA": 4,
+    "onlyB": 11
+  },
+  "selectedCandidate": {
+    "candidateId": "candidate-f6d1c84d6ffd839399ba",
+    "aRowId": "A000012",
+    "bRowId": "B000005",
+    "alternateBRowId": "B000017"
+  },
+  "status": "PASS",
+  "screenshots": [
+    "sw006-results.png",
+    "sw006-review-evidence.png",
+    "sw006-post-identity-conflicts.png"
+  ]
+}

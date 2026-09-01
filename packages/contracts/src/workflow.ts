@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
-export const MATCHER_VERSION = "baseline-matcher-v0.1.0" as const;
+export const MATCHER_VERSION = "explainable-matcher-v0.2.0" as const;
+export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.2.0" as const;
+export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
+export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0" as const;
+export const MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0" as const;
 
 export const DatasetSideSchema = z.enum(["A", "B"]);
 export type DatasetSide = z.infer<typeof DatasetSideSchema>;
@@ -48,8 +52,16 @@ export const FieldEvidenceSchema = z.object({
   bValue: z.string(),
   normalizedA: z.string(),
   normalizedB: z.string(),
+  fieldKind: z.enum(["name", "phone", "email", "domain", "address", "city", "region", "postal", "other"]),
+  featurePipelineVersion: z.literal(FEATURE_PIPELINE_VERSION),
+  features: z.array(z.object({ name: z.string().min(1), value: z.number().min(0).max(1) }).strict()),
   outcome: z.enum(["exact", "similar", "conflict", "missing_one", "missing_both"]),
-  contribution: z.number().min(0).max(1),
+  evidenceClass: z.enum(["exact_agreement", "partial_agreement", "conflict", "missing_left", "missing_right", "missing_both"]),
+  weight: z.number().positive(),
+  positiveContribution: z.number().nonnegative(),
+  conflictContribution: z.number().nonnegative(),
+  contribution: z.number(),
+  explanationCode: z.string().min(1),
   explanation: z.string().min(1),
 }).strict();
 export type FieldEvidence = z.infer<typeof FieldEvidenceSchema>;
@@ -61,10 +73,18 @@ export const CandidatePairSchema = z.object({
   aRecord: z.record(z.string(), z.string()),
   bRecord: z.record(z.string(), z.string()),
   rank: z.number().int().positive(),
-  baselineScore: z.number().min(0).max(1),
+  matchScore: z.number().min(0).max(1),
   runnerUpMargin: z.number().min(0).max(1),
-  band: z.enum(["proposed_match", "needs_review"]),
+  band: z.enum(["auto_match", "needs_review"]),
   collision: z.boolean(),
+  strongContradiction: z.boolean(),
+  blockingEvidence: z.array(z.object({
+    blockerId: z.string().min(1),
+    keyHash: z.string().regex(/^[a-f0-9]{16}$/),
+  }).strict()).min(1),
+  positiveEvidence: z.number().nonnegative(),
+  conflictEvidence: z.number().nonnegative(),
+  totalWeight: z.number().positive(),
   evidence: z.array(FieldEvidenceSchema).min(1),
 }).strict();
 export type CandidatePair = z.infer<typeof CandidatePairSchema>;
@@ -72,11 +92,25 @@ export type CandidatePair = z.infer<typeof CandidatePairSchema>;
 export const MatcherResultSchema = z.object({
   contractVersion: z.literal(WORKFLOW_CONTRACT_VERSION),
   matcherVersion: z.literal(MATCHER_VERSION),
+  candidateEngineVersion: z.literal(CANDIDATE_ENGINE_VERSION),
+  blockingNormalizationVersion: z.literal(BLOCKING_NORMALIZATION_VERSION),
+  featurePipelineVersion: z.literal(FEATURE_PIPELINE_VERSION),
+  matcherConfigVersion: z.literal(MATCHER_CONFIG_VERSION),
+  matcherConfig: z.record(z.string(), z.unknown()),
   candidates: z.array(CandidatePairSchema),
   onlyA: z.array(z.object({ rowId: z.string().min(1), record: z.record(z.string(), z.string()) }).strict()),
   onlyB: z.array(z.object({ rowId: z.string().min(1), record: z.record(z.string(), z.string()) }).strict()),
 }).strict();
 export type MatcherResult = z.infer<typeof MatcherResultSchema>;
+
+export const MatcherProvenanceSchema = MatcherResultSchema.pick({
+  matcherVersion: true,
+  candidateEngineVersion: true,
+  blockingNormalizationVersion: true,
+  featurePipelineVersion: true,
+  matcherConfigVersion: true,
+  matcherConfig: true,
+});
 
 export const IdentityDecisionSchema = z.object({
   decisionId: z.string().min(1),
@@ -84,7 +118,7 @@ export const IdentityDecisionSchema = z.object({
   candidateId: z.string().min(1),
   aRowId: z.string().min(1),
   bRowId: z.string().min(1),
-  systemProposal: z.enum(["proposed_match", "needs_review"]),
+  systemProposal: z.enum(["auto_match", "needs_review"]),
   humanDecision: z.enum(["same_entity", "different_entity"]),
   matcherVersion: z.literal(MATCHER_VERSION),
   evidenceShown: z.array(FieldEvidenceSchema).min(1),
@@ -128,7 +162,17 @@ export const RunViewSchema = z.object({
   stage: z.enum(["upload", "profile", "mapping", "results", "review", "resolution", "export"]),
   datasets: z.object({ A: DatasetProfileSchema.optional(), B: DatasetProfileSchema.optional() }).strict(),
   mappings: z.array(ManualMappingSchema),
+  mappingVersion: z.literal("confirmed-mappings-v1"),
+  semanticMappingProvenance: z.object({
+    provider: z.literal("openai"),
+    model: z.string().min(1),
+    promptVersion: z.string().min(1),
+    schemaVersion: z.string().min(1),
+    requestVersion: z.string().min(1),
+    responseId: z.string().min(1),
+  }).strict().nullable(),
   matcherVersion: z.literal(MATCHER_VERSION).nullable(),
+  matcherProvenance: MatcherProvenanceSchema.nullable(),
   summary: ResultSummarySchema.nullable(),
   candidates: z.array(CandidatePairSchema),
   decisions: z.array(IdentityDecisionSchema),

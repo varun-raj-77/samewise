@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import {
   DatasetProfileSchema,
+  MATCHER_VERSION,
   MatcherResultSchema,
   type DatasetProfile,
   type ManualMapping,
@@ -68,6 +69,8 @@ export function createMatcherRunner(): MatcherRunner {
         aPath: input.aPath,
         bPath: input.bPath,
         mappings: input.mappings,
+        candidateMode: "candidate_engine",
+        matcherVersion: MATCHER_VERSION,
       }));
     },
   };

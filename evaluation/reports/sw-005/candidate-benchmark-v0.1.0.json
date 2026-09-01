@@ -1,0 +1,79 @@
+{
+  "reportVersion": "candidate-benchmark-report-v0.1.0",
+  "candidateEngineVersion": "candidate-engine-v0.1.0",
+  "normalizationVersion": "blocking-normalization-v0.1.0",
+  "evaluationVersion": "candidate-evaluation-v0.1.0",
+  "fixtureGeneratorVersion": "fixture-generator-v0.1.0",
+  "candidateConfigPath": "evaluation/configs/candidate-engine-v0.1.0.json",
+  "mappingConfigPath": "evaluation/configs/organizations-confirmed-mappings-v1.json",
+  "measurementEnvironment": {
+    "operatingSystem": "Windows 11 10.0.26200",
+    "python": "3.13.15",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "logicalProcessors": 12,
+    "memoryMetric": "peak Python allocations measured with tracemalloc during candidate generation"
+  },
+  "benchmarks": [
+    {
+      "fixtureName": "organizations-dev-v1",
+      "seed": 42,
+      "aRows": 23,
+      "bRows": 22,
+      "theoreticalPairs": 506,
+      "candidatePairs": 131,
+      "reductionRatio": 3.862595,
+      "truePairsTotal": 21,
+      "truePairsRetained": 21,
+      "truePairsMissed": 0,
+      "candidateRecall": 1.0,
+      "generationRuntimeSeconds": 0.053049,
+      "peakPythonMemoryBytes": 619979
+    },
+    {
+      "fixtureName": "organizations-candidates-1k-v1",
+      "seed": 5001,
+      "aRows": 870,
+      "bRows": 870,
+      "theoreticalPairs": 756900,
+      "candidatePairs": 4246,
+      "reductionRatio": 178.261894,
+      "truePairsTotal": 738,
+      "truePairsRetained": 738,
+      "truePairsMissed": 0,
+      "candidateRecall": 1.0,
+      "generationRuntimeSeconds": 1.642917,
+      "peakPythonMemoryBytes": 16954461,
+      "bucketDiagnostics": [
+        {"blockerId":"exact_strong_v1","keysConsidered":2340,"keysUsed":2340,"keysSuppressed":0,"relationshipsGenerated":2480,"relationshipsSuppressed":0},
+        {"blockerId":"name_token_v1","keysConsidered":448,"keysUsed":425,"keysSuppressed":23,"relationshipsGenerated":498,"relationshipsSuppressed":142351},
+        {"blockerId":"name_character_v1","keysConsidered":59,"keysUsed":26,"keysSuppressed":33,"relationshipsGenerated":93,"relationshipsSuppressed":221185},
+        {"blockerId":"location_name_v1","keysConsidered":1633,"keysUsed":1388,"keysSuppressed":245,"relationshipsGenerated":11244,"relationshipsSuppressed":67764},
+        {"blockerId":"address_name_v1","keysConsidered":1586,"keysUsed":1586,"keysSuppressed":0,"relationshipsGenerated":1678,"relationshipsSuppressed":0}
+      ]
+    },
+    {
+      "fixtureName": "organizations-candidates-10k-v1",
+      "seed": 5002,
+      "aRows": 8600,
+      "bRows": 8600,
+      "theoreticalPairs": 73960000,
+      "candidatePairs": 13283,
+      "reductionRatio": 5568.019273,
+      "truePairsTotal": 7164,
+      "truePairsRetained": 7164,
+      "truePairsMissed": 0,
+      "candidateRecall": 1.0,
+      "generationRuntimeSeconds": 22.053859,
+      "peakPythonMemoryBytes": 108096256,
+      "bucketDiagnostics": [
+        {"blockerId":"exact_strong_v1","keysConsidered":23421,"keysUsed":23421,"keysSuppressed":0,"relationshipsGenerated":24736,"relationshipsSuppressed":0},
+        {"blockerId":"name_token_v1","keysConsidered":6653,"keysUsed":6626,"keysSuppressed":27,"relationshipsGenerated":9111,"relationshipsSuppressed":14340887},
+        {"blockerId":"name_character_v1","keysConsidered":6141,"keysUsed":6099,"keysSuppressed":42,"relationshipsGenerated":8012,"relationshipsSuppressed":22173215},
+        {"blockerId":"location_name_v1","keysConsidered":19667,"keysUsed":19246,"keysSuppressed":421,"relationshipsGenerated":22655,"relationshipsSuppressed":7865589},
+        {"blockerId":"address_name_v1","keysConsidered":18203,"keysUsed":18203,"keysSuppressed":0,"relationshipsGenerated":19516,"relationshipsSuppressed":0}
+      ]
+    }
+  ],
+  "missedTrueMatches": [],
+  "scopeWarning": "Candidate recall is not final record-matching recall, precision, accuracy, or scoring evidence."
+}

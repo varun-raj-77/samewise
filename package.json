@@ -16,6 +16,8 @@
     "python:lint": "uv run --project services/matcher ruff check services/matcher",
     "python:test": "uv run --project services/matcher pytest services/matcher --basetemp .samewise-data/pytest-tmp",
     "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
+    "acceptance:sw004": "node apps/web/e2e/sw004-closeout.mjs",
+    "acceptance:sw006": "node apps/web/e2e/sw006-closeout.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm python:lint && pnpm python:test"
   },
   "devDependencies": {

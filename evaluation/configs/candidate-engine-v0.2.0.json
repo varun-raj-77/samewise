@@ -1,0 +1,29 @@
+{
+  "engineVersion": "candidate-engine-v0.2.0",
+  "normalizationVersion": "blocking-normalization-v0.1.0",
+  "enabledBlockers": [
+    "exact_strong_v1",
+    "name_token_v1",
+    "name_character_v1",
+    "location_name_v2",
+    "address_name_v2"
+  ],
+  "stopTokens": [
+    "and",
+    "company",
+    "corporation",
+    "group",
+    "inc",
+    "incorporated",
+    "llc",
+    "ltd",
+    "limited",
+    "of",
+    "services",
+    "solutions",
+    "the"
+  ],
+  "namePrefixLength": 4,
+  "maxBucketSizePerSide": 20,
+  "maxBucketPairCount": 100
+}

@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App.js";
 import "./styles.css";
+import "./matcher-evidence.css";
+import "./semantic-mapping.css";
 
 const root = document.getElementById("root");
 

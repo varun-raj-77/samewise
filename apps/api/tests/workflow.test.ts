@@ -24,12 +24,20 @@ const matcher: MatcherRunner = {
   async match(): Promise<MatcherResult> {
     return {
       contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
+      candidateEngineVersion: "candidate-engine-v0.2.0",
+      blockingNormalizationVersion: "blocking-normalization-v0.1.0",
+      featurePipelineVersion: "feature-pipeline-v0.1.0",
+      matcherConfigVersion: "matcher-config-v0.2.0",
+      matcherConfig: { frozen: true },
       candidates: [{
         candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1",
         aRecord: { id: "A1", name: "Acme Corp", status: "=SUM(1,2)" },
         bRecord: { id: "B1", organization: "Acme Corporation", status: "inactive" },
-        rank: 1, baselineScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false,
-        evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme corp", normalizedB: "acme corporation", outcome: "similar", contribution: 0.72, explanation: "Normalized text similarity is the displayed contribution." }],
+        rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false,
+        strongContradiction: false,
+        blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }],
+        positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2,
+        evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [{ name: "token_similarity", value: 1 }], outcome: "similar", evidenceClass: "partial_agreement", weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." }],
       }],
       onlyA: [], onlyB: [
         { rowId: "B1", record: { id: "B1", organization: "Acme Corporation", status: "inactive" } },
@@ -65,6 +73,13 @@ describe("SW-003 API workflow", () => {
   it("uploads, profiles, maps, matches, decides SAME, resolves explicitly, and exports without mutating sources", async () => {
     const { runId, result } = await setup();
     expect(result.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 });
+    expect(result.mappingVersion).toBe("confirmed-mappings-v1");
+    expect(result.matcherProvenance).toMatchObject({
+      matcherVersion: MATCHER_VERSION,
+      candidateEngineVersion: "candidate-engine-v0.2.0",
+      featurePipelineVersion: "feature-pipeline-v0.1.0",
+      matcherConfigVersion: "matcher-config-v0.2.0",
+    });
     const runDirectory = join(dataRoot, runId);
     const paths = (await readdir(runDirectory)).map((name) => join(runDirectory, name));
     const before = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));

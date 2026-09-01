@@ -12,9 +12,7 @@ from samewise_matcher.workflow_models import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 CONTRACT_ROOT = REPOSITORY_ROOT / "packages" / "contracts"
-SCHEMA = json.loads(
-    (CONTRACT_ROOT / "schemas" / "workflow" / "1.0.0.json").read_text()
-)
+SCHEMA = json.loads((CONTRACT_ROOT / "schemas" / "workflow" / "1.0.0.json").read_text())
 EXAMPLES = json.loads(
     (CONTRACT_ROOT / "examples" / "workflow" / "1.0.0.json").read_text()
 )
@@ -26,6 +24,10 @@ def test_workflow_literals_and_boundary_definitions_match_canonical_schema() -> 
     assert {"datasetProfile", "matcherResult", "profileRequest", "matchRequest"} <= set(
         SCHEMA["$defs"]
     )
+    assert SCHEMA["$defs"]["matchRequest"]["properties"]["candidateMode"] == {
+        "enum": ["candidate_engine", "all_pairs"],
+        "default": "candidate_engine",
+    }
 
 
 @pytest.mark.parametrize(

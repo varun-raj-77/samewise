@@ -1,0 +1,42 @@
+{
+  "matcherVersion": "explainable-matcher-v0.2.0",
+  "configVersion": "matcher-config-v0.2.0",
+  "featurePipelineVersion": "feature-pipeline-v0.1.0",
+  "candidateEngineVersion": "candidate-engine-v0.2.0",
+  "blockingNormalizationVersion": "blocking-normalization-v0.1.0",
+  "frozen": false,
+  "tunedOnFixture": null,
+  "weights": {
+    "name": 2.0,
+    "phone": 1.5,
+    "email": 1.5,
+    "domain": 1.0,
+    "address": 1.5,
+    "city": 0.3,
+    "region": 0.3,
+    "postal": 0.6,
+    "other": 0.5
+  },
+  "conflictMultipliers": {
+    "name": 0.1,
+    "phone": 0.15,
+    "email": 0.2,
+    "domain": 0.15,
+    "address": 0.2,
+    "city": 0.2,
+    "region": 0.2,
+    "postal": 0.2,
+    "other": 0.25
+  },
+  "decisions": {
+    "autoMatchThreshold": 0.82,
+    "reviewThreshold": 0.3,
+    "minimumTopCandidateMargin": 0.1,
+    "minimumAutoAgreementFields": 2,
+    "alternativeFloor": 0.25,
+    "alternativeWindow": 0.3,
+    "maxAlternatives": 3,
+    "collisionPolicy": "route_to_review",
+    "contradictionPolicy": "block_auto_match"
+  }
+}
