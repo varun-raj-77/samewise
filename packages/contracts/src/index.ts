@@ -25,6 +25,11 @@ export {
   MatcherProvenanceSchema,
   NormalizerSchema,
   ResultSummarySchema,
+  ReviewEvidenceSummarySchema,
+  ReviewItemStateSchema,
+  ReviewProgressSchema,
+  ReviewQueueItemSchema,
+  ReviewUndoSchema,
   RunViewSchema,
   WORKFLOW_CONTRACT_VERSION,
   type CandidatePair,
@@ -36,6 +41,10 @@ export {
   type IdentityDecision,
   type ManualMapping,
   type MatcherResult,
+  type ReviewItemState,
+  type ReviewProgress,
+  type ReviewQueueItem,
+  type ReviewUndo,
   type RunView,
 } from "./workflow.js";
 export {

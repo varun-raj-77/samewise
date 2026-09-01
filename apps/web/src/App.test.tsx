@@ -23,7 +23,10 @@ function runView(overrides: Partial<RunView> = {}): RunView {
     matcherVersion: "explainable-matcher-v0.2.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
     matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
     candidates: [{ candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] }],
-    decisions: [], conflicts: [], onlyA: [], onlyB: [], ...overrides,
+    decisions: [], conflicts: [],
+    reviewQueue: [{ aRowId: "A1", candidateIds: ["candidate-1-1"], topCandidateId: "candidate-1-1", topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement", contribution: 0.72 }, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: 0 }],
+    reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null,
+    onlyA: [], onlyB: [], ...overrides,
   };
 }
 
@@ -40,7 +43,7 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
   return { contractVersion: "1.0.0", proposal: value, confirmedMappings };
 }
 
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
   it("validates that both CSV files are selected", () => {
@@ -135,12 +138,12 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByText("Only A").parentElement).toHaveTextContent("3");
     expect(screen.getByText("Only B").parentElement).toHaveTextContent("4");
     fireEvent.click(screen.getByRole("button", { name: /A1.*B1/ }));
-    expect(screen.getByRole("heading", { name: "Are these the same real-world entity?" })).toBeInTheDocument();
-    expect(screen.getByText("This decision will not choose any conflicting field value.")).toBeInTheDocument();
-    expect(screen.getByText("0.720")).toBeInTheDocument();
-    expect(screen.getByText("+0.720")).toBeInTheDocument();
-    expect(screen.getByText(/name token v1/)).toBeInTheDocument();
-    expect(screen.getByText(/token similarity 1.000/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Are A1 and B1 the same entity?" })).toBeInTheDocument();
+    expect(screen.getByText("Selection alone never records a decision.")).toBeInTheDocument();
+    expect(screen.getAllByText("0.720").length).toBeGreaterThan(0);
+    expect(screen.getByText("Strong agreement")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Feature detail and matcher explanation"));
+    expect(screen.getByText("token similarity")).toBeInTheDocument();
   });
 
   it("keeps SAME ENTITY separate from explicit field resolution", async () => {
@@ -156,7 +159,9 @@ describe("Samewise vertical slice", () => {
     render(<App initialRun={runView()} initialScreen="results" />);
     fireEvent.click(screen.getByRole("button", { name: /A1.*B1/ }));
     fireEvent.click(screen.getByRole("button", { name: "Same entity" }));
-    expect(await screen.findByRole("heading", { name: "Identity is settled. Values are not." })).toBeInTheDocument();
+    expect((await screen.findByText("1 field conflict")).parentElement).toHaveTextContent("Zero values were selected automatically.");
+    fireEvent.click(screen.getByRole("button", { name: "Resolve values separately" }));
+    expect(screen.getByRole("heading", { name: "Identity is settled. Values are not." })).toBeInTheDocument();
     expect(screen.getByText("Status")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use A" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Use A" }));
@@ -167,5 +172,16 @@ describe("Samewise vertical slice", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App />);
     expect(await screen.findByRole("alert")).toHaveTextContent("The API is unavailable");
+  });
+
+  it("recovers a live process-local run and review route after refresh", async () => {
+    window.history.replaceState(null, "", "/?run=run-1&screen=review");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(runView({ stage: "review" })), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Resolve identity uncertainty." })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1");
+    expect(window.location.search).toContain("run=run-1");
+    expect(window.location.search).toContain("screen=review");
   });
 });

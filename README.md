@@ -2,19 +2,19 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
-SW-006 combines the measured, truth-blind candidate engine with the first
-versioned, explainable multi-field matcher while preserving the SW-003 scorer and
-all-pairs path for comparison:
+SW-007 adds a purpose-built, keyboard-first ambiguous-identity review workspace
+on top of the frozen SW-006 candidate engine and explainable matcher:
 
 1. Upload immutable Dataset A and Dataset B CSV files.
 2. Inspect Python-generated profiles and limited representative samples.
 3. Request metadata-only AI column suggestions or map manually; accept, reject, or remap every suggestion before it can become active.
 4. Generate candidates from confirmed identity mappings, then run
    `feature-pipeline-v0.1.0` and `explainable-matcher-v0.2.0` only on those pairs.
-5. Inspect Auto Match, Needs Review, Only A, and Only B results, ranked alternatives,
-   blocker provenance, normalized values, features, agreements, conflicts, and
-   missing evidence.
-6. Record **Same entity** or **Different entity** for a candidate.
+5. Work a virtualized per-A Needs Review queue with real progress, filters,
+   deterministic evidence labels, aligned raw values, ranked alternatives, and
+   explicit collision context.
+6. Record **Same entity**, **Different entity**, or **Defer** with mouse or keyboard;
+   decisions auto-advance and an eligible recent decision can be undone safely.
 7. Only after identity confirmation, explicitly choose **Use A** or **Use B** for a conflict.
 8. Export a formula-safe reconciliation CSV that preserves unresolved values honestly.
 
@@ -64,6 +64,8 @@ Uploaded bytes are written once beneath the ignored `.samewise-data/<run-id>/` d
 | `PATCH` | `/api/runs/:runId/mapping-suggestions/:suggestionId` | Accept, reject, or remap one proposal without overwriting its origin |
 | `POST` | `/api/runs/:runId/match` | Invoke candidate generation and the explainable matcher |
 | `POST` | `/api/runs/:runId/candidates/:candidateId/decisions` | Record Same/Different identity |
+| `PATCH` | `/api/runs/:runId/review-items/:aRowId` | Defer or return one unresolved A-side review item |
+| `POST` | `/api/runs/:runId/review-undo` | Undo the most recent eligible human identity decision |
 | `POST` | `/api/runs/:runId/conflicts/:conflictId/resolutions` | Record Use A/Use B resolution |
 | `GET` | `/api/runs/:runId/export` | Download reconciliation CSV |
 
@@ -159,6 +161,8 @@ uv run --project services/matcher samewise-matcher candidates benchmark --root .
 
 - CSV only; no XLSX.
 - Process-local product state; no durable run or decision persistence.
+- Refresh and route navigation recover `?run=<run-id>&screen=<stage>` only while
+  that API process is still alive.
 - Local immutable artifacts; no object storage.
 - Synthetic candidate quality is not evidence of real-data recall; 100K-row
   behavior remains unmeasured.

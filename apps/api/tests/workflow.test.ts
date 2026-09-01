@@ -12,6 +12,33 @@ import type { MatcherRunner } from "../src/matcher-process.js";
 const aBytes = Buffer.from("id,name,status\nA1,Acme Corp,=SUM(1,2)\n");
 const bBytes = Buffer.from("id,organization,status\nB1,Acme Corporation,inactive\nB2,Other,active\n");
 
+let matcherResultOverride: MatcherResult | undefined;
+
+function baseMatcherResult(): MatcherResult {
+  return {
+    contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
+    candidateEngineVersion: "candidate-engine-v0.2.0",
+    blockingNormalizationVersion: "blocking-normalization-v0.1.0",
+    featurePipelineVersion: "feature-pipeline-v0.1.0",
+    matcherConfigVersion: "matcher-config-v0.2.0",
+    matcherConfig: { frozen: true },
+    candidates: [{
+      candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1",
+      aRecord: { id: "A1", name: "Acme Corp", status: "=SUM(1,2)" },
+      bRecord: { id: "B1", organization: "Acme Corporation", status: "inactive" },
+      rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false,
+      strongContradiction: false,
+      blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }],
+      positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2,
+      evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [{ name: "token_similarity", value: 1 }], outcome: "similar", evidenceClass: "partial_agreement", weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." }],
+    }],
+    onlyA: [], onlyB: [
+      { rowId: "B1", record: { id: "B1", organization: "Acme Corporation", status: "inactive" } },
+      { rowId: "B2", record: { id: "B2", organization: "Other", status: "active" } },
+    ],
+  };
+}
+
 const matcher: MatcherRunner = {
   async profile(input) {
     const names = input.side === "A" ? ["id", "name", "status"] : ["id", "organization", "status"];
@@ -22,28 +49,7 @@ const matcher: MatcherRunner = {
     };
   },
   async match(): Promise<MatcherResult> {
-    return {
-      contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
-      candidateEngineVersion: "candidate-engine-v0.2.0",
-      blockingNormalizationVersion: "blocking-normalization-v0.1.0",
-      featurePipelineVersion: "feature-pipeline-v0.1.0",
-      matcherConfigVersion: "matcher-config-v0.2.0",
-      matcherConfig: { frozen: true },
-      candidates: [{
-        candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1",
-        aRecord: { id: "A1", name: "Acme Corp", status: "=SUM(1,2)" },
-        bRecord: { id: "B1", organization: "Acme Corporation", status: "inactive" },
-        rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false,
-        strongContradiction: false,
-        blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }],
-        positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2,
-        evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [{ name: "token_similarity", value: 1 }], outcome: "similar", evidenceClass: "partial_agreement", weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." }],
-      }],
-      onlyA: [], onlyB: [
-        { rowId: "B1", record: { id: "B1", organization: "Acme Corporation", status: "inactive" } },
-        { rowId: "B2", record: { id: "B2", organization: "Other", status: "active" } },
-      ],
-    };
+    return matcherResultOverride ?? baseMatcherResult();
   },
 };
 
@@ -51,7 +57,7 @@ describe("SW-003 API workflow", () => {
   let dataRoot: string;
   let app: ReturnType<typeof buildApp>;
 
-  beforeEach(async () => { dataRoot = await mkdtemp(join(tmpdir(), "samewise-api-")); app = buildApp({ dataRoot, matcher }); });
+  beforeEach(async () => { matcherResultOverride = undefined; dataRoot = await mkdtemp(join(tmpdir(), "samewise-api-")); app = buildApp({ dataRoot, matcher }); });
   afterEach(async () => { await app.close(); });
 
   async function setup() {
@@ -113,6 +119,107 @@ describe("SW-003 API workflow", () => {
     expect(view.conflicts).toEqual([]);
     expect(view.summary?.onlyA).toBe(1);
     expect(view.summary?.onlyB).toBe(2);
+  });
+
+  it("derives a stable per-A queue, real progress, and reversible defer state", async () => {
+    const { runId, result } = await setup();
+    expect(result.reviewQueue).toEqual([expect.objectContaining({
+      aRowId: "A1", topCandidateId: "candidate-1-1", topBRowId: "B1",
+      candidateCount: 1, state: "needs_review", matcherVersion: MATCHER_VERSION,
+      strongestPositive: expect.objectContaining({ mappingId: "name" }),
+    })]);
+    expect(result.reviewProgress).toEqual({ total: 1, reviewed: 0, remaining: 1, deferred: 0 });
+
+    const deferred = RunViewSchema.parse((await app.inject({
+      method: "PATCH", url: `/api/runs/${runId}/review-items/A1`, payload: { deferred: true },
+    })).json());
+    expect(deferred.reviewQueue[0]?.state).toBe("deferred");
+    expect(deferred.reviewProgress).toEqual({ total: 1, reviewed: 0, remaining: 0, deferred: 1 });
+
+    const returned = RunViewSchema.parse((await app.inject({
+      method: "PATCH", url: `/api/runs/${runId}/review-items/A1`, payload: { deferred: false },
+    })).json());
+    expect(returned.reviewQueue[0]?.state).toBe("needs_review");
+    expect(returned.reviewProgress.remaining).toBe(1);
+  });
+
+  it("keeps alternatives available after DIFFERENT and undoes recent DIFFERENT decisions in order", async () => {
+    const base = baseMatcherResult();
+    const first = base.candidates[0]!;
+    matcherResultOverride = {
+      ...base,
+      candidates: [first, {
+        ...first,
+        candidateId: "candidate-1-2", bRowId: "B2", bRecord: { id: "B2", organization: "Other", status: "active" },
+        rank: 2, matchScore: 0.43, runnerUpMargin: 0.2,
+      }],
+    };
+    const { runId } = await setup();
+    const afterFirst = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "different_entity" } })).json());
+    expect(afterFirst.reviewQueue[0]).toMatchObject({ state: "needs_review", candidateCount: 2, topCandidateId: "candidate-1-2", topBRowId: "B2" });
+    expect(afterFirst.decisions).toHaveLength(1);
+    expect(afterFirst.conflicts).toEqual([]);
+
+    const afterSecond = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-2/decisions`, payload: { decision: "different_entity" } })).json());
+    expect(afterSecond.reviewQueue[0]?.state).toBe("reviewed_different");
+    expect(afterSecond.reviewProgress).toEqual({ total: 1, reviewed: 1, remaining: 0, deferred: 0 });
+
+    const undoneSecond = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` })).json());
+    expect(undoneSecond.decisions.map((decision) => decision.candidateId)).toEqual(["candidate-1-1"]);
+    expect(undoneSecond.reviewQueue[0]?.state).toBe("needs_review");
+    const undoneFirst = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` })).json());
+    expect(undoneFirst.decisions).toEqual([]);
+  });
+
+  it("undoes SAME and its unresolved dependent conflicts, but blocks after a field resolution", async () => {
+    const first = await setup();
+    const afterSame = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${first.runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    expect(afterSame.reviewUndo?.canUndo).toBe(true);
+    expect(afterSame.conflicts).toHaveLength(1);
+    const undone = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${first.runId}/review-undo` })).json());
+    expect(undone.decisions).toEqual([]);
+    expect(undone.conflicts).toEqual([]);
+    expect(undone.reviewQueue[0]?.state).toBe("needs_review");
+
+    const second = await setup();
+    const decided = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${second.runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    await app.inject({ method: "POST", url: `/api/runs/${second.runId}/conflicts/${decided.conflicts[0]!.conflictId}/resolutions`, payload: { action: "use_a" } });
+    const blocked = await app.inject({ method: "POST", url: `/api/runs/${second.runId}/review-undo` });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toEqual({ error: { code: "undo_blocked_by_resolutions", message: expect.stringContaining("already been resolved") } });
+    const preserved = RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${second.runId}` })).json());
+    expect(preserved.decisions).toHaveLength(1);
+    expect(preserved.conflicts[0]?.resolution).not.toBeNull();
+    expect(preserved.reviewUndo?.canUndo).toBe(false);
+  });
+
+  it("surfaces shared-B collision context without imposing global assignment", async () => {
+    const base = baseMatcherResult();
+    const first = { ...base.candidates[0]!, collision: true };
+    matcherResultOverride = {
+      ...base,
+      candidates: [first, {
+        ...first,
+        candidateId: "candidate-2-1", aRowId: "A2", aRecord: { id: "A2", name: "Acme Holdings", status: "active" },
+        matchScore: 0.68,
+      }],
+    };
+    const { result } = await setup();
+    expect(result.reviewQueue).toHaveLength(2);
+    expect(result.reviewQueue[0]).toMatchObject({ collision: true, collisionARowIds: ["A2"] });
+    expect(result.reviewQueue[1]).toMatchObject({ collision: true, collisionARowIds: ["A1"] });
+  });
+
+  it("keeps a system auto-match distinct from a human SAME confirmation", async () => {
+    const base = baseMatcherResult();
+    matcherResultOverride = { ...base, candidates: [{ ...base.candidates[0]!, band: "auto_match" }] };
+    const { runId, result } = await setup();
+    expect(result.summary?.matched).toBe(1);
+    expect(result.reviewQueue).toEqual([]);
+    expect(result.decisions).toEqual([]);
+    const humanConfirmed = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    expect(humanConfirmed.reviewQueue[0]).toMatchObject({ state: "reviewed_same", humanDecision: { humanDecision: "same_entity" } });
+    expect(humanConfirmed.decisions[0]?.systemProposal).toBe("auto_match");
   });
 
   it("rejects unsupported, empty, duplicate, and invalid mapping uploads safely", async () => {

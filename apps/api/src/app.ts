@@ -124,6 +124,25 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return view;
   });
 
+  app.patch("/api/runs/:runId/review-items/:aRowId", async (request) => {
+    const { runId, aRowId } = routeParams(request.params);
+    const deferred = objectBody(request.body).deferred;
+    if (!runId || !aRowId || typeof deferred !== "boolean") {
+      throw new WorkflowError("invalid_request", "A review item and deferred state are required.");
+    }
+    const view = RunViewSchema.parse(store.setDeferred(runId, aRowId, deferred));
+    app.log.info({ runId, stage: "review", aRowId, deferred }, "review item defer state changed");
+    return view;
+  });
+
+  app.post("/api/runs/:runId/review-undo", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const view = RunViewSchema.parse(store.undo(runId));
+    app.log.info({ runId, stage: "review", undoneCandidateId: view.reviewUndo?.candidateId ?? null }, "review decision undone");
+    return view;
+  });
+
   app.post("/api/runs/:runId/conflicts/:conflictId/resolutions", async (request) => {
     const { runId, conflictId } = routeParams(request.params);
     const action = objectBody(request.body).action;

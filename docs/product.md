@@ -26,6 +26,14 @@ Candidate retention and scorer behavior have separate versioned synthetic evalua
 harnesses. Product match scores and AI mapping confidence are distinct systems and
 neither is a calibrated probability.
 
+The SW-007 review product groups retained alternatives by stable A-side row ID.
+Reviewers can inspect and switch among B candidates without creating state, then
+record SAME, DIFFERENT, or DEFER. A SAME/Different action advances only after the
+server accepts it. SAME creates comparison-field conflicts but no field resolution;
+DIFFERENT leaves other alternatives available; DEFER preserves unresolved identity.
+The queue distinguishes system proposals from human confirmations and reports
+reviewed, remaining, deferred, and filtered counts from the live run.
+
 ## Evaluation foundation
 
 Ground truth is created before matcher development so future changes can be compared against known identity relationships, including source-only entities, hard negatives, and duplicate source rows. The product-visible CSVs never contain canonical identifiers, corruption labels, or partner hints. Canonical entities, source-to-canonical mappings, schema mapping truth, and provenance are evaluation-only artifacts.

@@ -6,11 +6,11 @@ Samewise begins with three executable surfaces and one shared contract package. 
 
 ### `apps/web`
 
-The React/Vite application owns a seven-step upload-to-export workflow. It validates API run views and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions.
+The React/Vite application owns a seven-step upload-to-export workflow. It validates API run views and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps server state in `RunView` while selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its fixed-height queue window renders only the visible range plus overscan.
 
 ### `apps/api`
 
-The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions and field resolutions, and creates reconciliation exports. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
+The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, and field resolutions, and creates reconciliation exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
 
 Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v1` input from its authoritative profiles using only column name, inferred type, null rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs, canonical entities, schema truth, identity truth, and corruption provenance. The API uses a versioned developer prompt and strict structured output, then independently validates referenced columns, enums, confidence, allowlisted hints, duplicates, and mapping/unmapped consistency. Provider failures do not mutate proposals or confirmed mappings.
 

@@ -17,6 +17,7 @@ import {
   type MatcherResult,
   type MappingSuggestionDecision,
   type MappingSuggestionResponse,
+  type ReviewQueueItem,
   type RunView,
   type SemanticMappingProposal,
 } from "@samewise/contracts";
@@ -44,7 +45,16 @@ interface RunState {
   result?: MatcherResult;
   decisions: Map<string, IdentityDecision>;
   conflicts: Map<string, FieldConflict>;
+  deferredARowIds: Set<string>;
+  undoStack: UndoEntry[];
   mappingProposal?: SemanticMappingProposal;
+}
+
+interface UndoEntry {
+  candidateId: string;
+  decisionId: string;
+  createdConflictIds: string[];
+  wasDeferred: boolean;
 }
 
 export class WorkflowError extends Error {
@@ -98,6 +108,8 @@ export class WorkflowStore {
       mappings: [],
       decisions: new Map(),
       conflicts: new Map(),
+      deferredARowIds: new Set(),
+      undoStack: [],
     };
     this.runs.set(run.runId, run);
     return this.view(run);
@@ -163,6 +175,8 @@ export class WorkflowStore {
     delete run.result;
     run.decisions.clear();
     run.conflicts.clear();
+    run.deferredARowIds.clear();
+    run.undoStack.length = 0;
     run.stage = "mapping";
     return this.view(run);
   }
@@ -291,6 +305,8 @@ export class WorkflowStore {
     });
     run.decisions.clear();
     run.conflicts.clear();
+    run.deferredARowIds.clear();
+    run.undoStack.length = 0;
     for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "auto_match")) {
       for (const conflict of comparisonConflicts(run, candidate)) run.conflicts.set(conflict.conflictId, conflict);
     }
@@ -307,7 +323,7 @@ export class WorkflowStore {
       const existingSame = [...run.decisions.values()].some((decision) => decision.aRowId === candidate.aRowId && decision.humanDecision === "same_entity");
       if (existingSame) throw new WorkflowError("identity_already_confirmed", "This A row already has a confirmed identity.", 409);
     }
-    run.decisions.set(candidateId, {
+    const decision: IdentityDecision = {
       decisionId: `decision-${randomUUID()}`,
       runId,
       candidateId,
@@ -318,13 +334,58 @@ export class WorkflowStore {
       matcherVersion: MATCHER_VERSION,
       evidenceShown: candidate.evidence,
       decidedAt: new Date().toISOString(),
-    });
+    };
+    run.decisions.set(candidateId, decision);
+    const createdConflictIds: string[] = [];
     if (humanDecision === "same_entity") {
-      for (const conflict of comparisonConflicts(run, candidate)) run.conflicts.set(conflict.conflictId, conflict);
+      for (const conflict of comparisonConflicts(run, candidate)) {
+        if (!run.conflicts.has(conflict.conflictId)) createdConflictIds.push(conflict.conflictId);
+        run.conflicts.set(conflict.conflictId, conflict);
+      }
       run.stage = run.conflicts.size ? "resolution" : "review";
     } else {
       run.stage = "review";
     }
+    const wasDeferred = run.deferredARowIds.delete(candidate.aRowId);
+    run.undoStack.push({ candidateId, decisionId: decision.decisionId, createdConflictIds, wasDeferred });
+    if (run.undoStack.length > 20) run.undoStack.shift();
+    return this.view(run);
+  }
+
+  setDeferred(runId: string, aRowId: string, deferred: boolean): RunView {
+    const run = this.requireRun(runId);
+    const candidates = run.result?.candidates.filter((candidate) => candidate.aRowId === aRowId) ?? [];
+    if (!candidates.length) throw new WorkflowError("review_item_not_found", "Review item was not found.", 404);
+    const hasSame = [...run.decisions.values()].some((decision) => decision.aRowId === aRowId && decision.humanDecision === "same_entity");
+    const hasUnresolved = candidates.some((candidate) => !run.decisions.has(candidate.candidateId));
+    if (hasSame || !hasUnresolved) throw new WorkflowError("review_item_resolved", "Only an unresolved review item can be deferred.", 409);
+    if (deferred) run.deferredARowIds.add(aRowId);
+    else run.deferredARowIds.delete(aRowId);
+    run.stage = "review";
+    return this.view(run);
+  }
+
+  undo(runId: string): RunView {
+    const run = this.requireRun(runId);
+    const entry = run.undoStack.at(-1);
+    if (!entry) throw new WorkflowError("nothing_to_undo", "There is no recent review decision to undo.", 409);
+    const decision = run.decisions.get(entry.candidateId);
+    if (!decision || decision.decisionId !== entry.decisionId) {
+      throw new WorkflowError("undo_state_changed", "The recent decision can no longer be undone safely.", 409);
+    }
+    const hasDependentResolution = entry.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution);
+    if (hasDependentResolution) {
+      throw new WorkflowError(
+        "undo_blocked_by_resolutions",
+        "Undo is blocked because a field conflict created by this SAME decision has already been resolved. Revert that field resolution first.",
+        409,
+      );
+    }
+    run.decisions.delete(entry.candidateId);
+    for (const conflictId of entry.createdConflictIds) run.conflicts.delete(conflictId);
+    if (entry.wasDeferred) run.deferredARowIds.add(decision.aRowId);
+    run.undoStack.pop();
+    run.stage = "review";
     return this.view(run);
   }
 
@@ -401,6 +462,13 @@ export class WorkflowStore {
       }
     }
     const onlyB = [...onlyBById.values()];
+    const reviewQueue = this.reviewQueue(run, candidates);
+    const reviewed = reviewQueue.filter((item) => item.state === "reviewed_same" || item.state === "reviewed_different").length;
+    const deferred = reviewQueue.filter((item) => item.state === "deferred").length;
+    const remaining = reviewQueue.filter((item) => item.state === "needs_review").length;
+    const undoEntry = run.undoStack.at(-1);
+    const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateId) : undefined;
+    const undoBlocked = undoEntry?.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution) ?? false;
     return {
       contractVersion: WORKFLOW_CONTRACT_VERSION,
       runId: run.runId,
@@ -425,9 +493,98 @@ export class WorkflowStore {
       candidates,
       decisions: [...run.decisions.values()],
       conflicts: [...run.conflicts.values()],
+      reviewQueue,
+      reviewProgress: { total: reviewQueue.length, reviewed, remaining, deferred },
+      reviewUndo: undoDecision ? {
+        decisionId: undoDecision.decisionId,
+        candidateId: undoDecision.candidateId,
+        aRowId: undoDecision.aRowId,
+        bRowId: undoDecision.bRowId,
+        humanDecision: undoDecision.humanDecision,
+        canUndo: !undoBlocked,
+        blockedReason: undoBlocked
+          ? "A dependent field resolution exists. Revert it before undoing this identity decision."
+          : null,
+      } : null,
       onlyA,
       onlyB,
     };
+  }
+
+  private reviewQueue(run: RunState, candidates: CandidatePair[]): ReviewQueueItem[] {
+    const groups = new Map<string, CandidatePair[]>();
+    for (const candidate of candidates) {
+      const group = groups.get(candidate.aRowId) ?? [];
+      group.push(candidate);
+      groups.set(candidate.aRowId, group);
+    }
+    const decisions = [...run.decisions.values()];
+    const queue: ReviewQueueItem[] = [];
+    let sourceOrder = 0;
+    for (const [aRowId, unsorted] of groups) {
+      const options = [...unsorted].sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+      const rowDecisions = decisions.filter((decision) => decision.aRowId === aRowId);
+      if (!options.some((candidate) => candidate.band === "needs_review") && rowDecisions.length === 0) continue;
+      const sameDecision = rowDecisions.find((decision) => decision.humanDecision === "same_entity");
+      const allDifferent = options.every((candidate) => run.decisions.get(candidate.candidateId)?.humanDecision === "different_entity");
+      const current = (sameDecision ? options.find((candidate) => candidate.candidateId === sameDecision.candidateId) : null)
+        ?? options.find((candidate) => !run.decisions.has(candidate.candidateId))
+        ?? options[0]!;
+      const isDeferred = !sameDecision && !allDifferent && run.deferredARowIds.has(aRowId);
+      const state = sameDecision
+        ? "reviewed_same" as const
+        : allDifferent
+          ? "reviewed_different" as const
+          : isDeferred
+            ? "deferred" as const
+            : "needs_review" as const;
+      const latestDecision = sameDecision ?? rowDecisions.at(-1) ?? null;
+      const strongestPositive = [...current.evidence]
+        .filter((evidence) => evidence.positiveContribution > 0)
+        .sort((left, right) => right.positiveContribution - left.positiveContribution)[0] ?? null;
+      const strongestContradiction = [...current.evidence]
+        .filter((evidence) => evidence.conflictContribution > 0)
+        .sort((left, right) => right.conflictContribution - left.conflictContribution)[0] ?? null;
+      const collisionARowIds = [...new Set(candidates
+        .filter((candidate) => candidate.bRowId === current.bRowId && candidate.aRowId !== aRowId)
+        .map((candidate) => candidate.aRowId))].sort();
+      queue.push({
+        aRowId,
+        candidateIds: options.map((candidate) => candidate.candidateId),
+        topCandidateId: current.candidateId,
+        topBRowId: current.bRowId,
+        topMatchScore: current.matchScore,
+        runnerUpMargin: current.runnerUpMargin,
+        candidateCount: options.length,
+        strongestPositive: strongestPositive ? {
+          mappingId: strongestPositive.mappingId,
+          label: strongestPositive.label,
+          evidenceClass: strongestPositive.evidenceClass,
+          contribution: strongestPositive.contribution,
+        } : null,
+        strongestContradiction: strongestContradiction ? {
+          mappingId: strongestContradiction.mappingId,
+          label: strongestContradiction.label,
+          evidenceClass: strongestContradiction.evidenceClass,
+          contribution: strongestContradiction.contribution,
+        } : null,
+        collision: current.collision || collisionARowIds.length > 0,
+        collisionARowIds,
+        strongContradiction: current.strongContradiction,
+        state,
+        deferred: isDeferred,
+        humanDecision: latestDecision ? {
+          candidateId: latestDecision.candidateId,
+          bRowId: latestDecision.bRowId,
+          humanDecision: latestDecision.humanDecision,
+          decidedAt: latestDecision.decidedAt,
+        } : null,
+        matcherVersion: MATCHER_VERSION,
+        sourceOrder,
+      });
+      sourceOrder += 1;
+    }
+    return queue;
   }
 }
 

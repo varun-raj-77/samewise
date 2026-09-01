@@ -149,6 +149,66 @@ export const FieldConflictSchema = z.object({
 }).strict();
 export type FieldConflict = z.infer<typeof FieldConflictSchema>;
 
+export const ReviewItemStateSchema = z.enum([
+  "needs_review",
+  "deferred",
+  "reviewed_same",
+  "reviewed_different",
+]);
+export type ReviewItemState = z.infer<typeof ReviewItemStateSchema>;
+
+export const ReviewEvidenceSummarySchema = z.object({
+  mappingId: z.string().min(1),
+  label: z.string().min(1),
+  evidenceClass: FieldEvidenceSchema.shape.evidenceClass,
+  contribution: z.number(),
+}).strict();
+
+export const ReviewQueueItemSchema = z.object({
+  aRowId: z.string().min(1),
+  candidateIds: z.array(z.string().min(1)).min(1),
+  topCandidateId: z.string().min(1),
+  topBRowId: z.string().min(1),
+  topMatchScore: z.number().min(0).max(1),
+  runnerUpMargin: z.number().min(0).max(1),
+  candidateCount: z.number().int().positive(),
+  strongestPositive: ReviewEvidenceSummarySchema.nullable(),
+  strongestContradiction: ReviewEvidenceSummarySchema.nullable(),
+  collision: z.boolean(),
+  collisionARowIds: z.array(z.string().min(1)),
+  strongContradiction: z.boolean(),
+  state: ReviewItemStateSchema,
+  deferred: z.boolean(),
+  humanDecision: IdentityDecisionSchema.pick({
+    candidateId: true,
+    bRowId: true,
+    humanDecision: true,
+    decidedAt: true,
+  }).nullable(),
+  matcherVersion: z.literal(MATCHER_VERSION),
+  sourceOrder: z.number().int().nonnegative(),
+}).strict();
+export type ReviewQueueItem = z.infer<typeof ReviewQueueItemSchema>;
+
+export const ReviewProgressSchema = z.object({
+  total: z.number().int().nonnegative(),
+  reviewed: z.number().int().nonnegative(),
+  remaining: z.number().int().nonnegative(),
+  deferred: z.number().int().nonnegative(),
+}).strict();
+export type ReviewProgress = z.infer<typeof ReviewProgressSchema>;
+
+export const ReviewUndoSchema = z.object({
+  decisionId: z.string().min(1),
+  candidateId: z.string().min(1),
+  aRowId: z.string().min(1),
+  bRowId: z.string().min(1),
+  humanDecision: z.enum(["same_entity", "different_entity"]),
+  canUndo: z.boolean(),
+  blockedReason: z.string().min(1).nullable(),
+}).strict();
+export type ReviewUndo = z.infer<typeof ReviewUndoSchema>;
+
 export const ResultSummarySchema = z.object({
   matched: z.number().int().nonnegative(),
   needsReview: z.number().int().nonnegative(),
@@ -177,6 +237,9 @@ export const RunViewSchema = z.object({
   candidates: z.array(CandidatePairSchema),
   decisions: z.array(IdentityDecisionSchema),
   conflicts: z.array(FieldConflictSchema),
+  reviewQueue: z.array(ReviewQueueItemSchema),
+  reviewProgress: ReviewProgressSchema,
+  reviewUndo: ReviewUndoSchema.nullable(),
   onlyA: MatcherResultSchema.shape.onlyA,
   onlyB: MatcherResultSchema.shape.onlyB,
 }).strict();

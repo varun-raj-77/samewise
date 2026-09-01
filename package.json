@@ -18,6 +18,8 @@
     "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
     "acceptance:sw004": "node apps/web/e2e/sw004-closeout.mjs",
     "acceptance:sw006": "node apps/web/e2e/sw006-closeout.mjs",
+    "acceptance:sw007:api": "node apps/web/e2e/sw007-api-closeout.mjs",
+    "acceptance:sw007:browser": "node apps/web/e2e/sw007-visible-closeout.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm python:lint && pnpm python:test"
   },
   "devDependencies": {
