@@ -1,0 +1,15 @@
+{
+  "mappings": [
+    {"mappingId":"organization-name","label":"Organization name","aColumn":"vendor_name","bColumn":"organization","role":"identity","normalizer":"text"},
+    {"mappingId":"phone","label":"Phone","aColumn":"phone","bColumn":"telephone","role":"identity","normalizer":"phone"},
+    {"mappingId":"email","label":"Email","aColumn":"contact_email","bColumn":"email_address","role":"identity","normalizer":"email"},
+    {"mappingId":"address","label":"Street address","aColumn":"street","bColumn":"address_line_1","role":"identity","normalizer":"text"},
+    {"mappingId":"city","label":"City","aColumn":"city","bColumn":"locality","role":"identity","normalizer":"text"},
+    {"mappingId":"region","label":"State or region","aColumn":"state","bColumn":"region","role":"identity","normalizer":"text"},
+    {"mappingId":"postal","label":"Postal code","aColumn":"zip","bColumn":"postal_code","role":"identity","normalizer":"text"},
+    {"mappingId":"website-domain","label":"Website domain","aColumn":"website","bColumn":"domain","role":"identity","normalizer":"text"},
+    {"mappingId":"status","label":"Status","aColumn":"account_status","bColumn":"status","role":"comparison","normalizer":"text"},
+    {"mappingId":"balance","label":"Balance","aColumn":"balance","bColumn":"outstanding_balance","role":"comparison","normalizer":"number"},
+    {"mappingId":"updated","label":"Updated at","aColumn":"updated_at","bColumn":"last_updated","role":"comparison","normalizer":"date"}
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "fixture": "organizations-dev-v1",
+  "runId": "run-86c39240-3e05-4d26-b5af-2925b6c7863f",
+  "recoveryRoute": "http://localhost:5173/?run=run-86c39240-3e05-4d26-b5af-2925b6c7863f&screen=review",
+  "initialSummary": {
+    "matched": 11,
+    "needsReview": 8,
+    "onlyA": 4,
+    "onlyB": 11
+  },
+  "initialProgress": {
+    "total": 8,
+    "reviewed": 0,
+    "remaining": 8,
+    "deferred": 0
+  },
+  "matcher": "explainable-matcher-v0.2.0",
+  "candidateEngine": "candidate-engine-v0.2.0",
+  "ambiguous": {
+    "aRowId": "A000012",
+    "candidateCount": 2,
+    "topBRowId": "B000005",
+    "alternateBRowId": "B000017"
+  },
+  "checks": {
+    "deferRoundTrip": true,
+    "sameDecisionStored": true,
+    "sameCreatedConflicts": true,
+    "sameAutomaticResolutionCount": 0,
+    "undoRemovedDecision": true,
+    "undoRemovedCreatedConflicts": true,
+    "differentCreatedConflictCount": 0,
+    "refreshRecovered": true,
+    "sourceImmutable": true
+  },
+  "finalProgress": {
+    "total": 8,
+    "reviewed": 2,
+    "remaining": 5,
+    "deferred": 1
+  },
+  "sourceHashesBefore": [
+    "33cd7600bb45b9e031b9b40c520a2bb4fb1a5b0213ca99823bf039381e8196a4",
+    "8c3ba23355ec76cfd8b745a31f8f2c2ddcc6dc39b428d6011d1dd785a1d70219"
+  ],
+  "sourceHashesAfter": [
+    "33cd7600bb45b9e031b9b40c520a2bb4fb1a5b0213ca99823bf039381e8196a4",
+    "8c3ba23355ec76cfd8b745a31f8f2c2ddcc6dc39b428d6011d1dd785a1d70219"
+  ]
+}

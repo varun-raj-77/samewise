@@ -1,0 +1,22 @@
+{
+  "patterns": [
+    {
+      "description": "Deliberately similar organizations that remain distinct entities.",
+      "left_canonical_entity_id": "entity_000001",
+      "pattern": "shared_name_tokens",
+      "right_canonical_entity_id": "entity_000002"
+    },
+    {
+      "description": "Deliberately similar organizations that remain distinct entities.",
+      "left_canonical_entity_id": "entity_000003",
+      "pattern": "service_line_extension",
+      "right_canonical_entity_id": "entity_000004"
+    },
+    {
+      "description": "Deliberately similar organizations that remain distinct entities.",
+      "left_canonical_entity_id": "entity_000005",
+      "pattern": "singular_related_service",
+      "right_canonical_entity_id": "entity_000006"
+    }
+  ]
+}

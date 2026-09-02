@@ -1,0 +1,1241 @@
+{
+  "baselineComparison": {
+    "delta": {
+      "autoMatchPrecision": 0.0,
+      "falseAutoMatches": 0,
+      "reviewRate": -0.274738068,
+      "top1TrueCandidateRate": 0.024852071
+    },
+    "hardNegativeAutoMatches": 0,
+    "matcherVersion": "baseline-matcher-v0.1.0",
+    "metrics": {
+      "autoMatchCount": 1,
+      "autoMatchPrecision": 1.0,
+      "autoMatchRecall": 0.001135074,
+      "autoMatchedARows": 1,
+      "belowReviewThresholdTruePairs": 2,
+      "candidateConditionalFeatureScoringCoverage": 1.0,
+      "candidateConditionalRetentionRate": 0.993071594,
+      "candidateConditionalReviewThresholdCoverage": 0.997690531,
+      "candidateMisses": 15,
+      "candidatePairs": 4352,
+      "candidateRecall": 0.982973893,
+      "candidateTruePairs": 866,
+      "endToEndRecovery": 0.976163451,
+      "falseAutoMatches": 0,
+      "matchableARows": 859,
+      "postScoreRetentionMisses": 4,
+      "recoverableMatchableARows": 839,
+      "retainedTruePairs": 860,
+      "reviewRate": 0.989522701,
+      "reviewRateDenominator": "A rows with at least one cross-source truth link",
+      "reviewRateDenominatorCount": 859,
+      "reviewRoutedARows": 850,
+      "scoredTruePairs": 866,
+      "sourceOnlyARows": 185,
+      "top1EligibleRows": 845,
+      "top1TrueCandidateRate": 0.965680473,
+      "top1TrueCandidateRows": 816,
+      "trueAutoMatches": 1,
+      "truePairsAtOrAboveReviewThreshold": 864,
+      "truePairsTotal": 881,
+      "truthUncoveredARows": 20,
+      "truthUncoveredAutoRows": 0,
+      "truthUncoveredReviewRows": 12,
+      "truthUncoveredUnmatchedRows": 8,
+      "unmatchedMatchableARows": 8
+    }
+  },
+  "candidateConfig": {
+    "enabledBlockers": [
+      "exact_strong_v1",
+      "name_token_v1",
+      "name_character_v1",
+      "location_name_v2",
+      "address_name_v2"
+    ],
+    "engineVersion": "candidate-engine-v0.2.0",
+    "maxBucketPairCount": 100,
+    "maxBucketSizePerSide": 20,
+    "namePrefixLength": 4,
+    "normalizationVersion": "blocking-normalization-v0.1.0",
+    "stopTokens": [
+      "and",
+      "company",
+      "corporation",
+      "group",
+      "inc",
+      "incorporated",
+      "llc",
+      "ltd",
+      "limited",
+      "of",
+      "services",
+      "solutions",
+      "the"
+    ]
+  },
+  "candidateEngineVersion": "candidate-engine-v0.2.0",
+  "decomposition": {
+    "aRowLevel": {
+      "autoMatchedARows": 236,
+      "matchableARows": 859,
+      "recoverableMatchableARows": 844,
+      "reviewRoutedARows": 614,
+      "truthUncoveredARows": 15,
+      "truthUncoveredAutoRows": 0,
+      "truthUncoveredReviewRows": 6,
+      "truthUncoveredUnmatchedRows": 9,
+      "unmatchedMatchableARows": 9
+    },
+    "pairLevel": {
+      "candidateMissedTrueLinks": 15,
+      "candidateRetainedTrueLinks": 866,
+      "endToEndRecoverableTrueLinks": 865,
+      "featureScoredTrueLinks": 866,
+      "postScoreRetentionMisses": 0,
+      "totalTrueCrossSourceLinks": 881,
+      "trueLinksAtOrAboveReviewThreshold": 865,
+      "trueLinksBelowReviewThreshold": 1
+    }
+  },
+  "evaluationVersion": "matcher-evaluation-v0.2.0",
+  "featurePipelineVersion": "feature-pipeline-v0.1.0",
+  "fixture": {
+    "actual_counts": {
+      "a_only_entities": 180,
+      "b_only_entities": 180,
+      "canonical_entities": 1200,
+      "duplicate_rows_a": 24,
+      "duplicate_rows_b": 24,
+      "hard_negative_pairs": 3,
+      "overlapping_entities": 840,
+      "theoretical_cross_source_pairs": 1089936,
+      "true_cross_source_pairs": 881,
+      "visible_rows_a": 1044,
+      "visible_rows_b": 1044
+    },
+    "artifacts": {
+      "canonical_entities": {
+        "path": "fixtures/canonical/organizations/organizations-matcher-tune-1200-v1/canonical_entities.jsonl",
+        "sha256": "1aebac63d6592d1456deceaa41e1e9fc2e4601dfd82a213b35135f0f8168f327"
+      },
+      "config": {
+        "path": "evaluation/benchmarks/organizations-matcher-tune-1200-v1/config.json",
+        "sha256": "a59243c659d2a1e74b1439d282f004b91279864a99baa196cc8c7f9c5e2ca6a2"
+      },
+      "corruption_provenance": {
+        "path": "fixtures/ground-truth/organizations/organizations-matcher-tune-1200-v1/corruption_provenance.jsonl",
+        "sha256": "c89276c1d2e173a37f751cf5cfc5f2482221e25cc717f08968cfc06d2ca798c8"
+      },
+      "dataset_a": {
+        "path": "fixtures/corrupted/organizations/organizations-matcher-tune-1200-v1/dataset_a.csv",
+        "sha256": "0d899365205c39b57d5f08071a03b19cbb855e27befd21e574c7d47a859ecde5"
+      },
+      "dataset_b": {
+        "path": "fixtures/corrupted/organizations/organizations-matcher-tune-1200-v1/dataset_b.csv",
+        "sha256": "599d4583d5b7ed0cac93e9541e1c84cd796eec288b93e5f983f1eabf00d4ce36"
+      },
+      "hard_negatives": {
+        "path": "fixtures/adversarial/organizations/organizations-matcher-tune-1200-v1/hard_negatives.json",
+        "sha256": "d9215986fbf35df8b493babc8c6ba04701143841f0827cde01b2683cc1cf7cd8"
+      },
+      "identity_truth": {
+        "path": "fixtures/ground-truth/organizations/organizations-matcher-tune-1200-v1/identity_truth.json",
+        "sha256": "54cc106cbc16f4b7e45b702789b6cf6ebe4b4519e1493e3aa77bf726523e68fa"
+      },
+      "schema_mapping": {
+        "path": "fixtures/ground-truth/organizations/organizations-matcher-tune-1200-v1/schema_mapping.json",
+        "sha256": "5fb87f959d890a6020f0baca9462e3b57dc94f2a86b39824668455b5f9c6d3c6"
+      },
+      "summary": {
+        "path": "evaluation/reports/organizations-matcher-tune-1200-v1/summary.md",
+        "sha256": "2306f9475df2ded42a5d02de741d51de556ba29aacb5298b04f09c5cbdc32415"
+      }
+    },
+    "base_generator_version": "fixture-generator-v0.1.0",
+    "corruption_counts_by_strategy": {
+      "abbreviation": 15,
+      "case_change": 338,
+      "corporate_suffix_variation": 312,
+      "country_code_added": 353,
+      "domain_typo": 62,
+      "extended_format": 223,
+      "format_change": 1112,
+      "incorrect_value": 47,
+      "local_part_case": 361,
+      "missing_street_type": 159,
+      "missing_value": 399,
+      "one_digit_error": 74,
+      "punctuation_spacing": 283,
+      "small_typo": 150,
+      "source_business_value": 1220,
+      "source_timestamp_shift": 1114,
+      "stale_address": 86,
+      "street_type_abbreviation": 602,
+      "token_deletion": 112,
+      "token_spacing": 91,
+      "weak_policy_digit_corruption": 766,
+      "weak_policy_format": 209,
+      "weak_policy_missing": 2671,
+      "weak_policy_stale": 863,
+      "weak_policy_typo": 791
+    },
+    "fixture_format_version": "1.0.0",
+    "fixture_name": "organizations-matcher-tune-1200-v1",
+    "generator_version": "weak-identifier-fixture-generator-v0.1.0",
+    "hard_negative_patterns": [
+      "shared_name_tokens",
+      "service_line_extension",
+      "singular_related_service"
+    ],
+    "requested_config": {
+      "baseFixture": {
+        "a_only_rate": 0.15,
+        "b_only_rate": 0.15,
+        "canonical_entity_count": 1200,
+        "corruption": {
+          "address_abbreviation_rate": 0.3,
+          "address_format_rate": 0.14,
+          "address_missing_component_rate": 0.07,
+          "address_stale_rate": 0.04,
+          "business_conflict_rate": 0.28,
+          "email_case_rate": 0.18,
+          "email_missing_rate": 0.08,
+          "email_typo_rate": 0.035,
+          "name_abbreviation_rate": 0.08,
+          "name_case_rate": 0.18,
+          "name_punctuation_rate": 0.1,
+          "name_spacing_rate": 0.05,
+          "name_suffix_rate": 0.24,
+          "name_token_deletion_rate": 0.05,
+          "name_typo_rate": 0.08,
+          "phone_country_code_rate": 0.16,
+          "phone_digit_error_rate": 0.04,
+          "phone_format_rate": 0.55,
+          "phone_missing_rate": 0.08,
+          "postal_format_rate": 0.1,
+          "postal_incorrect_rate": 0.025,
+          "postal_missing_rate": 0.04,
+          "profile": "moderate",
+          "timestamp_shift_rate": 0.55
+        },
+        "duplicate_rows_a": 24,
+        "duplicate_rows_b": 24,
+        "fixture_name": "organizations-matcher-tune-1200-v1",
+        "hard_negative_pairs": 3,
+        "overlap_rate": 0.7,
+        "seed": 6061
+      },
+      "fixtureGeneratorVersion": "weak-identifier-fixture-generator-v0.1.0",
+      "weakIdentifierPolicy": {
+        "domainFormatVariationRate": 0.1,
+        "domainMissingRate": 0.45,
+        "domainStaleRate": 0.4,
+        "emailMissingRate": 0.45,
+        "emailTypoRate": 0.4,
+        "phoneDigitCorruptionRate": 0.4,
+        "phoneMissingRate": 0.45,
+        "policyVersion": "weak-identifier-policy-v0.1.0",
+        "seed": 9061
+      }
+    },
+    "schema_mapping_version": "organizations-schema-v1",
+    "seed": 6061,
+    "weak_identifier_policy_version": "weak-identifier-policy-v0.1.0"
+  },
+  "hardNegatives": [
+    {
+      "aRowId": "A000180",
+      "autoMatched": false,
+      "bRowId": "B000667",
+      "isTopCandidate": false,
+      "matchScore": 0.073386,
+      "pattern": "shared_name_tokens",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000212",
+      "autoMatched": false,
+      "bRowId": "B000529",
+      "isTopCandidate": false,
+      "matchScore": 0.106583,
+      "pattern": "singular_related_service",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000366",
+      "autoMatched": false,
+      "bRowId": "B000959",
+      "isTopCandidate": false,
+      "matchScore": 0.224536,
+      "pattern": "service_line_extension",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000637",
+      "autoMatched": false,
+      "bRowId": "B000429",
+      "isTopCandidate": false,
+      "matchScore": 0.080721,
+      "pattern": "singular_related_service",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000722",
+      "autoMatched": false,
+      "bRowId": "B000277",
+      "isTopCandidate": false,
+      "matchScore": 0.095656,
+      "pattern": "shared_name_tokens",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000953",
+      "autoMatched": false,
+      "bRowId": "B000691",
+      "isTopCandidate": false,
+      "matchScore": 0.124536,
+      "pattern": "service_line_extension",
+      "rank": 2
+    }
+  ],
+  "matcherConfig": {
+    "blockingNormalizationVersion": "blocking-normalization-v0.1.0",
+    "candidateEngineVersion": "candidate-engine-v0.2.0",
+    "configVersion": "matcher-config-v0.2.0",
+    "conflictMultipliers": {
+      "address": 0.2,
+      "city": 0.2,
+      "domain": 0.15,
+      "email": 0.2,
+      "name": 0.1,
+      "other": 0.25,
+      "phone": 0.15,
+      "postal": 0.2,
+      "region": 0.2
+    },
+    "decisions": {
+      "alternativeFloor": 0.25,
+      "alternativeWindow": 0.3,
+      "autoMatchThreshold": 0.5,
+      "collisionPolicy": "route_to_review",
+      "contradictionPolicy": "block_auto_match",
+      "maxAlternatives": 3,
+      "minimumAutoAgreementFields": 2,
+      "minimumTopCandidateMargin": 0.04,
+      "reviewThreshold": 0.25
+    },
+    "featurePipelineVersion": "feature-pipeline-v0.1.0",
+    "frozen": true,
+    "matcherVersion": "explainable-matcher-v0.2.0",
+    "tunedOnFixture": "organizations-matcher-tune-1200-v1",
+    "weights": {
+      "address": 1.5,
+      "city": 0.3,
+      "domain": 1.0,
+      "email": 1.5,
+      "name": 2.0,
+      "other": 0.5,
+      "phone": 1.5,
+      "postal": 0.6,
+      "region": 0.3
+    }
+  },
+  "matcherVersion": "explainable-matcher-v0.2.0",
+  "metrics": {
+    "autoMatchCount": 236,
+    "autoMatchPrecision": 1.0,
+    "autoMatchRecall": 0.267877412,
+    "autoMatchedARows": 236,
+    "belowReviewThresholdTruePairs": 1,
+    "candidateConditionalFeatureScoringCoverage": 1.0,
+    "candidateConditionalRetentionRate": 0.998845266,
+    "candidateConditionalReviewThresholdCoverage": 0.998845266,
+    "candidateMisses": 15,
+    "candidatePairs": 4352,
+    "candidateRecall": 0.982973893,
+    "candidateTruePairs": 866,
+    "endToEndRecovery": 0.98183882,
+    "falseAutoMatches": 0,
+    "hardNegativeAutoMatches": 0,
+    "hardNegativeCandidatePairs": 6,
+    "matchableARows": 859,
+    "postScoreRetentionMisses": 0,
+    "recoverableMatchableARows": 844,
+    "retainedTruePairs": 865,
+    "reviewRate": 0.714784633,
+    "reviewRateDenominator": "A rows with at least one cross-source truth link",
+    "reviewRateDenominatorCount": 859,
+    "reviewRoutedARows": 614,
+    "scoredTruePairs": 866,
+    "sourceOnlyARows": 185,
+    "top1EligibleRows": 845,
+    "top1TrueCandidateRate": 0.990532544,
+    "top1TrueCandidateRows": 837,
+    "trueAutoMatches": 236,
+    "truePairsAtOrAboveReviewThreshold": 865,
+    "truePairsTotal": 881,
+    "truthUncoveredARows": 15,
+    "truthUncoveredAutoRows": 0,
+    "truthUncoveredReviewRows": 6,
+    "truthUncoveredUnmatchedRows": 9,
+    "unmatchedMatchableARows": 9
+  },
+  "phase": "tuning",
+  "postScoreRetentionLosses": [],
+  "rankingMisses": [
+    {
+      "aRowId": "A000028",
+      "bestTrueBRowId": "B000725",
+      "bestTrueEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.247436,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.385715,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.411856,
+      "falseTopBRowId": "B000848",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.175,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.451149
+    },
+    {
+      "aRowId": "A000060",
+      "bestTrueBRowId": "B000354",
+      "bestTrueEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.263724,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 1.5,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.438359,
+      "falseTopBRowId": "B000235",
+      "falseTopEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.428572,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.332955,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.443854
+    },
+    {
+      "aRowId": "A000201",
+      "bestTrueBRowId": "B000072",
+      "bestTrueEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 1.5,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.454023,
+      "falseTopBRowId": "B000212",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.142106,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.45493
+    },
+    {
+      "aRowId": "A000384",
+      "bestTrueBRowId": "B000221",
+      "bestTrueEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.342858,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.385715,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.319376,
+      "falseTopBRowId": "B000029",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.161112,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.349297
+    },
+    {
+      "aRowId": "A000472",
+      "bestTrueBRowId": "B000006",
+      "bestTrueEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.15,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 1.5,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.373563,
+      "falseTopBRowId": "B000848",
+      "falseTopEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.2,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.16712,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.39852
+    },
+    {
+      "aRowId": "A000482",
+      "bestTrueBRowId": "B000941",
+      "bestTrueEvidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 0.803,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.225,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 1.5,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.376782,
+      "falseTopBRowId": "B000186",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.225,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.355682,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.382837
+    },
+    {
+      "aRowId": "A000803",
+      "bestTrueBRowId": "B000099",
+      "bestTrueEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.114583,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.380987,
+      "falseTopBRowId": "B000936",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.181579,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.433152
+    },
+    {
+      "aRowId": "A000879",
+      "bestTrueBRowId": "B000254",
+      "bestTrueEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.225,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.31875,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "bestTrueScore": 0.378592,
+      "falseTopBRowId": "B001037",
+      "falseTopEvidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "falseTopScore": 0.454023
+    }
+  ],
+  "scoreBands": [
+    {
+      "band": "0.0-0.1",
+      "candidateCount": 143,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 143,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.1-0.2",
+      "candidateCount": 771,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 771,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.2-0.3",
+      "candidateCount": 1656,
+      "empiricalMatchRate": 0.002415459,
+      "falseMatchCount": 1652,
+      "trueMatchCount": 4
+    },
+    {
+      "band": "0.3-0.4",
+      "candidateCount": 864,
+      "empiricalMatchRate": 0.05787037,
+      "falseMatchCount": 814,
+      "trueMatchCount": 50
+    },
+    {
+      "band": "0.4-0.5",
+      "candidateCount": 439,
+      "empiricalMatchRate": 0.758542141,
+      "falseMatchCount": 106,
+      "trueMatchCount": 333
+    },
+    {
+      "band": "0.5-0.6",
+      "candidateCount": 345,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 345
+    },
+    {
+      "band": "0.6-0.7",
+      "candidateCount": 120,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 120
+    },
+    {
+      "band": "0.7-0.8",
+      "candidateCount": 13,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 13
+    },
+    {
+      "band": "0.8-0.9",
+      "candidateCount": 1,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 1
+    },
+    {
+      "band": "0.9-1.0",
+      "candidateCount": 0,
+      "empiricalMatchRate": null,
+      "falseMatchCount": 0,
+      "trueMatchCount": 0
+    }
+  ],
+  "thresholdSelection": {
+    "minimumRequiredAutoMatchPrecision": 0.995,
+    "searchCandidates": 1914,
+    "selectedMetrics": {
+      "autoMatchCount": 236,
+      "autoMatchPrecision": 1.0,
+      "autoMatchRecall": 0.267877412,
+      "autoMatchedARows": 236,
+      "belowReviewThresholdTruePairs": 1,
+      "candidateConditionalFeatureScoringCoverage": 1.0,
+      "candidateConditionalRetentionRate": 0.998845266,
+      "candidateConditionalReviewThresholdCoverage": 0.998845266,
+      "candidateMisses": 15,
+      "candidatePairs": 4352,
+      "candidateRecall": 0.982973893,
+      "candidateTruePairs": 866,
+      "endToEndRecovery": 0.98183882,
+      "falseAutoMatches": 0,
+      "matchableARows": 859,
+      "postScoreRetentionMisses": 0,
+      "recoverableMatchableARows": 844,
+      "retainedTruePairs": 865,
+      "reviewRate": 0.714784633,
+      "reviewRateDenominator": "A rows with at least one cross-source truth link",
+      "reviewRateDenominatorCount": 859,
+      "reviewRoutedARows": 614,
+      "scoredTruePairs": 866,
+      "sourceOnlyARows": 185,
+      "top1EligibleRows": 845,
+      "top1TrueCandidateRate": 0.990532544,
+      "top1TrueCandidateRows": 837,
+      "trueAutoMatches": 236,
+      "truePairsAtOrAboveReviewThreshold": 865,
+      "truePairsTotal": 881,
+      "truthUncoveredARows": 15,
+      "truthUncoveredAutoRows": 0,
+      "truthUncoveredReviewRows": 6,
+      "truthUncoveredUnmatchedRows": 9,
+      "unmatchedMatchableARows": 9
+    },
+    "selectedRules": {
+      "alternativeFloor": 0.25,
+      "alternativeWindow": 0.3,
+      "autoMatchThreshold": 0.5,
+      "collisionPolicy": "route_to_review",
+      "contradictionPolicy": "block_auto_match",
+      "maxAlternatives": 3,
+      "minimumAutoAgreementFields": 2,
+      "minimumTopCandidateMargin": 0.04,
+      "reviewThreshold": 0.25
+    }
+  }
+}

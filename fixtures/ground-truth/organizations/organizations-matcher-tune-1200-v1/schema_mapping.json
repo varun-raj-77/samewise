@@ -1,0 +1,77 @@
+{
+  "fields": [
+    {
+      "dataset_a_column": "vendor_id",
+      "dataset_b_column": "organization_ref",
+      "role": "source_identifier",
+      "semantic_field": "source_row_id"
+    },
+    {
+      "dataset_a_column": "vendor_name",
+      "dataset_b_column": "organization",
+      "role": "identity_evidence",
+      "semantic_field": "organization_name"
+    },
+    {
+      "dataset_a_column": "phone",
+      "dataset_b_column": "telephone",
+      "role": "identity_evidence",
+      "semantic_field": "phone"
+    },
+    {
+      "dataset_a_column": "contact_email",
+      "dataset_b_column": "email_address",
+      "role": "identity_evidence",
+      "semantic_field": "email"
+    },
+    {
+      "dataset_a_column": "street",
+      "dataset_b_column": "address_line_1",
+      "role": "identity_evidence",
+      "semantic_field": "street_address"
+    },
+    {
+      "dataset_a_column": "city",
+      "dataset_b_column": "locality",
+      "role": "identity_evidence",
+      "semantic_field": "city"
+    },
+    {
+      "dataset_a_column": "state",
+      "dataset_b_column": "region",
+      "role": "identity_evidence",
+      "semantic_field": "state_region"
+    },
+    {
+      "dataset_a_column": "zip",
+      "dataset_b_column": "postal_code",
+      "role": "identity_evidence",
+      "semantic_field": "postal_code"
+    },
+    {
+      "dataset_a_column": "website",
+      "dataset_b_column": "domain",
+      "role": "identity_evidence",
+      "semantic_field": "website_domain"
+    },
+    {
+      "dataset_a_column": "account_status",
+      "dataset_b_column": "status",
+      "role": "business_value",
+      "semantic_field": "status"
+    },
+    {
+      "dataset_a_column": "balance",
+      "dataset_b_column": "outstanding_balance",
+      "role": "business_value",
+      "semantic_field": "balance"
+    },
+    {
+      "dataset_a_column": "updated_at",
+      "dataset_b_column": "last_updated",
+      "role": "business_value",
+      "semantic_field": "updated_at"
+    }
+  ],
+  "schema_mapping_version": "organizations-schema-v1"
+}

@@ -1,0 +1,67 @@
+{
+  "reportVersion": "candidate-falsification-report-v0.2.0",
+  "fixture": {
+    "name": "organizations-weak-identifiers-1500-v1",
+    "generatorVersion": "weak-identifier-fixture-generator-v0.1.0",
+    "baseGeneratorVersion": "fixture-generator-v0.1.0",
+    "policyVersion": "weak-identifier-policy-v0.1.0",
+    "baseSeed": 5051,
+    "policySeed": 9051,
+    "canonicalEntities": 1500,
+    "aRows": 1305,
+    "bRows": 1305,
+    "theoreticalPairs": 1703025,
+    "truePairs": 1101,
+    "strongIdentifierTruePairs": 58,
+    "weakIdentifierTruePairs": 1043
+  },
+  "engineComparison": [
+    {"engine":"candidate-engine-v0.1.0","candidatePairs":2369,"reductionRatio":718.879274,"truePairsRetained":1070,"truePairsMissed":31,"candidateRecall":0.971843778,"weakTruePairsRetained":1012,"weakTruePairsTotal":1043,"weakCandidateRecall":0.970278044},
+    {"engine":"candidate-engine-v0.2.0","candidatePairs":2651,"reductionRatio":642.408525,"truePairsRetained":1093,"truePairsMissed":8,"candidateRecall":0.992733878,"weakTruePairsRetained":1035,"weakTruePairsTotal":1043,"weakCandidateRecall":0.992329818}
+  ],
+  "v0.2.0Ablations": [
+    {"variant":"full","candidatePairs":2651,"reductionRatio":642.408525,"retained":1093,"missed":8,"recall":0.992733878,"weakRetained":1035,"weakTotal":1043,"weakRecall":0.992329818,"unique":{"address_name_v2":129,"exact_strong_v1":2,"location_name_v2":1314,"name_character_v1":93,"name_token_v1":83}},
+    {"variant":"exact_only","candidatePairs":60,"reductionRatio":28383.75,"retained":58,"missed":1043,"recall":0.052679382,"weakRetained":0,"weakTotal":1043,"weakRecall":0.0,"unique":{"exact_strong_v1":60}},
+    {"variant":"without_exact_strong_v1","candidatePairs":2649,"reductionRatio":642.893545,"retained":1093,"missed":8,"recall":0.992733878,"weakRetained":1035,"weakTotal":1043,"weakRecall":0.992329818,"unique":{"address_name_v2":134,"location_name_v2":1314,"name_character_v1":93,"name_token_v1":83}},
+    {"variant":"without_name_token_v1","candidatePairs":2568,"reductionRatio":663.171729,"retained":1093,"missed":8,"recall":0.992733878,"weakRetained":1035,"weakTotal":1043,"weakRecall":0.992329818,"unique":{"address_name_v2":129,"exact_strong_v1":2,"location_name_v2":1350,"name_character_v1":118}},
+    {"variant":"without_name_character_v1","candidatePairs":2558,"reductionRatio":665.764269,"retained":1093,"missed":8,"recall":0.992733878,"weakRetained":1035,"weakTotal":1043,"weakRecall":0.992329818,"unique":{"address_name_v2":129,"exact_strong_v1":2,"location_name_v2":1315,"name_token_v1":108}},
+    {"variant":"without_location_name_v2","candidatePairs":1337,"reductionRatio":1273.765894,"retained":1082,"missed":19,"recall":0.982742961,"weakRetained":1024,"weakTotal":1043,"weakRecall":0.981783317,"unique":{"address_name_v2":363,"exact_strong_v1":2,"name_character_v1":94,"name_token_v1":119}},
+    {"variant":"without_address_name_v2","candidatePairs":2522,"reductionRatio":675.267645,"retained":1002,"missed":99,"recall":0.910081744,"weakRetained":944,"weakTotal":1043,"weakRecall":0.905081496,"unique":{"exact_strong_v1":7,"location_name_v2":1548,"name_character_v1":93,"name_token_v1":83}}
+  ],
+  "suppression": {
+    "keysSuppressed": 437,
+    "perKeyRelationshipsSuppressed": 1014725,
+    "truePairsWithSuppressedUsefulKey": 1095,
+    "truePairsRetainedDespiteSuppression": 1088,
+    "truePairsRescuedByDifferentBlocker": 1020,
+    "truePairsMissedAfterSuppression": 7
+  },
+  "hardNegatives": {
+    "knownCrossSourcePairs": 6,
+    "candidatePairsEntered": 6,
+    "coverage": 1.0,
+    "blockerCounts": {"name_character_v1": 6, "name_token_v1": 6}
+  },
+  "weakTruePairsRetainedByBlocker": {
+    "address_name_v2": 964,
+    "location_name_v2": 944,
+    "name_character_v1": 318,
+    "name_token_v1": 699
+  },
+  "remainingMisses": [
+    {"aRowId":"A000196","bRowId":"B000467","cause":"name typo plus stale address; broad shared keys suppressed"},
+    {"aRowId":"A000254","bRowId":"B000384","cause":"name typo and token deletion; no contextual compact-name intersection"},
+    {"aRowId":"A000475","bRowId":"B000197","cause":"name spacing plus stale address; broad shared keys suppressed"},
+    {"aRowId":"A000581","bRowId":"B001074","cause":"name token deletion plus stale address; broad shared keys suppressed"},
+    {"aRowId":"A000856","bRowId":"B001183","cause":"name deletion and spacing plus stale address; broad shared keys suppressed"},
+    {"aRowId":"A000921","bRowId":"B001122","cause":"independent name typos plus incomplete address; no blocking-key intersection"},
+    {"aRowId":"A001079","bRowId":"B000786","cause":"name token deletion plus stale address; broad shared keys suppressed"},
+    {"aRowId":"A001258","bRowId":"B000618","cause":"name deletion and spacing; character key suppressed and contextual compact names differ"}
+  ],
+  "originalFixtureRegression": [
+    {"fixture":"organizations-dev-v1","candidatePairs":131,"reductionRatio":3.862595,"retained":21,"total":21},
+    {"fixture":"organizations-candidates-1k-v1","candidatePairs":4370,"reductionRatio":173.203661,"retained":738,"total":738},
+    {"fixture":"organizations-candidates-10k-v1","candidatePairs":13801,"reductionRatio":5359.031954,"retained":7164,"total":7164}
+  ],
+  "scopeWarning": "Candidate recall is not final matching recall, precision, or scoring evidence."
+}

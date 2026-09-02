@@ -13,9 +13,14 @@
     "lint": "pnpm exec eslint apps packages --max-warnings=0",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "python:lint": "uv run --project services/matcher ruff check services/matcher",
-    "python:test": "uv run --project services/matcher pytest services/matcher --basetemp .samewise-data/pytest-tmp",
+    "python:lint": "node scripts/run-python-check.mjs lint",
+    "python:test": "node scripts/run-python-check.mjs test",
     "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
+    "acceptance:sw004": "node apps/web/e2e/sw004-closeout.mjs",
+    "acceptance:sw006": "node apps/web/e2e/sw006-closeout.mjs",
+    "acceptance:sw007:api": "node apps/web/e2e/sw007-api-closeout.mjs",
+    "acceptance:sw007:browser": "node apps/web/e2e/sw007-visible-closeout.mjs",
+    "acceptance:sw008:browser": "node apps/web/e2e/sw008-visible-closeout.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm python:lint && pnpm python:test"
   },
   "devDependencies": {

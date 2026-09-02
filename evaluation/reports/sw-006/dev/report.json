@@ -1,0 +1,463 @@
+{
+  "baselineComparison": {
+    "delta": {
+      "autoMatchPrecision": 0.0,
+      "falseAutoMatches": 0,
+      "reviewRate": 0.052631579,
+      "top1TrueCandidateRate": 0.0
+    },
+    "hardNegativeAutoMatches": 0,
+    "matcherVersion": "baseline-matcher-v0.1.0",
+    "metrics": {
+      "autoMatchCount": 12,
+      "autoMatchPrecision": 1.0,
+      "autoMatchRecall": 0.571428571,
+      "autoMatchedARows": 12,
+      "belowReviewThresholdTruePairs": 0,
+      "candidateConditionalFeatureScoringCoverage": 1.0,
+      "candidateConditionalRetentionRate": 1.0,
+      "candidateConditionalReviewThresholdCoverage": 1.0,
+      "candidateMisses": 0,
+      "candidatePairs": 131,
+      "candidateRecall": 1.0,
+      "candidateTruePairs": 21,
+      "endToEndRecovery": 1.0,
+      "falseAutoMatches": 0,
+      "matchableARows": 19,
+      "postScoreRetentionMisses": 0,
+      "recoverableMatchableARows": 19,
+      "retainedTruePairs": 21,
+      "reviewRate": 0.368421053,
+      "reviewRateDenominator": "A rows with at least one cross-source truth link",
+      "reviewRateDenominatorCount": 19,
+      "reviewRoutedARows": 7,
+      "scoredTruePairs": 21,
+      "sourceOnlyARows": 4,
+      "top1EligibleRows": 19,
+      "top1TrueCandidateRate": 1.0,
+      "top1TrueCandidateRows": 19,
+      "trueAutoMatches": 12,
+      "truePairsAtOrAboveReviewThreshold": 21,
+      "truePairsTotal": 21,
+      "truthUncoveredARows": 0,
+      "truthUncoveredAutoRows": 0,
+      "truthUncoveredReviewRows": 0,
+      "truthUncoveredUnmatchedRows": 0,
+      "unmatchedMatchableARows": 0
+    }
+  },
+  "candidateConfig": {
+    "enabledBlockers": [
+      "exact_strong_v1",
+      "name_token_v1",
+      "name_character_v1",
+      "location_name_v2",
+      "address_name_v2"
+    ],
+    "engineVersion": "candidate-engine-v0.2.0",
+    "maxBucketPairCount": 100,
+    "maxBucketSizePerSide": 20,
+    "namePrefixLength": 4,
+    "normalizationVersion": "blocking-normalization-v0.1.0",
+    "stopTokens": [
+      "and",
+      "company",
+      "corporation",
+      "group",
+      "inc",
+      "incorporated",
+      "llc",
+      "ltd",
+      "limited",
+      "of",
+      "services",
+      "solutions",
+      "the"
+    ]
+  },
+  "candidateEngineVersion": "candidate-engine-v0.2.0",
+  "decomposition": {
+    "aRowLevel": {
+      "autoMatchedARows": 11,
+      "matchableARows": 19,
+      "recoverableMatchableARows": 19,
+      "reviewRoutedARows": 8,
+      "truthUncoveredARows": 0,
+      "truthUncoveredAutoRows": 0,
+      "truthUncoveredReviewRows": 0,
+      "truthUncoveredUnmatchedRows": 0,
+      "unmatchedMatchableARows": 0
+    },
+    "pairLevel": {
+      "candidateMissedTrueLinks": 0,
+      "candidateRetainedTrueLinks": 21,
+      "endToEndRecoverableTrueLinks": 21,
+      "featureScoredTrueLinks": 21,
+      "postScoreRetentionMisses": 0,
+      "totalTrueCrossSourceLinks": 21,
+      "trueLinksAtOrAboveReviewThreshold": 21,
+      "trueLinksBelowReviewThreshold": 0
+    }
+  },
+  "evaluationVersion": "matcher-evaluation-v0.2.0",
+  "featurePipelineVersion": "feature-pipeline-v0.1.0",
+  "fixture": {
+    "actual_counts": {
+      "a_only_entities": 4,
+      "b_only_entities": 3,
+      "canonical_entities": 24,
+      "duplicate_rows_a": 2,
+      "duplicate_rows_b": 2,
+      "hard_negative_pairs": 3,
+      "overlapping_entities": 17,
+      "theoretical_cross_source_pairs": 506,
+      "true_cross_source_pairs": 21,
+      "visible_rows_a": 23,
+      "visible_rows_b": 22
+    },
+    "artifacts": {
+      "canonical_entities": {
+        "path": "fixtures/canonical/organizations/organizations-dev-v1/canonical_entities.jsonl",
+        "sha256": "9ad5fa0729c99f5fefd5f55a906fb54aeab686a91c895485e32cc92d98c3e8ba"
+      },
+      "config": {
+        "path": "evaluation/benchmarks/organizations-dev-v1/config.json",
+        "sha256": "219d3fe3c1f46f9d6f0c372bad107949750d2193b3e730698e16e91e1445dd76"
+      },
+      "corruption_provenance": {
+        "path": "fixtures/ground-truth/organizations/organizations-dev-v1/corruption_provenance.jsonl",
+        "sha256": "9f1eba5ace0c43b0d3d44c2d23600b8ef7b10bb0f65d0c836db66ffaf3e04c89"
+      },
+      "dataset_a": {
+        "path": "fixtures/corrupted/organizations/organizations-dev-v1/dataset_a.csv",
+        "sha256": "33cd7600bb45b9e031b9b40c520a2bb4fb1a5b0213ca99823bf039381e8196a4"
+      },
+      "dataset_b": {
+        "path": "fixtures/corrupted/organizations/organizations-dev-v1/dataset_b.csv",
+        "sha256": "8c3ba23355ec76cfd8b745a31f8f2c2ddcc6dc39b428d6011d1dd785a1d70219"
+      },
+      "hard_negatives": {
+        "path": "fixtures/adversarial/organizations/organizations-dev-v1/hard_negatives.json",
+        "sha256": "d9215986fbf35df8b493babc8c6ba04701143841f0827cde01b2683cc1cf7cd8"
+      },
+      "identity_truth": {
+        "path": "fixtures/ground-truth/organizations/organizations-dev-v1/identity_truth.json",
+        "sha256": "b1a14c048764d5aeda33b723d420563c508940833447b8b0509bad75cd628edb"
+      },
+      "schema_mapping": {
+        "path": "fixtures/ground-truth/organizations/organizations-dev-v1/schema_mapping.json",
+        "sha256": "5fb87f959d890a6020f0baca9462e3b57dc94f2a86b39824668455b5f9c6d3c6"
+      },
+      "summary": {
+        "path": "evaluation/reports/organizations-dev-v1/summary.md",
+        "sha256": "eb92141ca0a1636a0cdcd9306e034cb32f78abc1cdf125004b65df0161fae616"
+      }
+    },
+    "corruption_counts_by_strategy": {
+      "case_change": 6,
+      "corporate_suffix_variation": 3,
+      "country_code_added": 6,
+      "domain_typo": 1,
+      "extended_format": 6,
+      "format_change": 27,
+      "local_part_case": 11,
+      "missing_street_type": 4,
+      "missing_value": 7,
+      "one_digit_error": 3,
+      "punctuation_spacing": 2,
+      "small_typo": 4,
+      "source_business_value": 34,
+      "source_timestamp_shift": 21,
+      "stale_address": 1,
+      "street_type_abbreviation": 18,
+      "token_spacing": 2
+    },
+    "fixture_format_version": "1.0.0",
+    "fixture_name": "organizations-dev-v1",
+    "generator_version": "fixture-generator-v0.1.0",
+    "hard_negative_patterns": [
+      "shared_name_tokens",
+      "service_line_extension",
+      "singular_related_service"
+    ],
+    "requested_config": {
+      "a_only_rate": 0.15,
+      "b_only_rate": 0.15,
+      "canonical_entity_count": 24,
+      "corruption": {
+        "address_abbreviation_rate": 0.3,
+        "address_format_rate": 0.14,
+        "address_missing_component_rate": 0.07,
+        "address_stale_rate": 0.04,
+        "business_conflict_rate": 0.28,
+        "email_case_rate": 0.18,
+        "email_missing_rate": 0.08,
+        "email_typo_rate": 0.035,
+        "name_abbreviation_rate": 0.08,
+        "name_case_rate": 0.18,
+        "name_punctuation_rate": 0.1,
+        "name_spacing_rate": 0.05,
+        "name_suffix_rate": 0.24,
+        "name_token_deletion_rate": 0.05,
+        "name_typo_rate": 0.08,
+        "phone_country_code_rate": 0.16,
+        "phone_digit_error_rate": 0.04,
+        "phone_format_rate": 0.55,
+        "phone_missing_rate": 0.08,
+        "postal_format_rate": 0.1,
+        "postal_incorrect_rate": 0.025,
+        "postal_missing_rate": 0.04,
+        "profile": "moderate",
+        "timestamp_shift_rate": 0.55
+      },
+      "duplicate_rows_a": 2,
+      "duplicate_rows_b": 2,
+      "fixture_name": "organizations-dev-v1",
+      "hard_negative_pairs": 3,
+      "overlap_rate": 0.7,
+      "seed": 42
+    },
+    "schema_mapping_version": "organizations-schema-v1",
+    "seed": 42
+  },
+  "hardNegatives": [
+    {
+      "aRowId": "A000006",
+      "autoMatched": false,
+      "bRowId": "B000015",
+      "isTopCandidate": false,
+      "matchScore": 0.155747,
+      "pattern": "singular_related_service",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000009",
+      "autoMatched": false,
+      "bRowId": "B000004",
+      "isTopCandidate": false,
+      "matchScore": 0.182915,
+      "pattern": "singular_related_service",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000011",
+      "autoMatched": false,
+      "bRowId": "B000010",
+      "isTopCandidate": false,
+      "matchScore": 0.085181,
+      "pattern": "service_line_extension",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000011",
+      "autoMatched": false,
+      "bRowId": "B000011",
+      "isTopCandidate": false,
+      "matchScore": 0.085181,
+      "pattern": "service_line_extension",
+      "rank": 3
+    },
+    {
+      "aRowId": "A000013",
+      "autoMatched": false,
+      "bRowId": "B000016",
+      "isTopCandidate": false,
+      "matchScore": 0.173242,
+      "pattern": "shared_name_tokens",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000015",
+      "autoMatched": false,
+      "bRowId": "B000020",
+      "isTopCandidate": false,
+      "matchScore": 0.214492,
+      "pattern": "service_line_extension",
+      "rank": 3
+    },
+    {
+      "aRowId": "A000018",
+      "autoMatched": false,
+      "bRowId": "B000006",
+      "isTopCandidate": false,
+      "matchScore": 0.173242,
+      "pattern": "shared_name_tokens",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000020",
+      "autoMatched": false,
+      "bRowId": "B000004",
+      "isTopCandidate": false,
+      "matchScore": 0.157053,
+      "pattern": "singular_related_service",
+      "rank": 2
+    },
+    {
+      "aRowId": "A000021",
+      "autoMatched": false,
+      "bRowId": "B000016",
+      "isTopCandidate": false,
+      "matchScore": 0.173242,
+      "pattern": "shared_name_tokens",
+      "rank": 2
+    }
+  ],
+  "matcherConfig": {
+    "blockingNormalizationVersion": "blocking-normalization-v0.1.0",
+    "candidateEngineVersion": "candidate-engine-v0.2.0",
+    "configVersion": "matcher-config-v0.2.0",
+    "conflictMultipliers": {
+      "address": 0.2,
+      "city": 0.2,
+      "domain": 0.15,
+      "email": 0.2,
+      "name": 0.1,
+      "other": 0.25,
+      "phone": 0.15,
+      "postal": 0.2,
+      "region": 0.2
+    },
+    "decisions": {
+      "alternativeFloor": 0.25,
+      "alternativeWindow": 0.3,
+      "autoMatchThreshold": 0.5,
+      "collisionPolicy": "route_to_review",
+      "contradictionPolicy": "block_auto_match",
+      "maxAlternatives": 3,
+      "minimumAutoAgreementFields": 2,
+      "minimumTopCandidateMargin": 0.04,
+      "reviewThreshold": 0.25
+    },
+    "featurePipelineVersion": "feature-pipeline-v0.1.0",
+    "frozen": true,
+    "matcherVersion": "explainable-matcher-v0.2.0",
+    "tunedOnFixture": "organizations-matcher-tune-1200-v1",
+    "weights": {
+      "address": 1.5,
+      "city": 0.3,
+      "domain": 1.0,
+      "email": 1.5,
+      "name": 2.0,
+      "other": 0.5,
+      "phone": 1.5,
+      "postal": 0.6,
+      "region": 0.3
+    }
+  },
+  "matcherVersion": "explainable-matcher-v0.2.0",
+  "metrics": {
+    "autoMatchCount": 11,
+    "autoMatchPrecision": 1.0,
+    "autoMatchRecall": 0.523809524,
+    "autoMatchedARows": 11,
+    "belowReviewThresholdTruePairs": 0,
+    "candidateConditionalFeatureScoringCoverage": 1.0,
+    "candidateConditionalRetentionRate": 1.0,
+    "candidateConditionalReviewThresholdCoverage": 1.0,
+    "candidateMisses": 0,
+    "candidatePairs": 131,
+    "candidateRecall": 1.0,
+    "candidateTruePairs": 21,
+    "endToEndRecovery": 1.0,
+    "falseAutoMatches": 0,
+    "hardNegativeAutoMatches": 0,
+    "hardNegativeCandidatePairs": 9,
+    "matchableARows": 19,
+    "postScoreRetentionMisses": 0,
+    "recoverableMatchableARows": 19,
+    "retainedTruePairs": 21,
+    "reviewRate": 0.421052632,
+    "reviewRateDenominator": "A rows with at least one cross-source truth link",
+    "reviewRateDenominatorCount": 19,
+    "reviewRoutedARows": 8,
+    "scoredTruePairs": 21,
+    "sourceOnlyARows": 4,
+    "top1EligibleRows": 19,
+    "top1TrueCandidateRate": 1.0,
+    "top1TrueCandidateRows": 19,
+    "trueAutoMatches": 11,
+    "truePairsAtOrAboveReviewThreshold": 21,
+    "truePairsTotal": 21,
+    "truthUncoveredARows": 0,
+    "truthUncoveredAutoRows": 0,
+    "truthUncoveredReviewRows": 0,
+    "truthUncoveredUnmatchedRows": 0,
+    "unmatchedMatchableARows": 0
+  },
+  "phase": "holdout",
+  "postScoreRetentionLosses": [],
+  "rankingMisses": [],
+  "scoreBands": [
+    {
+      "band": "0.0-0.1",
+      "candidateCount": 32,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 32,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.1-0.2",
+      "candidateCount": 73,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 73,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.2-0.3",
+      "candidateCount": 5,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 5,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.3-0.4",
+      "candidateCount": 0,
+      "empiricalMatchRate": null,
+      "falseMatchCount": 0,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.4-0.5",
+      "candidateCount": 0,
+      "empiricalMatchRate": null,
+      "falseMatchCount": 0,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.5-0.6",
+      "candidateCount": 0,
+      "empiricalMatchRate": null,
+      "falseMatchCount": 0,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.6-0.7",
+      "candidateCount": 1,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 1
+    },
+    {
+      "band": "0.7-0.8",
+      "candidateCount": 1,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 1
+    },
+    {
+      "band": "0.8-0.9",
+      "candidateCount": 8,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 8
+    },
+    {
+      "band": "0.9-1.0",
+      "candidateCount": 11,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 11
+    }
+  ]
+}

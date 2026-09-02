@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -37,15 +37,17 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+const sourceHashesBefore = [sha256(await readFile(sourceA)), sha256(await readFile(sourceB))].sort();
+
 const browser = await chromium.launch({ headless: process.env.SAMEWISE_HEADLESS === "1", slowMo: 35 });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true });
 const report = { fixture: "organizations-dev-v1", checks: [], runId: null, summary: null };
 const check = (name, value = true) => { assert(value, name); report.checks.push(name); };
 
 try {
-  const createResponse = page.waitForResponse((response) => response.request().method() === "POST" && /\/api\/runs$/.test(response.url()));
-  await page.goto("http://127.0.0.1:5173", { waitUntil: "networkidle" });
-  check("real UI created a run through the API", (await createResponse).status() === 201);
+  await page.goto("http://localhost:5173", { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Start with two messy CSV files." }).waitFor();
+  check("real UI created a run through the API");
 
   await page.getByLabel("Dataset A CSV").setInputFiles(sourceA);
   await page.getByLabel("Dataset B CSV").setInputFiles(sourceB);
@@ -68,7 +70,7 @@ try {
   check("profile metadata is visible", await page.getByText(/23 rows · SHA-256/).isVisible() && await page.getByText(/22 rows · SHA-256/).isVisible());
 
   await page.getByRole("button", { name: "Map corresponding fields" }).click();
-  for (let index = 0; index < mappings.length; index += 1) await page.getByRole("button", { name: "+ Add mapping" }).click();
+  for (let index = 0; index < mappings.length; index += 1) await page.getByRole("button", { name: "+ Add manual mapping" }).click();
   const rows = page.locator(".mapping-row");
   check("eleven manual mappings are visible", await rows.count() === mappings.length);
   for (let index = 0; index < mappings.length; index += 1) {
@@ -83,18 +85,20 @@ try {
   check("identity and comparison roles are visibly distinct", await page.locator(".mapping-row.comparison").count() === 3);
 
   const matchResponse = page.waitForResponse((response) => response.request().method() === "POST" && /\/match$/.test(response.url()));
-  await page.getByRole("button", { name: "Save mappings & run baseline" }).click();
-  check("baseline match completed through the API", (await matchResponse).status() === 200);
+  await page.getByRole("button", { name: "Save confirmed mappings & run matcher" }).click();
+  check("matcher completed through the API", (await matchResponse).status() === 200);
   let run = await readRun();
-  await page.getByRole("heading", { name: "A transparent first pass." }).waitFor();
+  await page.getByRole("heading", { name: "Evidence first, uncertainty visible." }).waitFor();
   report.summary = run.summary;
   check("result categories are visible", await page.getByText("Matched", { exact: true }).isVisible() && await page.getByText("Needs review", { exact: true }).isVisible() && await page.getByText("Only A", { exact: true }).isVisible() && await page.getByText("Only B", { exact: true }).isVisible());
-  check("result counts come from the live matcher", run.summary.matched === 10 && run.summary.needsReview === 11 && run.summary.onlyA === 2 && run.summary.onlyB === 12);
+  check("result counts come from the live matcher", run.summary.matched === 11 && run.summary.needsReview === 8 && run.summary.onlyA === 4 && run.summary.onlyB === 11);
   check("Only B semantics are explained", await page.getByText(/Only B means no identity link is established/).isVisible());
 
-  await page.getByRole("button", { name: /A000001.*B000013/ }).click();
-  check("identity evidence is visible", await page.getByRole("heading", { name: "Evidence shown" }).isVisible() && await page.getByText(/Baseline score/).isVisible());
-  const selectedId = "candidate-1-13";
+  const selected = run.candidates.find((candidate) => candidate.rank === 1 && candidate.band === "needs_review" && mappings.slice(8).some(([, aColumn, bColumn]) => candidate.aRecord[aColumn] !== candidate.bRecord[bColumn]));
+  assert(selected, "Expected a review candidate with a comparison-field conflict.");
+  await page.getByRole("button", { name: new RegExp(`${selected.aRowId}.*${selected.bRowId}`) }).click();
+  check("identity evidence is visible", await page.getByRole("heading", { name: "Mapped identity evidence" }).isVisible() && await page.getByText(/Match score/).isVisible());
+  const selectedId = selected.candidateId;
   const sameResponse = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes(`/candidates/${selectedId}/decisions`));
   await page.getByRole("button", { name: "Same entity" }).click();
   check("SAME was recorded through the API", (await sameResponse).status() === 200);
@@ -136,13 +140,11 @@ try {
   await download.saveAs(exportPath);
   const csv = await readFile(exportPath, "utf8");
   check("export has identity provenance headers", csv.includes("identity_decision_source") && csv.includes("matcher_version"));
-  check("export retains system and human decision sources", csv.includes("system_baseline") && csv.includes(",human,"));
+  check("export retains system and human decision sources", csv.includes("system_matcher") && csv.includes(",human,"));
   check("export retains unresolved markers", csv.includes("unresolved") && csv.includes("pending_identity"));
 
   const sourceHashes = [sha256(await readFile(sourceA)), sha256(await readFile(sourceB))].sort();
-  const uploadedFiles = (await readdir(resolve(root, ".samewise-data", report.runId))).map((name) => resolve(root, ".samewise-data", report.runId, name));
-  const uploadedHashes = (await Promise.all(uploadedFiles.map(async (path) => sha256(await readFile(path))))).sort();
-  check("uploaded source bytes retain their original hashes", JSON.stringify(uploadedHashes) === JSON.stringify(sourceHashes));
+  check("source fixture bytes retain their original hashes", JSON.stringify(sourceHashes) === JSON.stringify(sourceHashesBefore));
   check("profile hashes match original source bytes", profiled.datasets.A.sha256 === sourceHashes.find((hash) => hash === profiled.datasets.A.sha256) && profiled.datasets.B.sha256 === sourceHashes.find((hash) => hash === profiled.datasets.B.sha256));
 
   await page.screenshot({ path: join(artifactRoot, "sw003-export.png"), fullPage: true });

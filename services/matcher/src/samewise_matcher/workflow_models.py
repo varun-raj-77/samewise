@@ -3,7 +3,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 WORKFLOW_CONTRACT_VERSION = "1.0.0"
-MATCHER_VERSION = "baseline-matcher-v0.1.0"
+MATCHER_VERSION = "explainable-matcher-v0.2.0"
+LEGACY_MATCHER_VERSION = "baseline-matcher-v0.1.0"
+FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0"
+MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0"
 
 
 class StrictModel(BaseModel):
@@ -39,6 +42,16 @@ class ManualMapping(StrictModel):
     normalizer: Literal["text", "phone", "email", "number", "date"]
 
 
+class FeatureValue(StrictModel):
+    name: str = Field(min_length=1)
+    value: float = Field(ge=0, le=1)
+
+
+class BlockingEvidenceView(StrictModel):
+    blockerId: str = Field(min_length=1)
+    keyHash: str = Field(pattern=r"^[a-f0-9]{16}$")
+
+
 class FieldEvidence(StrictModel):
     mappingId: str
     label: str
@@ -48,8 +61,35 @@ class FieldEvidence(StrictModel):
     bValue: str
     normalizedA: str
     normalizedB: str
+    fieldKind: Literal[
+        "name",
+        "phone",
+        "email",
+        "domain",
+        "address",
+        "city",
+        "region",
+        "postal",
+        "other",
+    ]
+    featurePipelineVersion: Literal[
+        "baseline-feature-pipeline-v0.1.0", "feature-pipeline-v0.1.0"
+    ]
+    features: list[FeatureValue]
     outcome: Literal["exact", "similar", "conflict", "missing_one", "missing_both"]
-    contribution: float = Field(ge=0, le=1)
+    evidenceClass: Literal[
+        "exact_agreement",
+        "partial_agreement",
+        "conflict",
+        "missing_left",
+        "missing_right",
+        "missing_both",
+    ]
+    weight: float = Field(gt=0)
+    positiveContribution: float = Field(ge=0)
+    conflictContribution: float = Field(ge=0)
+    contribution: float
+    explanationCode: str = Field(min_length=1)
     explanation: str
 
 
@@ -60,16 +100,28 @@ class CandidatePair(StrictModel):
     aRecord: dict[str, str]
     bRecord: dict[str, str]
     rank: int = Field(gt=0)
-    baselineScore: float = Field(ge=0, le=1)
+    matchScore: float = Field(ge=0, le=1)
     runnerUpMargin: float = Field(ge=0, le=1)
-    band: Literal["proposed_match", "needs_review"]
+    band: Literal["auto_match", "needs_review"]
     collision: bool
+    strongContradiction: bool
+    blockingEvidence: list[BlockingEvidenceView] = Field(min_length=1)
+    positiveEvidence: float = Field(ge=0)
+    conflictEvidence: float = Field(ge=0)
+    totalWeight: float = Field(gt=0)
     evidence: list[FieldEvidence] = Field(min_length=1)
 
 
 class MatcherResult(StrictModel):
     contractVersion: Literal["1.0.0"]
-    matcherVersion: Literal["baseline-matcher-v0.1.0"]
+    matcherVersion: Literal["baseline-matcher-v0.1.0", "explainable-matcher-v0.2.0"]
+    candidateEngineVersion: Literal["candidate-engine-v0.2.0"]
+    blockingNormalizationVersion: Literal["blocking-normalization-v0.1.0"]
+    featurePipelineVersion: Literal[
+        "baseline-feature-pipeline-v0.1.0", "feature-pipeline-v0.1.0"
+    ]
+    matcherConfigVersion: Literal["baseline-config-v0.1.0", "matcher-config-v0.2.0"]
+    matcherConfig: dict[str, object]
     candidates: list[CandidatePair]
     onlyA: list[dict[str, object]]
     onlyB: list[dict[str, object]]
@@ -89,3 +141,7 @@ class MatchRequest(StrictModel):
     aPath: str = Field(min_length=1)
     bPath: str = Field(min_length=1)
     mappings: list[ManualMapping] = Field(min_length=1)
+    candidateMode: Literal["candidate_engine", "all_pairs"] = "candidate_engine"
+    matcherVersion: Literal["baseline-matcher-v0.1.0", "explainable-matcher-v0.2.0"] = (
+        MATCHER_VERSION
+    )

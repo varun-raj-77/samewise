@@ -10,7 +10,7 @@ from samewise_matcher.baseline import (
     normalize,
     profile_csv,
 )
-from samewise_matcher.workflow_models import MATCHER_VERSION, ManualMapping
+from samewise_matcher.workflow_models import LEGACY_MATCHER_VERSION, ManualMapping
 
 
 def write_csv(path: Path, text: str) -> None:
@@ -97,8 +97,8 @@ def test_match_is_deterministic_versioned_and_ignores_comparison_fields(
     second = match_csvs(a_path, b_path, mappings)
 
     assert first == second
-    assert first.matcherVersion == MATCHER_VERSION
-    assert first.candidates[0].baselineScore == 1
+    assert first.matcherVersion == LEGACY_MATCHER_VERSION
+    assert first.candidates[0].matchScore == 1
     assert [item.mappingId for item in first.candidates[0].evidence] == ["name"]
 
 
@@ -115,7 +115,7 @@ def test_alternative_candidate_is_not_consumed_when_primary_is_proposed(
         ("B1", 1),
         ("B2", 2),
     ]
-    assert result.candidates[0].band == "proposed_match"
+    assert result.candidates[0].band == "auto_match"
     assert [row["rowId"] for row in result.onlyB] == ["B2"]
 
 
