@@ -47,6 +47,17 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
+  it("navigates between reconciliation and the dedicated Evaluation product", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<App initialRun={runView()} initialScreen="results" />);
+    fireEvent.click(screen.getByRole("button", { name: "Evaluation" }));
+    expect(screen.getByRole("button", { name: "Evaluation" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector(".workspace.evaluation-layout")).toBeInTheDocument();
+    expect(await screen.findByText("offline")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reconciliation" }));
+    expect(screen.getByRole("heading", { name: "Evidence first, uncertainty visible." })).toBeInTheDocument();
+  });
+
   it("validates that both CSV files are selected", () => {
     render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, summary: null, candidates: [] })} initialScreen="upload" />);
     fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
@@ -150,7 +161,7 @@ describe("Samewise vertical slice", () => {
   it("keeps SAME ENTITY separate from explicit field resolution", async () => {
     const conflictRun = runView({
       stage: "resolution",
-      decisions: [{ decisionId: "d1", runId: "run-1", candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review", humanDecision: "same_entity", matcherVersion: "explainable-matcher-v0.2.0", evidenceShown: [evidence], decidedAt: "2026-08-30T12:00:00.000Z" }],
+      decisions: [{ decisionId: "d1", runId: "run-1", candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review", humanDecision: "same_entity", matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", matchScore: 0.72, evidenceShown: [evidence], decidedAt: "2026-08-30T12:00:00.000Z" }],
       conflicts: [{ conflictId: "c1", runId: "run-1", candidateId: "candidate-1-1", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", identityDecisionId: "d1", identitySource: "human", status: "unresolved", resolution: null, resolutionHistory: [] }],
       trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["1 comparison-field conflict(s) remain unresolved."] },
     });

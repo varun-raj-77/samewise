@@ -10,9 +10,10 @@ import { useEffect, useState } from "react";
 
 import { ReviewWorkspace } from "./ReviewWorkspace.js";
 import { SurvivorshipWorkspace } from "./SurvivorshipWorkspace.js";
+import { EvaluationWorkspace } from "./EvaluationWorkspace.js";
 import "./survivorship-workspace.css";
 
-type Screen = "upload" | "profile" | "mapping" | "results" | "review" | "resolution" | "export";
+type Screen = "upload" | "profile" | "mapping" | "results" | "review" | "resolution" | "export" | "evaluation";
 const STEPS: { id: Screen; label: string }[] = [
   { id: "upload", label: "Upload" }, { id: "profile", label: "Profile" },
   { id: "mapping", label: "Map fields" }, { id: "results", label: "Results" },
@@ -43,7 +44,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [screen, setScreen] = useState<Screen>(() => {
     if (initialScreen) return initialScreen;
     const requested = new URLSearchParams(window.location.search).get("screen");
-    return STEPS.some((step) => step.id === requested) ? requested as Screen : "upload";
+    return requested === "evaluation" || STEPS.some((step) => step.id === requested) ? requested as Screen : "upload";
   });
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
@@ -188,9 +189,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   }
 
   return <main className="app-shell">
-    <header className="topbar"><div><span className="mark">S</span><strong>Samewise</strong></div><p>Trusted reconciliation workspace</p></header>
-    <div className="workspace">
-      <nav className="stepper" aria-label="Reconciliation progress"><p className="eyebrow">Reconciliation run</p><ol>{STEPS.map((step, index) => <li key={step.id} className={screen === step.id ? "active" : ""}><span>{index + 1}</span>{step.label}</li>)}</ol><div className="principle"><strong>Identity ≠ survivorship</strong><p>First confirm the entity. Then choose which conflicting values survive.</p></div></nav>
+    <header className="topbar"><div><span className="mark">S</span><strong>Samewise</strong></div><div className="product-nav" aria-label="Product areas"><button aria-current={screen !== "evaluation" ? "page" : undefined} onClick={() => setScreen(run?.stage ?? "upload")}>Reconciliation</button><button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => setScreen("evaluation")}>Evaluation</button></div><p>Trusted reconciliation workspace</p></header>
+    <div className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
+      {screen !== "evaluation" && <nav className="stepper" aria-label="Reconciliation progress"><p className="eyebrow">Reconciliation run</p><ol>{STEPS.map((step, index) => <li key={step.id} className={screen === step.id ? "active" : ""}><span>{index + 1}</span>{step.label}</li>)}</ol><div className="principle"><strong>Identity ≠ survivorship</strong><p>First confirm the entity. Then choose which conflicting values survive.</p></div></nav>}
       <section className={screen === "review" ? "content review-content" : "content"}>
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
         {screen === "upload" && <section aria-labelledby="upload-title"><p className="eyebrow">Step 1 · Immutable sources</p><h1 id="upload-title">Start with two messy CSV files.</h1><p className="lede">Samewise fingerprints and profiles each source without rewriting it.</p><div className="upload-grid"><FilePicker side="A" file={fileA} onChange={setFileA} /><FilePicker side="B" file={fileB} onChange={setFileB} /></div><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile</button><p className="fine-print">CSV only · 2 MiB per file · source bytes remain unchanged</p></section>}
@@ -200,6 +201,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         {screen === "review" && run && <ReviewWorkspace run={run} initialCandidateId={selectedCandidateId} busy={busy} onDecision={decide} onDefer={setDeferred} onUndo={undoReview} onGoResolution={() => setScreen("resolution")} />}
         {screen === "resolution" && run && <SurvivorshipWorkspace run={run} busy={busy} onRun={setRun} onBusy={setBusy} onError={setError} onBack={() => setScreen("results")} onContinue={() => setScreen("export")} />}
         {screen === "export" && run?.summary && <section aria-labelledby="export-title"><p className="eyebrow">Step 7 · Separate exports</p><h1 id="export-title">Report everything. Trust only what is ready.</h1><p className="lede">The reconciliation report always preserves uncertainty. Trusted merged output is gated until identity review and every relevant field conflict are resolved.</p><div className="export-card"><div><small>Reconciliation report</small><strong>Available</strong></div><div><small>Trusted output</small><strong>{run.trustedExportReadiness.ready ? "Ready" : "Blocked"}</strong></div><div><small>Formula safety</small><strong>Enabled</strong></div></div>{!run.trustedExportReadiness.ready && <div className="warning" role="status"><strong>Trusted export blocked.</strong> {run.trustedExportReadiness.blockers.join(" ")}</div>}<div className="actions"><button className="secondary" onClick={() => setScreen("resolution")}>Review conflicts</button><button className="secondary" onClick={() => void downloadExport("reconciliation")} disabled={busy}>Download reconciliation report</button><button className="primary" onClick={() => void downloadExport("trusted")} disabled={busy || !run.trustedExportReadiness.ready}>Download trusted merged output</button></div></section>}
+        {screen === "evaluation" && <EvaluationWorkspace runId={run?.runId ?? null} onBack={() => setScreen(run?.summary ? "results" : run?.stage ?? "upload")} />}
       </section>
     </div>
   </main>;

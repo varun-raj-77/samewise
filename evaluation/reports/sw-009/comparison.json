@@ -1,0 +1,82 @@
+{
+  "comparisonVersion": "evaluation-comparison-v1.0.0",
+  "compatible": true,
+  "metrics": [
+    {
+      "delta": null,
+      "deltaUnit": "percentage_points",
+      "label": "Auto-match precision",
+      "metricId": "auto_match_precision",
+      "versionA": null,
+      "versionB": 1.0
+    },
+    {
+      "delta": 0.287827076,
+      "deltaUnit": "percentage_points",
+      "label": "Auto-match recall",
+      "metricId": "auto_match_recall",
+      "versionA": 0.0,
+      "versionB": 0.287827076
+    },
+    {
+      "delta": 0.0,
+      "deltaUnit": "percentage_points",
+      "label": "Candidate recall",
+      "metricId": "candidate_recall",
+      "versionA": 0.985210466,
+      "versionB": 0.985210466
+    },
+    {
+      "delta": 0.0,
+      "deltaUnit": "percentage_points",
+      "label": "Candidate reduction",
+      "metricId": "candidate_reduction_ratio",
+      "versionA": 0.996208952,
+      "versionB": 0.996208952
+    },
+    {
+      "delta": 0.001137657,
+      "deltaUnit": "percentage_points",
+      "label": "End-to-end true-link recovery",
+      "metricId": "end_to_end_recovery",
+      "versionA": 0.981797497,
+      "versionB": 0.982935154
+    },
+    {
+      "delta": 0.0,
+      "deltaUnit": "percentage_points",
+      "label": "Candidate-conditional feature scoring coverage",
+      "metricId": "feature_scoring_coverage",
+      "versionA": 1.0,
+      "versionB": 1.0
+    },
+    {
+      "delta": 0.001154734,
+      "deltaUnit": "percentage_points",
+      "label": "Candidate-conditional retained-link coverage",
+      "metricId": "retained_link_coverage",
+      "versionA": 0.996535797,
+      "versionB": 0.997690531
+    },
+    {
+      "delta": -0.294871795,
+      "deltaUnit": "percentage_points",
+      "label": "Review rate",
+      "metricId": "review_rate",
+      "versionA": 0.991841492,
+      "versionB": 0.696969697
+    },
+    {
+      "delta": 0.017730496,
+      "deltaUnit": "percentage_points",
+      "label": "Top-1 true-candidate rate",
+      "metricId": "top1_true_candidate_rate",
+      "versionA": 0.973995272,
+      "versionB": 0.991725768
+    }
+  ],
+  "reasons": [],
+  "snapshotA": "organizations-matcher-holdout-1200-v1--baseline-matcher-v0.1.0--e2d59f74473b",
+  "snapshotB": "organizations-matcher-holdout-1200-v1--explainable-matcher-v0.2.0--f515777f9c86",
+  "status": "Comparable"
+}

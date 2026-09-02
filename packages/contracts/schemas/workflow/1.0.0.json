@@ -128,12 +128,14 @@
     "identityDecision": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decisionId", "runId", "candidateId", "aRowId", "bRowId", "systemProposal", "humanDecision", "matcherVersion", "evidenceShown", "decidedAt"],
+      "required": ["decisionId", "runId", "candidateId", "aRowId", "bRowId", "systemProposal", "humanDecision", "matcherVersion", "candidateEngineVersion", "matchScore", "evidenceShown", "decidedAt"],
       "properties": {
         "decisionId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 },
         "candidateId": { "type": "string", "minLength": 1 }, "aRowId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 },
         "systemProposal": { "$ref": "#/$defs/candidateBand" }, "humanDecision": { "$ref": "#/$defs/humanDecision" },
         "matcherVersion": { "$ref": "#/$defs/matcherVersion" },
+        "candidateEngineVersion": { "const": "candidate-engine-v0.2.0" },
+        "matchScore": { "type": "number", "minimum": 0, "maximum": 1 },
         "evidenceShown": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fieldEvidence" } },
         "decidedAt": { "type": "string", "format": "date-time" }
       }

@@ -1,0 +1,277 @@
+{
+  "artifactHashes": {
+    "errors": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "sw006Report": "b2e250af4364341c33889b15d12985b1f5db2b45ed712596b0165ccb26ea47d3"
+  },
+  "contentHash": "e2d59f74473b1e89dfb87cc5c1a2c7646ae6563537a6f7415df1750b81b15259",
+  "counts": {
+    "autoMatches": 0,
+    "candidateMisses": 13,
+    "candidatePairs": 4132,
+    "falseAutoMatches": 0,
+    "featureScoredTrueLinks": 866,
+    "hardNegativeAutoMatches": 0,
+    "postCandidateLosses": 4,
+    "recoverableTrueLinks": 863,
+    "reviewRoutedARows": 851,
+    "trueAutoMatches": 0,
+    "trueLinks": 879,
+    "unmatchedMatchableARows": 7
+  },
+  "decomposition": {
+    "aRowLevel": {
+      "autoMatched": 0,
+      "matchable": 858,
+      "reviewRouted": 851,
+      "unmatched": 7
+    },
+    "pairLevel": {
+      "autoMatched": 0,
+      "candidateRetained": 866,
+      "featureScored": 866,
+      "recoverable": 863,
+      "trueLinks": 879
+    }
+  },
+  "errorSummary": {
+    "candidate_misses": 0,
+    "false_auto_matches": 0,
+    "false_unmatched": 0,
+    "hard_negatives": 0,
+    "post_score_losses": 0,
+    "ranking_losses": 0
+  },
+  "evaluationVersion": "matcher-evaluation-v0.3.0",
+  "fixture": {
+    "aRows": 1044,
+    "bRows": 1044,
+    "name": "organizations-matcher-holdout-1200-v1",
+    "seed": 7071,
+    "theoreticalPairs": 1089936
+  },
+  "gateResult": {
+    "checks": [
+      {
+        "actual": 0.985210466,
+        "expected": 0.985,
+        "id": "candidate_recall_minimum",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "id": "false_auto_match_tolerance",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "id": "hard_negative_auto_match_tolerance",
+        "passed": true
+      },
+      {
+        "actual": null,
+        "expected": 0.995,
+        "id": "auto_match_precision_minimum",
+        "passed": false
+      },
+      {
+        "actual": 0.981797497,
+        "expected": 0.985210466,
+        "id": "candidate_ceiling_invariant",
+        "passed": true
+      }
+    ],
+    "configVersion": "matcher-quality-gates-v1.0.0",
+    "passed": false
+  },
+  "id": "organizations-matcher-holdout-1200-v1--baseline-matcher-v0.1.0--e2d59f74473b",
+  "metrics": [
+    {
+      "denominator": 1089936,
+      "description": "Theoretical cross-source pairs not emitted as candidates / all theoretical cross-source pairs.",
+      "id": "candidate_reduction_ratio",
+      "label": "Candidate reduction",
+      "level": "search_space",
+      "numerator": 1085804,
+      "unit": "ratio",
+      "value": 0.996208952
+    },
+    {
+      "denominator": 879,
+      "description": "True cross-source links retained as candidates / all true cross-source links.",
+      "id": "candidate_recall",
+      "label": "Candidate recall",
+      "level": "pair",
+      "numerator": 866,
+      "unit": "ratio",
+      "value": 0.985210466
+    },
+    {
+      "denominator": 866,
+      "description": "True candidate links feature-scored / true links retained by candidate generation.",
+      "id": "feature_scoring_coverage",
+      "label": "Candidate-conditional feature scoring coverage",
+      "level": "pair",
+      "numerator": 866,
+      "unit": "ratio",
+      "value": 1.0
+    },
+    {
+      "denominator": 866,
+      "description": "True links retained for automatic or human decision / true links retained by candidate generation.",
+      "id": "retained_link_coverage",
+      "label": "Candidate-conditional retained-link coverage",
+      "level": "pair",
+      "numerator": 863,
+      "unit": "ratio",
+      "value": 0.996535797
+    },
+    {
+      "denominator": 0,
+      "description": "True automatically linked pairs / all automatically linked pairs.",
+      "id": "auto_match_precision",
+      "label": "Auto-match precision",
+      "level": "pair",
+      "numerator": 0,
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "denominator": 879,
+      "description": "True automatically linked pairs / all true cross-source links.",
+      "id": "auto_match_recall",
+      "label": "Auto-match recall",
+      "level": "pair",
+      "numerator": 0,
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "denominator": 858,
+      "description": "Review-routed matchable A rows / A rows having one or more cross-source truth links.",
+      "id": "review_rate",
+      "label": "Review rate",
+      "level": "a_row",
+      "numerator": 851,
+      "unit": "ratio",
+      "value": 0.991841492
+    },
+    {
+      "denominator": 879,
+      "description": "True links retained for automatic or human decision / all true cross-source links.",
+      "id": "end_to_end_recovery",
+      "label": "End-to-end true-link recovery",
+      "level": "pair",
+      "numerator": 863,
+      "unit": "ratio",
+      "value": 0.981797497
+    },
+    {
+      "denominator": 846,
+      "description": "Candidate-reached A rows whose top-ranked pair is true / candidate-reached matchable A rows.",
+      "id": "top1_true_candidate_rate",
+      "label": "Top-1 true-candidate rate",
+      "level": "a_row",
+      "numerator": 824,
+      "unit": "ratio",
+      "value": 0.973995272
+    }
+  ],
+  "provenance": {
+    "candidateConfigHash": "0ce710a331948811f1b4890409e16307273dec827b553e5d7c9a104414070cc6",
+    "candidateEngineVersion": "candidate-engine-v0.2.0",
+    "datasetFingerprints": {
+      "dataset_a": "3d766768fdca30a4a072887e1743619b8e263bc527d51f3d7289ebc30bd7bb33",
+      "dataset_b": "8b12bf2b4624dc3fc5cd735b5c084e692de4d838d5059ff7590c870d19e28958"
+    },
+    "featurePipelineVersion": "feature-pipeline-v0.1.0",
+    "mappingVersion": "organizations-confirmed-mappings-v1",
+    "matcherConfigHash": "f5c2b6f00bdb9b380cb499da6cc70f9d02b15e6454a3cc344b9cda5a1f357f48",
+    "matcherConfigVersion": "baseline-matcher-config-v0.1.0",
+    "matcherVersion": "baseline-matcher-v0.1.0"
+  },
+  "scoreBandNotice": "Empirical match rates on this frozen fixture; scores are not calibrated probabilities.",
+  "scoreBands": [
+    {
+      "band": "0.0-0.1",
+      "candidateCount": 181,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 181,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.1-0.2",
+      "candidateCount": 35,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 35,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.2-0.3",
+      "candidateCount": 87,
+      "empiricalMatchRate": 0.0,
+      "falseMatchCount": 87,
+      "trueMatchCount": 0
+    },
+    {
+      "band": "0.3-0.4",
+      "candidateCount": 1044,
+      "empiricalMatchRate": 0.001915709,
+      "falseMatchCount": 1042,
+      "trueMatchCount": 2
+    },
+    {
+      "band": "0.4-0.5",
+      "candidateCount": 1675,
+      "empiricalMatchRate": 0.034029851,
+      "falseMatchCount": 1618,
+      "trueMatchCount": 57
+    },
+    {
+      "band": "0.5-0.6",
+      "candidateCount": 562,
+      "empiricalMatchRate": 0.483985765,
+      "falseMatchCount": 290,
+      "trueMatchCount": 272
+    },
+    {
+      "band": "0.6-0.7",
+      "candidateCount": 505,
+      "empiricalMatchRate": 0.974257426,
+      "falseMatchCount": 13,
+      "trueMatchCount": 492
+    },
+    {
+      "band": "0.7-0.8",
+      "candidateCount": 42,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 42
+    },
+    {
+      "band": "0.8-0.9",
+      "candidateCount": 1,
+      "empiricalMatchRate": 1.0,
+      "falseMatchCount": 0,
+      "trueMatchCount": 1
+    },
+    {
+      "band": "0.9-1.0",
+      "candidateCount": 0,
+      "empiricalMatchRate": null,
+      "falseMatchCount": 0,
+      "trueMatchCount": 0
+    }
+  ],
+  "snapshotVersion": "evaluation-snapshot-v1.0.0",
+  "source": {
+    "caveat": "Synthetic fixture evidence does not establish real-data quality.",
+    "id": "organizations-matcher-holdout-1200-v1",
+    "label": "Synthetic benchmark ground truth",
+    "representative": false,
+    "type": "SYNTHETIC_GROUND_TRUTH"
+  },
+  "thresholdAnalysis": [],
+  "thresholdAnalysisNotice": "Retrospective analysis only. Other matcher policies remain fixed and production configuration is not changed."
+}

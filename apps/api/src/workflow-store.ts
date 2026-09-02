@@ -337,7 +337,8 @@ export class WorkflowStore {
 
   decide(runId: string, candidateId: string, humanDecision: "same_entity" | "different_entity"): RunView {
     const run = this.requireRun(runId);
-    const candidate = run.result?.candidates.find((item) => item.candidateId === candidateId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before recording identity decisions.", 409);
+    const candidate = run.result.candidates.find((item) => item.candidateId === candidateId);
     if (!candidate) throw new WorkflowError("candidate_not_found", "Candidate was not found.", 404);
     if (run.decisions.has(candidateId)) throw new WorkflowError("decision_exists", "This candidate already has a recorded decision.", 409);
     if (humanDecision === "different_entity" && [...run.conflicts.values()].some((conflict) => conflict.candidateId === candidateId && conflict.resolution)) {
@@ -355,7 +356,9 @@ export class WorkflowStore {
       bRowId: candidate.bRowId,
       systemProposal: candidate.band,
       humanDecision,
-      matcherVersion: MATCHER_VERSION,
+      matcherVersion: run.result.matcherVersion,
+      candidateEngineVersion: run.result.candidateEngineVersion,
+      matchScore: candidate.matchScore,
       evidenceShown: candidate.evidence,
       decidedAt: new Date().toISOString(),
     };

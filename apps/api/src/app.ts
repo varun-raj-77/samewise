@@ -1,9 +1,11 @@
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   ManualMappingSchema,
   MappingSuggestionDecisionSchema,
   MappingSuggestionResponseSchema,
+  HumanReviewEvidenceSchema,
   ResolutionPreviewSchema,
   RuleApplicationResponseSchema,
   RunViewSchema,
@@ -13,6 +15,7 @@ import {
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
+import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
 import { exportRun, exportTrustedRun, MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
 
@@ -21,6 +24,7 @@ interface BuildAppOptions {
   logger?: boolean;
   matcher?: MatcherRunner;
   semanticMapper?: SemanticMapper;
+  evaluationRoot?: string;
 }
 
 function objectBody(value: unknown): Record<string, unknown> {
@@ -41,6 +45,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     options.matcher ?? createMatcherRunner(),
     options.semanticMapper ?? createSemanticMapperFromEnvironment(),
   );
+  const evaluations = new EvaluationStore(
+    options.evaluationRoot ?? fileURLToPath(new URL("../../../evaluation/reports/sw-009/", import.meta.url)),
+  );
 
   app.addContentTypeParser(
     ["text/csv", "application/csv", "application/vnd.ms-excel"],
@@ -49,6 +56,33 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   );
 
   app.get("/api/health", async () => createHealthResponse("api"));
+
+  app.get("/api/evaluations", async () => evaluations.catalog());
+
+  app.get("/api/evaluations/:evaluationId", async (request) => {
+    const { evaluationId } = routeParams(request.params);
+    const snapshot = evaluationId ? await evaluations.snapshot(evaluationId) : null;
+    if (!snapshot) throw new WorkflowError("evaluation_not_found", "Evaluation snapshot was not found.", 404);
+    return snapshot;
+  });
+
+  app.get("/api/evaluations/:evaluationId/comparison/:otherId", async (request) => {
+    const { evaluationId, otherId } = routeParams(request.params);
+    const comparison = evaluationId && otherId ? await evaluations.comparison(evaluationId, otherId) : null;
+    if (!comparison) throw new WorkflowError("comparison_not_found", "Evaluation comparison was not found.", 404);
+    return comparison;
+  });
+
+  app.get("/api/evaluations/:evaluationId/errors", async (request) => {
+    const { evaluationId } = routeParams(request.params);
+    const query = request.query as { type?: string; offset?: string; limit?: string };
+    const groups = ["candidate_misses", "ranking_losses", "post_score_losses", "false_auto_matches", "false_unmatched", "hard_negatives"] as const;
+    const group = groups.find((value) => value === query.type);
+    if (!evaluationId || !group) throw new WorkflowError("invalid_request", "A valid evaluation error type is required.");
+    const offset = Math.max(0, Number.parseInt(query.offset ?? "0", 10) || 0);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(query.limit ?? "20", 10) || 20));
+    return evaluations.errorPage(evaluationId, group, offset, limit);
+  });
 
   app.post("/api/runs", async (_request, reply) => {
     const view = RunViewSchema.parse(store.createRun());
@@ -61,6 +95,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
     return RunViewSchema.parse(store.get(runId));
+  });
+
+  app.get("/api/runs/:runId/evaluation-evidence", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    return HumanReviewEvidenceSchema.parse(humanReviewEvidence(RunViewSchema.parse(store.get(runId))));
   });
 
   app.post("/api/runs/:runId/datasets/:side", async (request, reply) => {

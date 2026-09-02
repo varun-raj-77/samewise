@@ -1,0 +1,8 @@
+{
+  "configVersion": "matcher-quality-gates-v1.0.0",
+  "fixture": "organizations-matcher-holdout-1200-v1",
+  "minimumCandidateRecall": 0.985,
+  "maximumFalseAutoMatches": 0,
+  "maximumHardNegativeAutoMatches": 0,
+  "minimumAutoMatchPrecision": 0.995
+}

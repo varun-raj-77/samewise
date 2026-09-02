@@ -1,0 +1,5389 @@
+[
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "5439.60",
+      "city": "Portland",
+      "contact_email": "",
+      "phone": "(355) 011-3815",
+      "state": "ME",
+      "street": "4404 Main St",
+      "updated_at": "2026-07-11T21:00:00Z",
+      "vendor_id": "A000075",
+      "vendor_name": "MaplePackaging LLC",
+      "website": "",
+      "zip": "04102"
+    },
+    "aRowId": "A000075",
+    "bRecord": {
+      "address_line_1": "4404 Main St",
+      "domain": "www.maplepackagingllc398.example",
+      "email_address": "accounts@maplepickagingllc398.example",
+      "last_updated": "2026-07-16T02:00:00Z",
+      "locality": "Portland",
+      "organization": "Maple Packbging LLC",
+      "organization_ref": "B000790",
+      "outstanding_balance": "5439.60",
+      "postal_code": "04101",
+      "region": "ME",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000790",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-1",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2707.52",
+      "city": "Richmond",
+      "contact_email": "",
+      "phone": "555-013-2080",
+      "state": "VA",
+      "street": "6884 Main Street",
+      "updated_at": "2025-03-09T01:00:00Z",
+      "vendor_id": "A000076",
+      "vendor_name": "Redwood Packaging Corporation",
+      "website": "https://redwoodpackagingcorporat200.example",
+      "zip": "23219"
+    },
+    "aRowId": "A000076",
+    "bRecord": {
+      "address_line_1": "6874 Main Street",
+      "domain": "legacy-847978aa9890.invalid",
+      "email_address": "",
+      "last_updated": "2025-02-14T19:00:00Z",
+      "locality": "Richmond",
+      "organization": "Redwood Qackaging Corp",
+      "organization_ref": "B001022",
+      "outstanding_balance": "2707.52",
+      "postal_code": "23219",
+      "region": "VA",
+      "status": "active",
+      "telephone": "556-013-2080"
+    },
+    "bRowId": "B001022",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-2",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "3985.43",
+      "city": "Raleigh",
+      "contact_email": "accounts@evergreenpackaginglimite295.example",
+      "phone": "(655) 018-7149",
+      "state": "NC",
+      "street": "588 River Road",
+      "updated_at": "2025-12-20T20:00:00Z",
+      "vendor_id": "A000150",
+      "vendor_name": "EVERGREENPACKAGING LIMITED",
+      "website": "https://legacy-8371211bc1d8.invalid",
+      "zip": "27601"
+    },
+    "aRowId": "A000150",
+    "bRecord": {
+      "address_line_1": "588 River Road",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-01-07T20:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Everhreen Packaging Limited",
+      "organization_ref": "B000550",
+      "outstanding_balance": "4048.43",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "inactive",
+      "telephone": "555-018-7149"
+    },
+    "bRowId": "B000550",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-3",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "374.48",
+      "city": "Raleigh",
+      "contact_email": "accounts@summitanalyticsincorpora31.ixample",
+      "phone": "+1 555-014-7114",
+      "state": "NC",
+      "street": "619  River Road",
+      "updated_at": "2026-04-08T14:00:00Z",
+      "vendor_id": "A000249",
+      "vendor_name": "Analytics Incorporated",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000249",
+    "bRecord": {
+      "address_line_1": "619 River Road",
+      "domain": "legacy-a55137bf9099.invalid",
+      "email_address": "",
+      "last_updated": "2026-04-22T21:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Summit Analytids Inc",
+      "organization_ref": "B000934",
+      "outstanding_balance": "437.48",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000934",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-4",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "2662.68",
+      "city": "Columbus",
+      "contact_email": "accounts@erergreenpackagingcorpor195.example",
+      "phone": "+1 555-018-7575",
+      "state": "OH",
+      "street": "6692 Commerce Avenue",
+      "updated_at": "2025-04-05T06:00:00Z",
+      "vendor_id": "A000326",
+      "vendor_name": "Evergreen PackagingCorp",
+      "website": "https://legacy-9abe808afa24.invalid",
+      "zip": "43215-0000"
+    },
+    "aRowId": "A000326",
+    "bRecord": {
+      "address_line_1": "6692 Commerce",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-03-18T22:00:00Z",
+      "locality": "Columbus",
+      "organization": "EvergreenPackaging Corporation",
+      "organization_ref": "B000650",
+      "outstanding_balance": "2648.43",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "inactive",
+      "telephone": "+1 565.018.7575"
+    },
+    "bRowId": "B000650",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-5",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "4294.15",
+      "city": "Raleigh",
+      "contact_email": "",
+      "phone": "",
+      "state": "NC",
+      "street": "1485 River Rd",
+      "updated_at": "2026-12-02T15:00:00Z",
+      "vendor_id": "A000355",
+      "vendor_name": "PioneerLimited",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000355",
+    "bRecord": {
+      "address_line_1": "1485 River Road",
+      "domain": "legacy-bc1e0fa042f1.invalid",
+      "email_address": "",
+      "last_updated": "2026-11-26T20:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Pioneer Wholesale Limited",
+      "organization_ref": "B000696",
+      "outstanding_balance": "4294.15",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "on_hold",
+      "telephone": "555-012-8425"
+    },
+    "bRowId": "B000696",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-6",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "4385.74",
+      "city": "Columbus",
+      "contact_email": "accounts@bluerkdgeanalyticsllc323.example",
+      "phone": "",
+      "state": "OH",
+      "street": "1622 Market Street",
+      "updated_at": "2025-11-30T18:00:00Z",
+      "vendor_id": "A000385",
+      "vendor_name": "Ridge Analytics LLC",
+      "website": "",
+      "zip": "43215"
+    },
+    "aRowId": "A000385",
+    "bRecord": {
+      "address_line_1": "1632 Market St",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-12-05T22:00:00Z",
+      "locality": "Columbus",
+      "organization": "Blue Ridge Analytics LLC",
+      "organization_ref": "B000214",
+      "outstanding_balance": "4385.74",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000214",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-7",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "4324.04",
+      "city": "Madison",
+      "contact_email": "",
+      "phone": "",
+      "state": "WI",
+      "street": "1404 Market Street",
+      "updated_at": "2025-01-21T12:00:00Z",
+      "vendor_id": "A000492",
+      "vendor_name": "Keystone Wholesale Limited",
+      "website": "https://legacy-bc508f918dc3.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000492",
+    "bRecord": {
+      "address_line_1": "1414 Market St",
+      "domain": "legacy-a5681898c909.invalid",
+      "email_address": "accounts@kezstonewholesalelimited317.example",
+      "last_updated": "2025-01-21T12:00:00Z",
+      "locality": "Madison",
+      "organization": "Keystooe Wholesale Ltd",
+      "organization_ref": "B000997",
+      "outstanding_balance": "4324.04",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "active",
+      "telephone": "655.010.9994"
+    },
+    "bRowId": "B000997",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-8",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2610.97",
+      "city": "Madison",
+      "contact_email": "accounts@keystonepackagingcorpjra197.example",
+      "phone": "",
+      "state": "WI",
+      "street": "6767 Market Street",
+      "updated_at": "2026-01-15T12:00:00Z",
+      "vendor_id": "A000567",
+      "vendor_name": "KEYSTONE PACKAGINGCORPORATION",
+      "website": "https://legacy-a553da0d3548.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000567",
+    "bRecord": {
+      "address_line_1": "6777 Market Street",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-01-15T12:00:00Z",
+      "locality": "Madison",
+      "organization": "Keystone Packaging Corporation",
+      "organization_ref": "B000980",
+      "outstanding_balance": "2625.22",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "inactive",
+      "telephone": "755-010-4499"
+    },
+    "bRowId": "B000980",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-9",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "3552.89",
+      "city": "Denver",
+      "contact_email": "",
+      "phone": "",
+      "state": "CO",
+      "street": "9103 Main Street",
+      "updated_at": "2026-11-22T15:00:00Z",
+      "vendor_id": "A000648",
+      "vendor_name": "Redwood Foods Limitee",
+      "website": "https://www.redwoodfoodslimited260.example/directory",
+      "zip": "80202"
+    },
+    "aRowId": "A000648",
+    "bRecord": {
+      "address_line_1": "9113 Main",
+      "domain": "legacy-85a26766bfae.invalid",
+      "email_address": "",
+      "last_updated": "2026-11-22T15:00:00Z",
+      "locality": "Denver",
+      "organization": "Redwood Foods Limited",
+      "organization_ref": "B000758",
+      "outstanding_balance": "3538.64",
+      "postal_code": "",
+      "region": "CO",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000758",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-10",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2305.43",
+      "city": "Austin",
+      "contact_email": "",
+      "phone": "555-013-6789",
+      "state": "TX",
+      "street": "5773 Main Street",
+      "updated_at": "2026-06-12T21:00:00Z",
+      "vendor_id": "A000733",
+      "vendor_name": "RedwoodLogistics Cprporation",
+      "website": "https://legacy-c16bbd6eaf96.invalid",
+      "zip": "78701"
+    },
+    "aRowId": "A000733",
+    "bRecord": {
+      "address_line_1": "5773  Main Street",
+      "domain": "legacy-7c4f74369263.invalid",
+      "email_address": "accounts@redwoodloristicscorporat170.example",
+      "last_updated": "2026-07-23T22:00:00Z",
+      "locality": "Austin",
+      "organization": "Redwood Logistics Corp",
+      "organization_ref": "B000397",
+      "outstanding_balance": "2305.43",
+      "postal_code": "78701",
+      "region": "TX",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000397",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-11",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "2368.12",
+      "city": "Albany",
+      "contact_email": "ACCOUNTS@keystoremanufacturingcor177.example",
+      "phone": "",
+      "state": "NY",
+      "street": "6028 Commerce Avenue",
+      "updated_at": "2026-03-10T16:00:00Z",
+      "vendor_id": "A000745",
+      "vendor_name": "Keyttone Corporation",
+      "website": "https://www.keystonemanufacturingcor177.example/directory",
+      "zip": "12207"
+    },
+    "aRowId": "A000745",
+    "bRecord": {
+      "address_line_1": "6028 Commerce Avenue",
+      "domain": "",
+      "email_address": "ACCOUNTS@keystonemanufacturingcor177.example",
+      "last_updated": "2026-04-02T19:00:00Z",
+      "locality": "Albany",
+      "organization": "Keystone Manufacturing Corporation",
+      "organization_ref": "B000782",
+      "outstanding_balance": "2382.37",
+      "postal_code": "12207",
+      "region": "NY",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000782",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-12",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "4426.55",
+      "city": "Raleigh",
+      "contact_email": "accounts@leystoneanalyticsllc327.example",
+      "phone": "",
+      "state": "NC",
+      "street": "1786 Commerce Avenue",
+      "updated_at": "2025-10-19T02:00:00Z",
+      "vendor_id": "A000787",
+      "vendor_name": "Keystone Analytids LLC",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000787",
+    "bRecord": {
+      "address_line_1": "1776 Commerce Avenue",
+      "domain": "www.keystoneanalyticsllc327.example",
+      "email_address": "",
+      "last_updated": "2025-10-19T03:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Keystone Analytics LLC",
+      "organization_ref": "B000086",
+      "outstanding_balance": "4489.55",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "on_hold",
+      "telephone": "553.010.8621"
+    },
+    "bRowId": "B000086",
+    "blockingEvidence": [],
+    "category": "candidate_no_shared_key",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "failureReason": "True link did not reach feature scoring.",
+    "failureStage": "candidate_generation",
+    "group": "candidate_misses",
+    "id": "candidate-miss-13",
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "4946.74",
+      "city": "Austin",
+      "contact_email": "",
+      "phone": "(555) 015-6668",
+      "state": "TX",
+      "street": "3070 Main St",
+      "updated_at": "2025-08-05T21:00:00Z",
+      "vendor_id": "A000184",
+      "vendor_name": "Westfield Foods LLC",
+      "website": "",
+      "zip": "78701"
+    },
+    "aRowId": "A000184",
+    "bRecord": {
+      "address_line_1": "3070 Main St",
+      "domain": "legacy-9507a40b9c75.invalid",
+      "email_address": "ACCOUNTS@westfijldfoodsllc362.example",
+      "last_updated": "2025-08-17T06:00:00Z",
+      "locality": "Austin",
+      "organization": "WestfieldFoods LLC",
+      "organization_ref": "B000703",
+      "outstanding_balance": "4919.24",
+      "postal_code": "",
+      "region": "TX",
+      "status": "inactive",
+      "telephone": ""
+    },
+    "bRowId": "B000703",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000939",
+      "evidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.14375,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "5470 Oak Ave",
+        "domain": "www.westfieldfoodscorporatio162.example",
+        "email_address": "accounts@westfieldfoodscorforatio162.example",
+        "last_updated": "2025-02-02T23:00:00Z",
+        "locality": "Austin",
+        "organization": "Westfield Foods Corporation",
+        "organization_ref": "B000939",
+        "outstanding_balance": "2193.57",
+        "postal_code": "78701",
+        "region": "TX",
+        "status": "on_hold",
+        "telephone": ""
+      },
+      "score": 0.351293
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "partial_agreement",
+        "contribution": 0.845863,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_left",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 1.5,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_left",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-1",
+    "score": 0.338605,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "6954.69",
+      "city": "Madison",
+      "contact_email": "accounts@pioneertechnologyincorpo509.exampte",
+      "phone": "(555) 012-1143",
+      "state": "WI",
+      "street": "8506 Market",
+      "updated_at": "2026-03-22T15:00:00Z",
+      "vendor_id": "A000491",
+      "vendor_name": "Pioneer Technology Incorporated 487",
+      "website": "https://legacy-88c8a600a350.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000491",
+    "bRecord": {
+      "address_line_1": "8516 Market Street",
+      "domain": "www.pioneertechnologyincorpo509.example",
+      "email_address": "",
+      "last_updated": "2026-03-16T22:00:00Z",
+      "locality": "Madison",
+      "organization": "Pioneer Technology Inc 487",
+      "organization_ref": "B000713",
+      "outstanding_balance": "6940.44",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "active",
+      "telephone": "557-012-1153"
+    },
+    "bRowId": "B000713",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000701",
+      "evidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.31132,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.225,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.192856,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "1111 Commerce Avenue",
+        "domain": "",
+        "email_address": "accounts@pioneertechuologylimited309.example",
+        "last_updated": "2025-07-13T18:00:00Z",
+        "locality": "Madison",
+        "organization": "Pioneer Technology Limited",
+        "organization_ref": "B000701",
+        "outstanding_balance": "4186.04",
+        "postal_code": "53703",
+        "region": "WI",
+        "status": "inactive",
+        "telephone": "553.012.9939"
+      },
+      "score": 0.344076
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "partial_agreement",
+        "contribution": 1.472214,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "conflict",
+        "contribution": -0.225,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "conflict",
+        "contribution": 0.20625,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.6,
+        "mappingId": "postal"
+      },
+      {
+        "class": "conflict",
+        "contribution": -0.15,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-2",
+    "score": 0.287754,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "12820.11",
+      "city": "Denver",
+      "contact_email": "accounts@westfieldanalyticscorpor932.example",
+      "phone": "",
+      "state": "CO",
+      "street": "4556 Main Street",
+      "updated_at": "2026-03-16T21:00:00Z",
+      "vendor_id": "A000556",
+      "vendor_name": "Westfield Analytics Corporation",
+      "website": "https://legacy-8c0611b55e6c.invalid",
+      "zip": "80202"
+    },
+    "aRowId": "A000556",
+    "bRecord": {
+      "address_line_1": "4556  Main Street",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-03-01T22:00:00Z",
+      "locality": "Denver",
+      "organization": "Westfield Analytics Corporation 910",
+      "organization_ref": "B000207",
+      "outstanding_balance": "12757.11",
+      "postal_code": "80202",
+      "region": "CO",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000207",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000543",
+      "evidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_both",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.31875,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.15,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "1959 Main Street",
+        "domain": "legacy-b6297868b48a.invalid",
+        "email_address": "accounts@westoieldanalyticsllc332.example",
+        "last_updated": "2026-01-22T00:00:00Z",
+        "locality": "Denver",
+        "organization": "Westfield Analytics LLC",
+        "organization_ref": "B000543",
+        "outstanding_balance": "4593.30",
+        "postal_code": "80202",
+        "region": "CO",
+        "status": "on_hold",
+        "telephone": ""
+      },
+      "score": 0.490661
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "partial_agreement",
+        "contribution": 1.333334,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "missing_both",
+        "contribution": 0.0,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 1.5,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.6,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-3",
+    "score": 0.463602,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "414.73",
+      "city": "Denver",
+      "contact_email": "accounts@mapleanalyticsincorporat28.example",
+      "phone": "+1 (555) 311-8096",
+      "state": "CO",
+      "street": "514 Industrial Road",
+      "updated_at": "2025-10-14T23:00:00Z",
+      "vendor_id": "A000635",
+      "vendor_name": "MapleAnalytics Incorporated",
+      "website": "https://legacy-d338d37e5655.invalid",
+      "zip": "80202"
+    },
+    "aRowId": "A000635",
+    "bRecord": {
+      "address_line_1": "524 Industrial Road",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-11-06T08:00:00Z",
+      "locality": "Denver",
+      "organization": "Maple Analytics Incorporated",
+      "organization_ref": "B000905",
+      "outstanding_balance": "351.73",
+      "postal_code": "80202",
+      "region": "CO",
+      "status": "on_hold",
+      "telephone": "+1 555.016.8096"
+    },
+    "bRowId": "B000905",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000482",
+      "evidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 0.845863,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.225,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.222414,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "7922 Oak Avenue",
+        "domain": "",
+        "email_address": "ACCOUNTS@mapleanalyticslimited228.excmple",
+        "last_updated": "2026-11-25T20:00:00Z",
+        "locality": "Denver",
+        "organization": "Maple Analytics Ltd",
+        "organization_ref": "B000482",
+        "outstanding_balance": "3087.12",
+        "postal_code": "80202",
+        "region": "CO",
+        "status": "inactive",
+        "telephone": "+1 556-011-7528"
+      },
+      "score": 0.287178
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "partial_agreement",
+        "contribution": 0.845863,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "conflict",
+        "contribution": -0.225,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "conflict",
+        "contribution": 0.390441,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.6,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-4",
+    "score": 0.254173,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "12853.11",
+      "city": "Columbus",
+      "contact_email": "ACCOUNTS@pioneerdentalcorporation939.example",
+      "phone": "",
+      "state": "OH",
+      "street": "4819 Commerce Avenue",
+      "updated_at": "2026-04-08T22:00:00Z",
+      "vendor_id": "A000652",
+      "vendor_name": "PIONEER DENTAL CORPORATION 917",
+      "website": "",
+      "zip": "43215"
+    },
+    "aRowId": "A000652",
+    "bRecord": {
+      "address_line_1": "4829 Commerce Avenue",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-04-08T22:00:00Z",
+      "locality": "Columbus",
+      "organization": "Pioneer Dental Corporation 917",
+      "organization_ref": "B000788",
+      "outstanding_balance": "12853.11",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "inactive",
+      "telephone": "555-012-6887"
+    },
+    "bRowId": "B000788",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000861",
+      "evidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.272728,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": 0.346323,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "2228  Commerce Ave",
+        "domain": "legacy-ca83851939a7.invalid",
+        "email_address": "accounts@pioneerdentalllc339.example",
+        "last_updated": "2026-10-09T06:00:00Z",
+        "locality": "Columbus",
+        "organization": "Pioneer Dental LLC",
+        "organization_ref": "B000861",
+        "outstanding_balance": "4640.67",
+        "postal_code": "43215",
+        "region": "OH",
+        "status": "inactive",
+        "telephone": "+1 555-012-4317"
+      },
+      "score": 0.427477
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "exact_agreement",
+        "contribution": 2.0,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "missing_left",
+        "contribution": 0.0,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "conflict",
+        "contribution": 0.390441,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.6,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_both",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-5",
+    "score": 0.412694,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "7927.43",
+      "city": "Richmond",
+      "contact_email": "ACCOUNTS@warbormanufacturingcorpo576.example",
+      "phone": "",
+      "state": "VA",
+      "street": "1198 Oak Avenue",
+      "updated_at": "2025-07-14T19:00:00Z",
+      "vendor_id": "A000685",
+      "vendor_name": "Harbor Manufacturing Corporation 554",
+      "website": "https://legacy-7eac90c3beee.invalid",
+      "zip": "23219"
+    },
+    "aRowId": "A000685",
+    "bRecord": {
+      "address_line_1": "1208 Oak Avenue",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-08-10T21:00:00Z",
+      "locality": "Richmond",
+      "organization": "Harbor Manufacturing Corporation 554",
+      "organization_ref": "B000767",
+      "outstanding_balance": "7878.68",
+      "postal_code": "23220",
+      "region": "VA",
+      "status": "on_hold",
+      "telephone": ""
+    },
+    "bRowId": "B000767",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000167",
+      "evidence": [
+        {
+          "class": "partial_agreement",
+          "contribution": 1.58,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.175,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "6193 Industrial Road",
+        "domain": "",
+        "email_address": "accounts@harbormanufacturingcorpo976.example",
+        "last_updated": "2026-08-08T23:00:00Z",
+        "locality": "Richmond",
+        "organization": "Harbor Manufacturing Corporation 954",
+        "organization_ref": "B000167",
+        "outstanding_balance": "13368.28",
+        "postal_code": "23219",
+        "region": "VA",
+        "status": "on_hold",
+        "telephone": "558-019-9303"
+      },
+      "score": 0.402874
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "exact_agreement",
+        "contribution": 2.0,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "missing_both",
+        "contribution": 0.0,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "conflict",
+        "contribution": 0.35,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "conflict",
+        "contribution": -0.12,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-6",
+    "score": 0.325287,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2765.56",
+      "city": "Columbus",
+      "contact_email": "accounts@blgeridgetechnologycorpo203.example",
+      "phone": "555-016-7642",
+      "state": "OH",
+      "street": "6988 Market Street",
+      "updated_at": "2025-08-19T18:00:00Z",
+      "vendor_id": "A000738",
+      "vendor_name": "Blue Ridge Technology Corporation",
+      "website": "",
+      "zip": "43215"
+    },
+    "aRowId": "A000738",
+    "bRecord": {
+      "address_line_1": "6988 Market Street",
+      "domain": "legacy-a07a9ce9c55c.invalid",
+      "email_address": "",
+      "last_updated": "2025-08-19T18:00:00Z",
+      "locality": "Columbus",
+      "organization": "Blue Ridge Technology Corp",
+      "organization_ref": "B000927",
+      "outstanding_balance": "2779.81",
+      "postal_code": "",
+      "region": "OH",
+      "status": "inactive",
+      "telephone": "555.086.7642"
+    },
+    "bRowId": "B000927",
+    "category": "ranking_wrong_top1",
+    "competingCandidate": {
+      "bRowId": "B000967",
+      "evidence": [
+        {
+          "class": "exact_agreement",
+          "contribution": 2.0,
+          "mappingId": "organization-name"
+        },
+        {
+          "class": "missing_right",
+          "contribution": 0.0,
+          "mappingId": "phone"
+        },
+        {
+          "class": "partial_agreement",
+          "contribution": 0.9,
+          "mappingId": "email"
+        },
+        {
+          "class": "conflict",
+          "contribution": -0.161112,
+          "mappingId": "address"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "city"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.3,
+          "mappingId": "region"
+        },
+        {
+          "class": "exact_agreement",
+          "contribution": 0.6,
+          "mappingId": "postal"
+        },
+        {
+          "class": "missing_left",
+          "contribution": 0.0,
+          "mappingId": "website-domain"
+        }
+      ],
+      "record": {
+        "address_line_1": "4596 River Road",
+        "domain": "www.blueridgetechnologyllc403.example",
+        "email_address": "accounts@bluermdgetechnologyllc403.example",
+        "last_updated": "2025-09-05T14:00:00Z",
+        "locality": "Columbus",
+        "organization": "Blue Ridge Technology LLC",
+        "organization_ref": "B000967",
+        "outstanding_balance": "5448.88",
+        "postal_code": "43215",
+        "region": "OH",
+        "status": "on_hold",
+        "telephone": ""
+      },
+      "score": 0.452746
+    },
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "class": "exact_agreement",
+        "contribution": 2.0,
+        "mappingId": "organization-name"
+      },
+      {
+        "class": "conflict",
+        "contribution": -0.225,
+        "mappingId": "phone"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "email"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 1.5,
+        "mappingId": "address"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "city"
+      },
+      {
+        "class": "exact_agreement",
+        "contribution": 0.3,
+        "mappingId": "region"
+      },
+      {
+        "class": "missing_right",
+        "contribution": 0.0,
+        "mappingId": "postal"
+      },
+      {
+        "class": "missing_left",
+        "contribution": 0.0,
+        "mappingId": "website-domain"
+      }
+    ],
+    "failureReason": "A false candidate ranked above the best true candidate.",
+    "failureStage": "ranking",
+    "group": "ranking_losses",
+    "id": "ranking-loss-7",
+    "score": 0.445402,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "6954.69",
+      "city": "Madison",
+      "contact_email": "accounts@pioneertechnologyincorpo509.exampte",
+      "phone": "(555) 012-1143",
+      "state": "WI",
+      "street": "8506 Market",
+      "updated_at": "2026-03-22T15:00:00Z",
+      "vendor_id": "A000491",
+      "vendor_name": "Pioneer Technology Incorporated 487",
+      "website": "https://legacy-88c8a600a350.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000491",
+    "bRecord": {
+      "address_line_1": "8516 Market Street",
+      "domain": "www.pioneertechnologyincorpo509.example",
+      "email_address": "",
+      "last_updated": "2026-03-16T22:00:00Z",
+      "locality": "Madison",
+      "organization": "Pioneer Technology Inc 487",
+      "organization_ref": "B000713",
+      "outstanding_balance": "6940.44",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "active",
+      "telephone": "557-012-1153"
+    },
+    "bRowId": "B000713",
+    "category": "retention_top_n",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Pioneer Technology Incorporated 487",
+        "bColumn": "organization",
+        "bValue": "Pioneer Technology Inc 487",
+        "conflictContribution": 0.0,
+        "contribution": 1.472214,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.852459
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.6
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.75
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "pioneer technology incorporated 487",
+        "normalizedB": "pioneer technology inc 487",
+        "outcome": "similar",
+        "positiveContribution": 1.472214,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "(555) 012-1143",
+        "bColumn": "telephone",
+        "bValue": "557-012-1153",
+        "conflictContribution": 0.225,
+        "contribution": -0.225,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized phone values conflict.",
+        "explanationCode": "phone_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550121143",
+        "normalizedB": "5570121153",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@pioneertechnologyincorpo509.exampte",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@pioneertechnologyincorpo509.exampte",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "8506 Market",
+        "bColumn": "address_line_1",
+        "bValue": "8516 Market Street",
+        "conflictContribution": 0.3,
+        "contribution": 0.20625,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.25
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.5
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.8
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "8506 market",
+        "normalizedB": "8516 market st",
+        "outcome": "conflict",
+        "positiveContribution": 0.50625,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Madison",
+        "bColumn": "locality",
+        "bValue": "Madison",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "City matches after normalization.",
+        "explanationCode": "city_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "madison",
+        "normalizedB": "madison",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "WI",
+        "bColumn": "region",
+        "bValue": "WI",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Region matches after normalization.",
+        "explanationCode": "region_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "wi",
+        "normalizedB": "wi",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "53703",
+        "bColumn": "postal_code",
+        "bValue": "53703",
+        "conflictContribution": 0.0,
+        "contribution": 0.6,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Postal matches after normalization.",
+        "explanationCode": "postal_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "53703",
+        "normalizedB": "53703",
+        "outcome": "exact",
+        "positiveContribution": 0.6,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-88c8a600a350.invalid",
+        "bColumn": "domain",
+        "bValue": "www.pioneertechnologyincorpo509.example",
+        "conflictContribution": 0.15,
+        "contribution": -0.15,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized domain values conflict.",
+        "explanationCode": "domain_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_host_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-88c8a600a350.invalid",
+        "normalizedB": "pioneertechnologyincorpo509.example",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "top_n_alternative_limit",
+    "failureStage": "post_score_retention",
+    "group": "post_score_losses",
+    "id": "post-score-loss-1",
+    "rank": 4,
+    "score": 0.287754,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "7927.43",
+      "city": "Richmond",
+      "contact_email": "ACCOUNTS@warbormanufacturingcorpo576.example",
+      "phone": "",
+      "state": "VA",
+      "street": "1198 Oak Avenue",
+      "updated_at": "2025-07-14T19:00:00Z",
+      "vendor_id": "A000685",
+      "vendor_name": "Harbor Manufacturing Corporation 554",
+      "website": "https://legacy-7eac90c3beee.invalid",
+      "zip": "23219"
+    },
+    "aRowId": "A000685",
+    "bRecord": {
+      "address_line_1": "1208 Oak Avenue",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-08-10T21:00:00Z",
+      "locality": "Richmond",
+      "organization": "Harbor Manufacturing Corporation 554",
+      "organization_ref": "B000767",
+      "outstanding_balance": "7878.68",
+      "postal_code": "23220",
+      "region": "VA",
+      "status": "on_hold",
+      "telephone": ""
+    },
+    "bRowId": "B000767",
+    "category": "retention_top_n",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Harbor Manufacturing Corporation 554",
+        "bColumn": "organization",
+        "bValue": "Harbor Manufacturing Corporation 554",
+        "conflictContribution": 0.0,
+        "contribution": 2.0,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Name matches after normalization.",
+        "explanationCode": "name_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "harbor manufacturing corporation 554",
+        "normalizedB": "harbor manufacturing corporation 554",
+        "outcome": "exact",
+        "positiveContribution": 2.0,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "",
+        "bColumn": "telephone",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_both",
+        "explanation": "Both mapped values are missing; this field is neutral.",
+        "explanationCode": "phone_missing_both",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "",
+        "normalizedB": "",
+        "outcome": "missing_both",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "ACCOUNTS@warbormanufacturingcorpo576.example",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@warbormanufacturingcorpo576.example",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "1198 Oak Avenue",
+        "bColumn": "address_line_1",
+        "bValue": "1208 Oak Avenue",
+        "conflictContribution": 0.3,
+        "contribution": 0.35,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.833333
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "1198 oak ave",
+        "normalizedB": "1208 oak ave",
+        "outcome": "conflict",
+        "positiveContribution": 0.65,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Richmond",
+        "bColumn": "locality",
+        "bValue": "Richmond",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "City matches after normalization.",
+        "explanationCode": "city_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "richmond",
+        "normalizedB": "richmond",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "VA",
+        "bColumn": "region",
+        "bValue": "VA",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Region matches after normalization.",
+        "explanationCode": "region_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "va",
+        "normalizedB": "va",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "23219",
+        "bColumn": "postal_code",
+        "bValue": "23220",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.6
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "23219",
+        "normalizedB": "23220",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-7eac90c3beee.invalid",
+        "bColumn": "domain",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-7eac90c3beee.invalid",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "top_n_alternative_limit",
+    "failureStage": "post_score_retention",
+    "group": "post_score_losses",
+    "id": "post-score-loss-2",
+    "rank": 4,
+    "score": 0.325287,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "162.25",
+      "city": "Columbus",
+      "contact_email": "",
+      "phone": "+1 (555) 012-8482",
+      "state": "OH",
+      "street": "178 River Rd",
+      "updated_at": "2025-03-09T14:00:00Z",
+      "vendor_id": "A000111",
+      "vendor_name": "Acme Industrial LLC",
+      "website": "",
+      "zip": "43215"
+    },
+    "aRowId": "A000111",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "222 Main St",
+      "domain": "legacy-be8ed6e7e68b.invalid",
+      "email_address": "accounts@acmeicdustrialservicesll20.example",
+      "last_updated": "2025-12-29T17:00:00Z",
+      "locality": "Denver",
+      "organization": "Acme Industrial Services LLC",
+      "organization_ref": "B000514",
+      "outstanding_balance": "207.94",
+      "postal_code": "80202",
+      "region": "CO",
+      "status": "inactive",
+      "telephone": ""
+    },
+    "bRowId": "B000514",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "768d27957445ab1f"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "7954aac9780561b2"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "c7bacf29632f85da"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "8d72e413c4cbab48"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "b56bc0528ac39c36"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Acme Industrial LLC",
+        "bColumn": "organization",
+        "bValue": "Acme Industrial Services LLC",
+        "conflictContribution": 0.0,
+        "contribution": 1.525642,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.769231
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.666667
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "acme industrial",
+        "normalizedB": "acme industrial services",
+        "outcome": "similar",
+        "positiveContribution": 1.525642,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "+1 (555) 012-8482",
+        "bColumn": "telephone",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "phone_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550128482",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "",
+        "bColumn": "email_address",
+        "bValue": "accounts@acmeicdustrialservicesll20.example",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_left",
+        "explanation": "Dataset A is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_left",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "",
+        "normalizedB": "accounts@acmeicdustrialservicesll20.example",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "178 River Rd",
+        "bColumn": "address_line_1",
+        "bValue": "222 Main St",
+        "conflictContribution": 0.3,
+        "contribution": -0.202175,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.26087
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "178 river rd",
+        "normalizedB": "222 main st",
+        "outcome": "conflict",
+        "positiveContribution": 0.097825,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Columbus",
+        "bColumn": "locality",
+        "bValue": "Denver",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "columbus",
+        "normalizedB": "denver",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "OH",
+        "bColumn": "region",
+        "bValue": "CO",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "oh",
+        "normalizedB": "co",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "43215",
+        "bColumn": "postal_code",
+        "bValue": "80202",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "43215",
+        "normalizedB": "80202",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "",
+        "bColumn": "domain",
+        "bValue": "legacy-be8ed6e7e68b.invalid",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_left",
+        "explanation": "Dataset A is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_left",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "",
+        "normalizedB": "legacy-be8ed6e7e68b.invalid",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "service_line_extension",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-1",
+    "rank": 2,
+    "score": 0.124536,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "246.84",
+      "city": "Madison",
+      "contact_email": "accounts@greenvalleyfowdslimited21.example",
+      "phone": "(555) 014-5736",
+      "state": "WI",
+      "street": "254  Commerce Avenue",
+      "updated_at": "2026-09-28T20:00:00Z",
+      "vendor_id": "A000207",
+      "vendor_name": "Green Valley Foods Limited",
+      "website": "https://legacy-c5d9ab68993f.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000207",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "297 Industrial Rd",
+      "domain": "",
+      "email_address": "accounts@greenvalleyfoodservicesl22.example",
+      "last_updated": "2026-05-16T19:00:00Z",
+      "locality": "Portland",
+      "organization": "Green Valley Food Services Limited",
+      "organization_ref": "B000824",
+      "outstanding_balance": "198.56",
+      "postal_code": "04101",
+      "region": "ME",
+      "status": "on_hold",
+      "telephone": "+1 555-015-4984"
+    },
+    "bRowId": "B000824",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "7d6984986fbf3bf8"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "cd20b59c2cc8478e"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "fd80e646dd210309"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "9d5f5fb77369cf03"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "bbc6eab1336fb387"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Green Valley Foods Limited",
+        "bColumn": "organization",
+        "bValue": "Green Valley Food Services Limited",
+        "conflictContribution": 0.0,
+        "contribution": 1.256364,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.818182
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.4
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "green valley foods",
+        "normalizedB": "green valley food services",
+        "outcome": "similar",
+        "positiveContribution": 1.256364,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "(555) 014-5736",
+        "bColumn": "telephone",
+        "bValue": "+1 555-015-4984",
+        "conflictContribution": 0.225,
+        "contribution": -0.225,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized phone values conflict.",
+        "explanationCode": "phone_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550145736",
+        "normalizedB": "5550154984",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@greenvalleyfowdslimited21.example",
+        "bColumn": "email_address",
+        "bValue": "accounts@greenvalleyfoodservicesl22.example",
+        "conflictContribution": 0.15,
+        "contribution": 0.9,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Email has partial normalized agreement.",
+        "explanationCode": "email_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "local_part_exact",
+            "value": 1.0
+          },
+          {
+            "name": "domain_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.8
+          }
+        ],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@greenvalleyfowdslimited21.example",
+        "normalizedB": "accounts@greenvalleyfoodservicesl22.example",
+        "outcome": "similar",
+        "positiveContribution": 1.05,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "254  Commerce Avenue",
+        "bColumn": "address_line_1",
+        "bValue": "297 Industrial Rd",
+        "conflictContribution": 0.3,
+        "contribution": -0.209091,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.242424
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "254 commerce ave",
+        "normalizedB": "297 industrial rd",
+        "outcome": "conflict",
+        "positiveContribution": 0.090909,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Madison",
+        "bColumn": "locality",
+        "bValue": "Portland",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.266667
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "madison",
+        "normalizedB": "portland",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "WI",
+        "bColumn": "region",
+        "bValue": "ME",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "wi",
+        "normalizedB": "me",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "53703",
+        "bColumn": "postal_code",
+        "bValue": "04101",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "53703",
+        "normalizedB": "04101",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-c5d9ab68993f.invalid",
+        "bColumn": "domain",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-c5d9ab68993f.invalid",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "singular_related_service",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-2",
+    "rank": 2,
+    "score": 0.170376,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "198.56",
+      "city": "Portland",
+      "contact_email": "accounts@greenvalveyfoodservicesl22.example",
+      "phone": "(555) 015-4984",
+      "state": "ME",
+      "street": "287 Industrial Road",
+      "updated_at": "2026-04-30T17:00:00Z",
+      "vendor_id": "A000410",
+      "vendor_name": "Green Valley Food Services Limited",
+      "website": "",
+      "zip": "04101-0000"
+    },
+    "aRowId": "A000410",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "254 Commerce Avenue",
+      "domain": "legacy-b76e95102bc1.invalid",
+      "email_address": "",
+      "last_updated": "2026-09-28T01:00:00Z",
+      "locality": "Madison",
+      "organization": "Green Valley Foods Limited",
+      "organization_ref": "B000322",
+      "outstanding_balance": "246.84",
+      "postal_code": "53703-0000",
+      "region": "WI",
+      "status": "inactive",
+      "telephone": "555.014.2738"
+    },
+    "bRowId": "B000322",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "7d6984986fbf3bf8"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "cd20b59c2cc8478e"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "fd80e646dd210309"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "9d5f5fb77369cf03"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "bbc6eab1336fb387"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Green Valley Food Services Limited",
+        "bColumn": "organization",
+        "bValue": "Green Valley Foods Limited",
+        "conflictContribution": 0.0,
+        "contribution": 1.256364,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.818182
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.4
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "green valley food services",
+        "normalizedB": "green valley foods",
+        "outcome": "similar",
+        "positiveContribution": 1.256364,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "(555) 015-4984",
+        "bColumn": "telephone",
+        "bValue": "555.014.2738",
+        "conflictContribution": 0.225,
+        "contribution": -0.225,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized phone values conflict.",
+        "explanationCode": "phone_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550154984",
+        "normalizedB": "5550142738",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@greenvalveyfoodservicesl22.example",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@greenvalveyfoodservicesl22.example",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "287 Industrial Road",
+        "bColumn": "address_line_1",
+        "bValue": "254 Commerce Avenue",
+        "conflictContribution": 0.3,
+        "contribution": -0.209091,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.242424
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "287 industrial rd",
+        "normalizedB": "254 commerce ave",
+        "outcome": "conflict",
+        "positiveContribution": 0.090909,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Portland",
+        "bColumn": "locality",
+        "bValue": "Madison",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.266667
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "portland",
+        "normalizedB": "madison",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "ME",
+        "bColumn": "region",
+        "bValue": "WI",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "me",
+        "normalizedB": "wi",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "04101-0000",
+        "bColumn": "postal_code",
+        "bValue": "53703-0000",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "04101",
+        "normalizedB": "53703",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "",
+        "bColumn": "domain",
+        "bValue": "legacy-b76e95102bc1.invalid",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_left",
+        "explanation": "Dataset A is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_left",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "",
+        "normalizedB": "legacy-b76e95102bc1.invalid",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "singular_related_service",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-3",
+    "rank": 2,
+    "score": 0.066928,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "190.61",
+      "city": "Austin",
+      "contact_email": "accounts@northstarmedicalsupplyin18.example",
+      "phone": "",
+      "state": "TX",
+      "street": "145 Oak Avenue",
+      "updated_at": "2025-12-23T13:00:00Z",
+      "vendor_id": "A000453",
+      "vendor_name": "Northstar Medical Supply Incorporated",
+      "website": "https://legacy-c58a67d78f1b.invalid",
+      "zip": "78701"
+    },
+    "aRowId": "A000453",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "102 Market",
+      "domain": "",
+      "email_address": "accounts@northstarmedicalgroupinc17.example",
+      "last_updated": "2025-09-16T12:00:00Z",
+      "locality": "Albany",
+      "organization": "Northstar Medical Group Incorporated",
+      "organization_ref": "B000125",
+      "outstanding_balance": "167.22",
+      "postal_code": "12207",
+      "region": "NY",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000125",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "1489c20d0b34ce0b"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "71196db66410ec9e"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "a2418d57d532ab6a"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "8de5912ef52b441c"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "f303cac1135eb9e5"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Northstar Medical Supply Incorporated",
+        "bColumn": "organization",
+        "bValue": "Northstar Medical Group Incorporated",
+        "conflictContribution": 0.0,
+        "contribution": 1.365958,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.851064
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "northstar medical supply",
+        "normalizedB": "northstar medical group",
+        "outcome": "similar",
+        "positiveContribution": 1.365958,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "",
+        "bColumn": "telephone",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_both",
+        "explanation": "Both mapped values are missing; this field is neutral.",
+        "explanationCode": "phone_missing_both",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "",
+        "normalizedB": "",
+        "outcome": "missing_both",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@northstarmedicalsupplyin18.example",
+        "bColumn": "email_address",
+        "bValue": "accounts@northstarmedicalgroupinc17.example",
+        "conflictContribution": 0.15,
+        "contribution": 0.9,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Email has partial normalized agreement.",
+        "explanationCode": "email_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "local_part_exact",
+            "value": 1.0
+          },
+          {
+            "name": "domain_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.883721
+          }
+        ],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@northstarmedicalsupplyin18.example",
+        "normalizedB": "accounts@northstarmedicalgroupinc17.example",
+        "outcome": "similar",
+        "positiveContribution": 1.05,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "145 Oak Avenue",
+        "bColumn": "address_line_1",
+        "bValue": "102 Market",
+        "conflictContribution": 0.3,
+        "contribution": -0.121428,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.47619
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "145 oak ave",
+        "normalizedB": "102 market",
+        "outcome": "conflict",
+        "positiveContribution": 0.178572,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Austin",
+        "bColumn": "locality",
+        "bValue": "Albany",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.333333
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "austin",
+        "normalizedB": "albany",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "TX",
+        "bColumn": "region",
+        "bValue": "NY",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "tx",
+        "normalizedB": "ny",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "78701",
+        "bColumn": "postal_code",
+        "bValue": "12207",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "78701",
+        "normalizedB": "12207",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-c58a67d78f1b.invalid",
+        "bColumn": "domain",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-c58a67d78f1b.invalid",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "shared_name_tokens",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-4",
+    "rank": 9,
+    "score": 0.218911,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "167.22",
+      "city": "Albany",
+      "contact_email": "accounts@northstarmedicalgroupinc17.example",
+      "phone": "555-010-1063",
+      "state": "NY",
+      "street": "102 Market St",
+      "updated_at": "2025-09-16T12:00:00Z",
+      "vendor_id": "A000459",
+      "vendor_name": "Northstar Medical Group Incorporated",
+      "website": "https://legacy-a7145718b484.invalid",
+      "zip": "12207"
+    },
+    "aRowId": "A000459",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "145 Oak Avenue",
+      "domain": "northstarmedicalsupplyin18.example",
+      "email_address": "",
+      "last_updated": "2025-12-23T13:00:00Z",
+      "locality": "Austin",
+      "organization": "Northstar Medical Supply Incorporated",
+      "organization_ref": "B000417",
+      "outstanding_balance": "281.11",
+      "postal_code": "78701-0000",
+      "region": "TX",
+      "status": "active",
+      "telephone": "555-011-9508"
+    },
+    "bRowId": "B000417",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "1489c20d0b34ce0b"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "71196db66410ec9e"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "a2418d57d532ab6a"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "8de5912ef52b441c"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "f303cac1135eb9e5"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Northstar Medical Group Incorporated",
+        "bColumn": "organization",
+        "bValue": "Northstar Medical Supply Incorporated",
+        "conflictContribution": 0.0,
+        "contribution": 1.365958,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.851064
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "northstar medical group",
+        "normalizedB": "northstar medical supply",
+        "outcome": "similar",
+        "positiveContribution": 1.365958,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "555-010-1063",
+        "bColumn": "telephone",
+        "bValue": "555-011-9508",
+        "conflictContribution": 0.225,
+        "contribution": -0.225,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized phone values conflict.",
+        "explanationCode": "phone_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550101063",
+        "normalizedB": "5550119508",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@northstarmedicalgroupinc17.example",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@northstarmedicalgroupinc17.example",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "102 Market St",
+        "bColumn": "address_line_1",
+        "bValue": "145 Oak Avenue",
+        "conflictContribution": 0.3,
+        "contribution": -0.14375,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.416667
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "102 market st",
+        "normalizedB": "145 oak ave",
+        "outcome": "conflict",
+        "positiveContribution": 0.15625,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Albany",
+        "bColumn": "locality",
+        "bValue": "Austin",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.333333
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "albany",
+        "normalizedB": "austin",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "NY",
+        "bColumn": "region",
+        "bValue": "TX",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "ny",
+        "normalizedB": "tx",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "12207",
+        "bColumn": "postal_code",
+        "bValue": "78701-0000",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "12207",
+        "normalizedB": "78701",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-a7145718b484.invalid",
+        "bColumn": "domain",
+        "bValue": "northstarmedicalsupplyin18.example",
+        "conflictContribution": 0.15,
+        "contribution": -0.15,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized domain values conflict.",
+        "explanationCode": "domain_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_host_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-a7145718b484.invalid",
+        "normalizedB": "northstarmedicalsupplyin18.example",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "shared_name_tokens",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-5",
+    "rank": 2,
+    "score": 0.069794,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "193.69",
+      "city": "Denver",
+      "contact_email": "",
+      "phone": "",
+      "state": "CO",
+      "street": "222 Main Street",
+      "updated_at": "2025-12-26T15:00:00Z",
+      "vendor_id": "A000560",
+      "vendor_name": "Acme Industrial Services LLC",
+      "website": "https://legacy-c90a2fe9949f.invalid",
+      "zip": "80202"
+    },
+    "aRowId": "A000560",
+    "autoMatched": false,
+    "bRecord": {
+      "address_line_1": "178 River Road",
+      "domain": "legacy-cdbae71c5719.invalid",
+      "email_address": "",
+      "last_updated": "2025-03-09T14:00:00Z",
+      "locality": "Columbus",
+      "organization": "Acme Industrial LLC",
+      "organization_ref": "B000112",
+      "outstanding_balance": "162.25",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "on_hold",
+      "telephone": "555.017.8488"
+    },
+    "bRowId": "B000112",
+    "blockingEvidence": [
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "768d27957445ab1f"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "7954aac9780561b2"
+      },
+      {
+        "blockerId": "name_character_v1",
+        "keyHash": "c7bacf29632f85da"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "8d72e413c4cbab48"
+      },
+      {
+        "blockerId": "name_token_v1",
+        "keyHash": "b56bc0528ac39c36"
+      }
+    ],
+    "category": "hard_negative_case",
+    "evaluationOnlyTruth": {
+      "label": "DIFFERENT",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Acme Industrial Services LLC",
+        "bColumn": "organization",
+        "bValue": "Acme Industrial LLC",
+        "conflictContribution": 0.0,
+        "contribution": 1.525642,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.769231
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.666667
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "acme industrial services",
+        "normalizedB": "acme industrial",
+        "outcome": "similar",
+        "positiveContribution": 1.525642,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "",
+        "bColumn": "telephone",
+        "bValue": "555.017.8488",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_left",
+        "explanation": "Dataset A is missing this value; this field is neutral.",
+        "explanationCode": "phone_missing_left",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "",
+        "normalizedB": "5550178488",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_both",
+        "explanation": "Both mapped values are missing; this field is neutral.",
+        "explanationCode": "email_missing_both",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "",
+        "normalizedB": "",
+        "outcome": "missing_both",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "222 Main Street",
+        "bColumn": "address_line_1",
+        "bValue": "178 River Road",
+        "conflictContribution": 0.3,
+        "contribution": -0.202175,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.26087
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "222 main st",
+        "normalizedB": "178 river rd",
+        "outcome": "conflict",
+        "positiveContribution": 0.097825,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Denver",
+        "bColumn": "locality",
+        "bValue": "Columbus",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized city values conflict.",
+        "explanationCode": "city_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "denver",
+        "normalizedB": "columbus",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "CO",
+        "bColumn": "region",
+        "bValue": "OH",
+        "conflictContribution": 0.06,
+        "contribution": -0.06,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized region values conflict.",
+        "explanationCode": "region_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "co",
+        "normalizedB": "oh",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "80202",
+        "bColumn": "postal_code",
+        "bValue": "43215",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.2
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "80202",
+        "normalizedB": "43215",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-c90a2fe9949f.invalid",
+        "bColumn": "domain",
+        "bValue": "legacy-cdbae71c5719.invalid",
+        "conflictContribution": 0.15,
+        "contribution": -0.15,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized domain values conflict.",
+        "explanationCode": "domain_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_host_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-c90a2fe9949f.invalid",
+        "normalizedB": "legacy-cdbae71c5719.invalid",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "service_line_extension",
+    "failureStage": "adversarial_check",
+    "group": "hard_negatives",
+    "id": "hard-negative-6",
+    "rank": 2,
+    "score": 0.107295,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "5439.60",
+      "city": "Portland",
+      "contact_email": "",
+      "phone": "(355) 011-3815",
+      "state": "ME",
+      "street": "4404 Main St",
+      "updated_at": "2026-07-11T21:00:00Z",
+      "vendor_id": "A000075",
+      "vendor_name": "MaplePackaging LLC",
+      "website": "",
+      "zip": "04102"
+    },
+    "aRowId": "A000075",
+    "bRecord": {
+      "address_line_1": "4404 Main St",
+      "domain": "www.maplepackagingllc398.example",
+      "email_address": "accounts@maplepickagingllc398.example",
+      "last_updated": "2026-07-16T02:00:00Z",
+      "locality": "Portland",
+      "organization": "Maple Packbging LLC",
+      "organization_ref": "B000790",
+      "outstanding_balance": "5439.60",
+      "postal_code": "04101",
+      "region": "ME",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000790",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000075",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2707.52",
+      "city": "Richmond",
+      "contact_email": "",
+      "phone": "555-013-2080",
+      "state": "VA",
+      "street": "6884 Main Street",
+      "updated_at": "2025-03-09T01:00:00Z",
+      "vendor_id": "A000076",
+      "vendor_name": "Redwood Packaging Corporation",
+      "website": "https://redwoodpackagingcorporat200.example",
+      "zip": "23219"
+    },
+    "aRowId": "A000076",
+    "bRecord": {
+      "address_line_1": "6874 Main Street",
+      "domain": "legacy-847978aa9890.invalid",
+      "email_address": "",
+      "last_updated": "2025-02-14T19:00:00Z",
+      "locality": "Richmond",
+      "organization": "Redwood Qackaging Corp",
+      "organization_ref": "B001022",
+      "outstanding_balance": "2707.52",
+      "postal_code": "23219",
+      "region": "VA",
+      "status": "active",
+      "telephone": "556-013-2080"
+    },
+    "bRowId": "B001022",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000076",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "3985.43",
+      "city": "Raleigh",
+      "contact_email": "accounts@evergreenpackaginglimite295.example",
+      "phone": "(655) 018-7149",
+      "state": "NC",
+      "street": "588 River Road",
+      "updated_at": "2025-12-20T20:00:00Z",
+      "vendor_id": "A000150",
+      "vendor_name": "EVERGREENPACKAGING LIMITED",
+      "website": "https://legacy-8371211bc1d8.invalid",
+      "zip": "27601"
+    },
+    "aRowId": "A000150",
+    "bRecord": {
+      "address_line_1": "588 River Road",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-01-07T20:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Everhreen Packaging Limited",
+      "organization_ref": "B000550",
+      "outstanding_balance": "4048.43",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "inactive",
+      "telephone": "555-018-7149"
+    },
+    "bRowId": "B000550",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000150",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "374.48",
+      "city": "Raleigh",
+      "contact_email": "accounts@summitanalyticsincorpora31.ixample",
+      "phone": "+1 555-014-7114",
+      "state": "NC",
+      "street": "619  River Road",
+      "updated_at": "2026-04-08T14:00:00Z",
+      "vendor_id": "A000249",
+      "vendor_name": "Analytics Incorporated",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000249",
+    "bRecord": {
+      "address_line_1": "619 River Road",
+      "domain": "legacy-a55137bf9099.invalid",
+      "email_address": "",
+      "last_updated": "2026-04-22T21:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Summit Analytids Inc",
+      "organization_ref": "B000934",
+      "outstanding_balance": "437.48",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000934",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000249",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "2662.68",
+      "city": "Columbus",
+      "contact_email": "accounts@erergreenpackagingcorpor195.example",
+      "phone": "+1 555-018-7575",
+      "state": "OH",
+      "street": "6692 Commerce Avenue",
+      "updated_at": "2025-04-05T06:00:00Z",
+      "vendor_id": "A000326",
+      "vendor_name": "Evergreen PackagingCorp",
+      "website": "https://legacy-9abe808afa24.invalid",
+      "zip": "43215-0000"
+    },
+    "aRowId": "A000326",
+    "bRecord": {
+      "address_line_1": "6692 Commerce",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-03-18T22:00:00Z",
+      "locality": "Columbus",
+      "organization": "EvergreenPackaging Corporation",
+      "organization_ref": "B000650",
+      "outstanding_balance": "2648.43",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "inactive",
+      "telephone": "+1 565.018.7575"
+    },
+    "bRowId": "B000650",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000326",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "on_hold",
+      "balance": "4294.15",
+      "city": "Raleigh",
+      "contact_email": "",
+      "phone": "",
+      "state": "NC",
+      "street": "1485 River Rd",
+      "updated_at": "2026-12-02T15:00:00Z",
+      "vendor_id": "A000355",
+      "vendor_name": "PioneerLimited",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000355",
+    "bRecord": {
+      "address_line_1": "1485 River Road",
+      "domain": "legacy-bc1e0fa042f1.invalid",
+      "email_address": "",
+      "last_updated": "2026-11-26T20:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Pioneer Wholesale Limited",
+      "organization_ref": "B000696",
+      "outstanding_balance": "4294.15",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "on_hold",
+      "telephone": "555-012-8425"
+    },
+    "bRowId": "B000696",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000355",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "4385.74",
+      "city": "Columbus",
+      "contact_email": "accounts@bluerkdgeanalyticsllc323.example",
+      "phone": "",
+      "state": "OH",
+      "street": "1622 Market Street",
+      "updated_at": "2025-11-30T18:00:00Z",
+      "vendor_id": "A000385",
+      "vendor_name": "Ridge Analytics LLC",
+      "website": "",
+      "zip": "43215"
+    },
+    "aRowId": "A000385",
+    "bRecord": {
+      "address_line_1": "1632 Market St",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-12-05T22:00:00Z",
+      "locality": "Columbus",
+      "organization": "Blue Ridge Analytics LLC",
+      "organization_ref": "B000214",
+      "outstanding_balance": "4385.74",
+      "postal_code": "43215",
+      "region": "OH",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000214",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000385",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "6954.69",
+      "city": "Madison",
+      "contact_email": "accounts@pioneertechnologyincorpo509.exampte",
+      "phone": "(555) 012-1143",
+      "state": "WI",
+      "street": "8506 Market",
+      "updated_at": "2026-03-22T15:00:00Z",
+      "vendor_id": "A000491",
+      "vendor_name": "Pioneer Technology Incorporated 487",
+      "website": "https://legacy-88c8a600a350.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000491",
+    "bRecord": {
+      "address_line_1": "8516 Market Street",
+      "domain": "www.pioneertechnologyincorpo509.example",
+      "email_address": "",
+      "last_updated": "2026-03-16T22:00:00Z",
+      "locality": "Madison",
+      "organization": "Pioneer Technology Inc 487",
+      "organization_ref": "B000713",
+      "outstanding_balance": "6940.44",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "active",
+      "telephone": "557-012-1153"
+    },
+    "bRowId": "B000713",
+    "category": "unmatched_decision_policy",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Pioneer Technology Incorporated 487",
+        "bColumn": "organization",
+        "bValue": "Pioneer Technology Inc 487",
+        "conflictContribution": 0.0,
+        "contribution": 1.472214,
+        "evidenceClass": "partial_agreement",
+        "explanation": "Name has partial normalized agreement.",
+        "explanationCode": "name_partial",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.852459
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.6
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.75
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "pioneer technology incorporated 487",
+        "normalizedB": "pioneer technology inc 487",
+        "outcome": "similar",
+        "positiveContribution": 1.472214,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "(555) 012-1143",
+        "bColumn": "telephone",
+        "bValue": "557-012-1153",
+        "conflictContribution": 0.225,
+        "contribution": -0.225,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized phone values conflict.",
+        "explanationCode": "phone_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "5550121143",
+        "normalizedB": "5570121153",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "accounts@pioneertechnologyincorpo509.exampte",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@pioneertechnologyincorpo509.exampte",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "8506 Market",
+        "bColumn": "address_line_1",
+        "bValue": "8516 Market Street",
+        "conflictContribution": 0.3,
+        "contribution": 0.20625,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.25
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.5
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.8
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "8506 market",
+        "normalizedB": "8516 market st",
+        "outcome": "conflict",
+        "positiveContribution": 0.50625,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Madison",
+        "bColumn": "locality",
+        "bValue": "Madison",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "City matches after normalization.",
+        "explanationCode": "city_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "madison",
+        "normalizedB": "madison",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "WI",
+        "bColumn": "region",
+        "bValue": "WI",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Region matches after normalization.",
+        "explanationCode": "region_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "wi",
+        "normalizedB": "wi",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "53703",
+        "bColumn": "postal_code",
+        "bValue": "53703",
+        "conflictContribution": 0.0,
+        "contribution": 0.6,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Postal matches after normalization.",
+        "explanationCode": "postal_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "53703",
+        "normalizedB": "53703",
+        "outcome": "exact",
+        "positiveContribution": 0.6,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-88c8a600a350.invalid",
+        "bColumn": "domain",
+        "bValue": "www.pioneertechnologyincorpo509.example",
+        "conflictContribution": 0.15,
+        "contribution": -0.15,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized domain values conflict.",
+        "explanationCode": "domain_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_host_exact",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-88c8a600a350.invalid",
+        "normalizedB": "pioneertechnologyincorpo509.example",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "decision_coverage",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000491",
+    "score": 0.287754,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "4324.04",
+      "city": "Madison",
+      "contact_email": "",
+      "phone": "",
+      "state": "WI",
+      "street": "1404 Market Street",
+      "updated_at": "2025-01-21T12:00:00Z",
+      "vendor_id": "A000492",
+      "vendor_name": "Keystone Wholesale Limited",
+      "website": "https://legacy-bc508f918dc3.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000492",
+    "bRecord": {
+      "address_line_1": "1414 Market St",
+      "domain": "legacy-a5681898c909.invalid",
+      "email_address": "accounts@kezstonewholesalelimited317.example",
+      "last_updated": "2025-01-21T12:00:00Z",
+      "locality": "Madison",
+      "organization": "Keystooe Wholesale Ltd",
+      "organization_ref": "B000997",
+      "outstanding_balance": "4324.04",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "active",
+      "telephone": "655.010.9994"
+    },
+    "bRowId": "B000997",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000492",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2610.97",
+      "city": "Madison",
+      "contact_email": "accounts@keystonepackagingcorpjra197.example",
+      "phone": "",
+      "state": "WI",
+      "street": "6767 Market Street",
+      "updated_at": "2026-01-15T12:00:00Z",
+      "vendor_id": "A000567",
+      "vendor_name": "KEYSTONE PACKAGINGCORPORATION",
+      "website": "https://legacy-a553da0d3548.invalid",
+      "zip": "53703"
+    },
+    "aRowId": "A000567",
+    "bRecord": {
+      "address_line_1": "6777 Market Street",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2026-01-15T12:00:00Z",
+      "locality": "Madison",
+      "organization": "Keystone Packaging Corporation",
+      "organization_ref": "B000980",
+      "outstanding_balance": "2625.22",
+      "postal_code": "53703",
+      "region": "WI",
+      "status": "inactive",
+      "telephone": "755-010-4499"
+    },
+    "bRowId": "B000980",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000567",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "7927.43",
+      "city": "Richmond",
+      "contact_email": "ACCOUNTS@warbormanufacturingcorpo576.example",
+      "phone": "",
+      "state": "VA",
+      "street": "1198 Oak Avenue",
+      "updated_at": "2025-07-14T19:00:00Z",
+      "vendor_id": "A000685",
+      "vendor_name": "Harbor Manufacturing Corporation 554",
+      "website": "https://legacy-7eac90c3beee.invalid",
+      "zip": "23219"
+    },
+    "aRowId": "A000685",
+    "bRecord": {
+      "address_line_1": "1208 Oak Avenue",
+      "domain": "",
+      "email_address": "",
+      "last_updated": "2025-08-10T21:00:00Z",
+      "locality": "Richmond",
+      "organization": "Harbor Manufacturing Corporation 554",
+      "organization_ref": "B000767",
+      "outstanding_balance": "7878.68",
+      "postal_code": "23220",
+      "region": "VA",
+      "status": "on_hold",
+      "telephone": ""
+    },
+    "bRowId": "B000767",
+    "category": "unmatched_decision_policy",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [
+      {
+        "aColumn": "vendor_name",
+        "aValue": "Harbor Manufacturing Corporation 554",
+        "bColumn": "organization",
+        "bValue": "Harbor Manufacturing Corporation 554",
+        "conflictContribution": 0.0,
+        "contribution": 2.0,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Name matches after normalization.",
+        "explanationCode": "name_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "name",
+        "label": "Organization name",
+        "mappingId": "organization-name",
+        "normalizedA": "harbor manufacturing corporation 554",
+        "normalizedB": "harbor manufacturing corporation 554",
+        "outcome": "exact",
+        "positiveContribution": 2.0,
+        "weight": 2.0
+      },
+      {
+        "aColumn": "phone",
+        "aValue": "",
+        "bColumn": "telephone",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_both",
+        "explanation": "Both mapped values are missing; this field is neutral.",
+        "explanationCode": "phone_missing_both",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "phone",
+        "label": "Phone",
+        "mappingId": "phone",
+        "normalizedA": "",
+        "normalizedB": "",
+        "outcome": "missing_both",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "contact_email",
+        "aValue": "ACCOUNTS@warbormanufacturingcorpo576.example",
+        "bColumn": "email_address",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "email_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "email",
+        "label": "Email",
+        "mappingId": "email",
+        "normalizedA": "accounts@warbormanufacturingcorpo576.example",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "street",
+        "aValue": "1198 Oak Avenue",
+        "bColumn": "address_line_1",
+        "bValue": "1208 Oak Avenue",
+        "conflictContribution": 0.3,
+        "contribution": 0.35,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized address values conflict.",
+        "explanationCode": "address_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "house_number_exact",
+            "value": 0.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.5
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.666667
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.833333
+          },
+          {
+            "name": "house_number_conflict",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "address",
+        "label": "Street address",
+        "mappingId": "address",
+        "normalizedA": "1198 oak ave",
+        "normalizedB": "1208 oak ave",
+        "outcome": "conflict",
+        "positiveContribution": 0.65,
+        "weight": 1.5
+      },
+      {
+        "aColumn": "city",
+        "aValue": "Richmond",
+        "bColumn": "locality",
+        "bValue": "Richmond",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "City matches after normalization.",
+        "explanationCode": "city_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "city",
+        "label": "City",
+        "mappingId": "city",
+        "normalizedA": "richmond",
+        "normalizedB": "richmond",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "state",
+        "aValue": "VA",
+        "bColumn": "region",
+        "bValue": "VA",
+        "conflictContribution": 0.0,
+        "contribution": 0.3,
+        "evidenceClass": "exact_agreement",
+        "explanation": "Region matches after normalization.",
+        "explanationCode": "region_exact",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 1.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "token_similarity",
+            "value": 1.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 1.0
+          }
+        ],
+        "fieldKind": "region",
+        "label": "State or region",
+        "mappingId": "region",
+        "normalizedA": "va",
+        "normalizedB": "va",
+        "outcome": "exact",
+        "positiveContribution": 0.3,
+        "weight": 0.3
+      },
+      {
+        "aColumn": "zip",
+        "aValue": "23219",
+        "bColumn": "postal_code",
+        "bValue": "23220",
+        "conflictContribution": 0.12,
+        "contribution": -0.12,
+        "evidenceClass": "conflict",
+        "explanation": "Non-empty normalized postal values conflict.",
+        "explanationCode": "postal_conflict",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [
+          {
+            "name": "normalized_exact",
+            "value": 0.0
+          },
+          {
+            "name": "character_similarity",
+            "value": 0.6
+          },
+          {
+            "name": "token_similarity",
+            "value": 0.0
+          },
+          {
+            "name": "meaningful_token_overlap",
+            "value": 0.0
+          }
+        ],
+        "fieldKind": "postal",
+        "label": "Postal code",
+        "mappingId": "postal",
+        "normalizedA": "23219",
+        "normalizedB": "23220",
+        "outcome": "conflict",
+        "positiveContribution": 0.0,
+        "weight": 0.6
+      },
+      {
+        "aColumn": "website",
+        "aValue": "https://legacy-7eac90c3beee.invalid",
+        "bColumn": "domain",
+        "bValue": "",
+        "conflictContribution": 0.0,
+        "contribution": 0.0,
+        "evidenceClass": "missing_right",
+        "explanation": "Dataset B is missing this value; this field is neutral.",
+        "explanationCode": "domain_missing_right",
+        "featurePipelineVersion": "feature-pipeline-v0.1.0",
+        "features": [],
+        "fieldKind": "domain",
+        "label": "Website domain",
+        "mappingId": "website-domain",
+        "normalizedA": "legacy-7eac90c3beee.invalid",
+        "normalizedB": "",
+        "outcome": "missing_one",
+        "positiveContribution": 0.0,
+        "weight": 1.0
+      }
+    ],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "decision_coverage",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000685",
+    "score": 0.325287,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "active",
+      "balance": "2305.43",
+      "city": "Austin",
+      "contact_email": "",
+      "phone": "555-013-6789",
+      "state": "TX",
+      "street": "5773 Main Street",
+      "updated_at": "2026-06-12T21:00:00Z",
+      "vendor_id": "A000733",
+      "vendor_name": "RedwoodLogistics Cprporation",
+      "website": "https://legacy-c16bbd6eaf96.invalid",
+      "zip": "78701"
+    },
+    "aRowId": "A000733",
+    "bRecord": {
+      "address_line_1": "5773  Main Street",
+      "domain": "legacy-7c4f74369263.invalid",
+      "email_address": "accounts@redwoodloristicscorporat170.example",
+      "last_updated": "2026-07-23T22:00:00Z",
+      "locality": "Austin",
+      "organization": "Redwood Logistics Corp",
+      "organization_ref": "B000397",
+      "outstanding_balance": "2305.43",
+      "postal_code": "78701",
+      "region": "TX",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000397",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000733",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "2368.12",
+      "city": "Albany",
+      "contact_email": "ACCOUNTS@keystoremanufacturingcor177.example",
+      "phone": "",
+      "state": "NY",
+      "street": "6028 Commerce Avenue",
+      "updated_at": "2026-03-10T16:00:00Z",
+      "vendor_id": "A000745",
+      "vendor_name": "Keyttone Corporation",
+      "website": "https://www.keystonemanufacturingcor177.example/directory",
+      "zip": "12207"
+    },
+    "aRowId": "A000745",
+    "bRecord": {
+      "address_line_1": "6028 Commerce Avenue",
+      "domain": "",
+      "email_address": "ACCOUNTS@keystonemanufacturingcor177.example",
+      "last_updated": "2026-04-02T19:00:00Z",
+      "locality": "Albany",
+      "organization": "Keystone Manufacturing Corporation",
+      "organization_ref": "B000782",
+      "outstanding_balance": "2382.37",
+      "postal_code": "12207",
+      "region": "NY",
+      "status": "active",
+      "telephone": ""
+    },
+    "bRowId": "B000782",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000745",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  },
+  {
+    "aRecord": {
+      "account_status": "inactive",
+      "balance": "4426.55",
+      "city": "Raleigh",
+      "contact_email": "accounts@leystoneanalyticsllc327.example",
+      "phone": "",
+      "state": "NC",
+      "street": "1786 Commerce Avenue",
+      "updated_at": "2025-10-19T02:00:00Z",
+      "vendor_id": "A000787",
+      "vendor_name": "Keystone Analytids LLC",
+      "website": "",
+      "zip": "27601"
+    },
+    "aRowId": "A000787",
+    "bRecord": {
+      "address_line_1": "1776 Commerce Avenue",
+      "domain": "www.keystoneanalyticsllc327.example",
+      "email_address": "",
+      "last_updated": "2025-10-19T03:00:00Z",
+      "locality": "Raleigh",
+      "organization": "Keystone Analytics LLC",
+      "organization_ref": "B000086",
+      "outstanding_balance": "4489.55",
+      "postal_code": "27601",
+      "region": "NC",
+      "status": "on_hold",
+      "telephone": "553.010.8621"
+    },
+    "bRowId": "B000086",
+    "category": "unmatched_candidate_miss",
+    "evaluationOnlyTruth": {
+      "label": "SAME",
+      "notice": "Evaluation-only truth. This was not matcher input."
+    },
+    "evidence": [],
+    "failureReason": "Matchable A row has no true pair retained for decision coverage.",
+    "failureStage": "candidate_generation",
+    "group": "false_unmatched",
+    "id": "false-unmatched-A000787",
+    "score": null,
+    "taxonomyVersion": "evaluation-error-taxonomy-v1.0.0"
+  }
+]

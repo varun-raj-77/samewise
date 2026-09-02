@@ -1,5 +1,14 @@
 # Evaluation
 
+SW-009 adds versioned evaluation product artifacts under `reports/sw-009`, an
+explicit holdout gate configuration under `configs`, and `samewise-matcher
+evaluation run|compare|inspect-errors`. Snapshot content identity excludes wall-clock
+time and includes evaluation semantics and provenance. Error payloads are separate
+from the catalog so the API can page them without enlarging normal product state.
+
+See `docs/sw-009-evaluation.md` for metric denominators, compatibility rules, source
+types, frozen reproduction facts, and the human-label sampling caveat.
+
 Versioned fixture manifests, candidate configs, deterministic snapshots, and
 reproducible candidate-generation reports live here. SW-002 summaries remain
 fixture facts only. SW-005 reports are limited to candidate retention, pair

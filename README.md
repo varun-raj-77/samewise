@@ -2,8 +2,8 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
-SW-008 adds deterministic, provenance-retaining field survivorship and a gated
-trusted merged output on top of the frozen SW-006 matcher and SW-007 review workspace:
+SW-009 adds a versioned evaluation product and matcher-version comparison on top of
+the frozen SW-006 matcher, SW-007 review workspace, and SW-008 survivorship flow:
 
 1. Upload immutable Dataset A and Dataset B CSV files.
 2. Inspect Python-generated profiles and limited representative samples.
@@ -21,6 +21,9 @@ trusted merged output on top of the frozen SW-006 matcher and SW-007 review work
    existing manual choices remain untouched.
 9. Export a formula-safe reconciliation report at any time. Export trusted merged
    output only when identity and relevant field conflicts are fully resolved.
+10. Open Evaluation to inspect frozen stage metrics, compatible version deltas,
+    score-band evidence, gates, and paged failure examples without exposing hidden
+    truth to ordinary reconciliation.
 
 Identity and survivorship are separate state transitions. Confirming identity never chooses a field value.
 
@@ -132,6 +135,29 @@ matchable A rows to review, ranked a true candidate first for 839/846 eligible r
 and auto-matched none of six hard-negative candidate pairs. These are fixture facts,
 not calibrated probabilities or evidence of real-data quality. The full denominator
 definitions and failure decomposition are in `evaluation/reports/sw-006/README.md`.
+
+## Evaluation as product evidence
+
+Samewise separates fully labeled synthetic benchmarks from human decisions gathered
+on the ambiguity-enriched review queue. Candidate recall is pair-level true links
+retained by blocking divided by all true links; it is a ceiling on downstream
+recovery, not matcher recall. Auto-match precision is true automatic links divided
+by all automatic links and is undefined when there are none. Review rate is row
+level: review-routed matchable A rows divided by A rows having at least one truth
+link. End-to-end recovery returns to pair level: true links retained for automatic
+or human decision divided by all true links.
+
+Duplicate source rows can create more true pairs than matchable A rows, so pair and
+row counts are never mixed. Score-band rates are empirical fixture observations,
+not calibrated probabilities. Human SAME/DIFFERENT decisions retain the exact
+matcher/candidate versions and evidence shown, but are described only as reviewed-
+subset evidence because the review queue is not a random sample.
+
+Direct version deltas require the same fixture/source identity, dataset fingerprints,
+candidate engine/configuration, and compatible evaluator semantics. Threshold
+what-if is retrospective analysis and cannot deploy a matcher configuration. See
+[docs/sw-009-evaluation.md](docs/sw-009-evaluation.md) for exact denominators,
+reproduced SW-006 values, comparison rules, gates, and limitations.
 
 ## Verify
 

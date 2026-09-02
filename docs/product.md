@@ -60,6 +60,12 @@ review rate, top-1 ranking, hard-negative behavior, and empirical score bands wi
 explicit denominators. Downstream recovery is asserted not to exceed the candidate
 recall ceiling.
 
+SW-009 makes this evidence inspectable in a dedicated product area. Versioned,
+content-addressed snapshots distinguish synthetic ground truth from nonrepresentative
+human review labels. Compatible matcher snapshots show percentage-point deltas;
+incompatible fixtures or evaluator semantics show no delta. Metrics lead to paged
+candidate-miss, ranking, retention, false-auto-match, and hard-negative examples.
+
 ## What Samewise is not
 
 - It is not a fuzzy spreadsheet join with an AI label.

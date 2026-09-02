@@ -126,6 +126,8 @@ export const IdentityDecisionSchema = z.object({
   systemProposal: z.enum(["auto_match", "needs_review"]),
   humanDecision: z.enum(["same_entity", "different_entity"]),
   matcherVersion: z.literal(MATCHER_VERSION),
+  candidateEngineVersion: z.literal(CANDIDATE_ENGINE_VERSION),
+  matchScore: z.number().min(0).max(1),
   evidenceShown: z.array(FieldEvidenceSchema).min(1),
   decidedAt: z.string().datetime(),
 }).strict();

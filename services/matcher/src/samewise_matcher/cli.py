@@ -24,6 +24,13 @@ from samewise_matcher.candidate_falsification import (
     run_falsification,
 )
 from samewise_matcher.contracts import create_health_response
+from samewise_matcher.evaluation_product import (
+    compare_snapshots,
+    load_weak_identifier_evidence,
+    markdown_comparison,
+    run_evaluation_product,
+    write_evaluation_artifacts,
+)
 from samewise_matcher.explainable_matcher import MatcherConfig, match_csvs_explainable
 from samewise_matcher.fixture_generator import generate_fixture, summarize_fixture
 from samewise_matcher.fixture_models import CorruptionConfig, FixtureConfig
@@ -134,6 +141,44 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--candidate-config", required=True, type=Path)
         command.add_argument("--matcher-config", required=True, type=Path)
         command.add_argument("--output-dir", required=True, type=Path)
+
+    evaluation = subcommands.add_parser(
+        "evaluation", help="create, compare, and inspect versioned evaluation snapshots"
+    )
+    evaluation_commands = evaluation.add_subparsers(
+        dest="evaluation_command", required=True
+    )
+    evaluation_run = evaluation_commands.add_parser(
+        "run", help="evaluate baseline and current matcher on one frozen fixture"
+    )
+    evaluation_run.add_argument("--root", type=Path, default=Path.cwd())
+    evaluation_run.add_argument("--fixture", required=True)
+    evaluation_run.add_argument("--mappings", required=True, type=Path)
+    evaluation_run.add_argument("--candidate-config", required=True, type=Path)
+    evaluation_run.add_argument("--matcher-config", required=True, type=Path)
+    evaluation_run.add_argument("--gates", required=True, type=Path)
+    evaluation_run.add_argument("--output-dir", required=True, type=Path)
+    evaluation_compare = evaluation_commands.add_parser(
+        "compare", help="compare two compatible snapshot JSON files"
+    )
+    evaluation_compare.add_argument("--snapshot-a", required=True, type=Path)
+    evaluation_compare.add_argument("--snapshot-b", required=True, type=Path)
+    evaluation_compare.add_argument("--output-dir", required=True, type=Path)
+    evaluation_errors = evaluation_commands.add_parser(
+        "inspect-errors", help="print one filtered evaluation error set"
+    )
+    evaluation_errors.add_argument("--errors", required=True, type=Path)
+    evaluation_errors.add_argument(
+        "--type",
+        choices=(
+            "candidate_misses",
+            "ranking_losses",
+            "post_score_losses",
+            "false_auto_matches",
+            "false_unmatched",
+            "hard_negatives",
+        ),
+    )
     return parser
 
 
@@ -439,6 +484,50 @@ def main(argv: Sequence[str] | None = None) -> int:
                 frozen.model_dump_json(indent=2) + "\n", encoding="utf-8"
             )
         print(markdown_matcher_report(report), end="")
+        return 0
+
+    if args.command == "evaluation" and args.evaluation_command == "run":
+        snapshots, errors, comparison = run_evaluation_product(
+            args.root.resolve(),
+            args.fixture,
+            _load_mappings(args.mappings),
+            _load_candidate_config(args.candidate_config),
+            _load_matcher_config(args.matcher_config),
+            json.loads(args.gates.read_text(encoding="utf-8")),
+        )
+        write_evaluation_artifacts(
+            args.output_dir,
+            snapshots,
+            errors,
+            comparison,
+            [load_weak_identifier_evidence(args.root.resolve())],
+        )
+        print(markdown_comparison(comparison), end="")
+        return 0
+
+    if args.command == "evaluation" and args.evaluation_command == "compare":
+        left = json.loads(args.snapshot_a.read_text(encoding="utf-8"))
+        right = json.loads(args.snapshot_b.read_text(encoding="utf-8"))
+        comparison = compare_snapshots(left, right)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        (args.output_dir / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (args.output_dir / "comparison.md").write_text(
+            markdown_comparison(comparison), encoding="utf-8"
+        )
+        print(markdown_comparison(comparison), end="")
+        return 0 if comparison["compatible"] else 3
+
+    if args.command == "evaluation" and args.evaluation_command == "inspect-errors":
+        errors = json.loads(args.errors.read_text(encoding="utf-8"))
+        selected = (
+            [error for error in errors if error["group"] == args.type]
+            if args.type
+            else errors
+        )
+        print(json.dumps(selected, indent=2, sort_keys=True))
         return 0
 
     return 2

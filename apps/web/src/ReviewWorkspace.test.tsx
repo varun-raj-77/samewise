@@ -90,7 +90,7 @@ describe("SW-007 review workspace", () => {
     const options = [candidate("c11", "A1", "B1", 1), candidate("c12", "A1", "B2", 2)];
     const active = candidate("c21", "A2", "B3", 1);
     const decidedAt = "2026-09-01T12:00:00.000Z";
-    const decision = { decisionId: "d1", runId: "run-review", candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "same_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, evidenceShown: options[0]!.evidence, decidedAt };
+    const decision = { decisionId: "d1", runId: "run-review", candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "same_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, candidateEngineVersion: "candidate-engine-v0.2.0" as const, matchScore: 0.72, evidenceShown: options[0]!.evidence, decidedAt };
     const value = run([...options, active], [
       queueItem("A1", options, { state: "reviewed_same", humanDecision: { candidateId: "c11", bRowId: "B1", humanDecision: "same_entity", decidedAt } }),
       queueItem("A2", [active]),
@@ -111,7 +111,7 @@ describe("SW-007 review workspace", () => {
     const first = candidate("c11", "A1", "B1", 1);
     const second = candidate("c21", "A2", "B3", 1);
     const initial = run([first, second], [queueItem("A1", [first]), queueItem("A2", [second])]);
-    const decision = { decisionId: "d1", runId: initial.runId, candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "same_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, evidenceShown: first.evidence, decidedAt: "2026-09-01T12:00:00.000Z" };
+    const decision = { decisionId: "d1", runId: initial.runId, candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "same_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, candidateEngineVersion: "candidate-engine-v0.2.0" as const, matchScore: 0.72, evidenceShown: first.evidence, decidedAt: "2026-09-01T12:00:00.000Z" };
     const updated = run([first, second], [
       queueItem("A1", [first], { state: "reviewed_same", humanDecision: { candidateId: "c11", bRowId: "B1", humanDecision: "same_entity", decidedAt: decision.decidedAt } }),
       queueItem("A2", [second]),
@@ -127,7 +127,7 @@ describe("SW-007 review workspace", () => {
   it("records DIFFERENT with D and advances to the next undecided alternative", async () => {
     const options = [candidate("c11", "A1", "B1", 1), candidate("c12", "A1", "B2", 2)];
     const initial = run(options, [queueItem("A1", options)]);
-    const decision = { decisionId: "d1", runId: initial.runId, candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "different_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, evidenceShown: options[0]!.evidence, decidedAt: "2026-09-01T12:00:00.000Z" };
+    const decision = { decisionId: "d1", runId: initial.runId, candidateId: "c11", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review" as const, humanDecision: "different_entity" as const, matcherVersion: "explainable-matcher-v0.2.0" as const, candidateEngineVersion: "candidate-engine-v0.2.0" as const, matchScore: 0.72, evidenceShown: options[0]!.evidence, decidedAt: "2026-09-01T12:00:00.000Z" };
     const updated = run(options, [queueItem("A1", options, { humanDecision: { candidateId: "c11", bRowId: "B1", humanDecision: "different_entity", decidedAt: decision.decidedAt } })], { decisions: [decision] });
     const onDecision = vi.fn(async () => updated);
     renderWorkspace(initial, { onDecision });

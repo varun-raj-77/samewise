@@ -96,6 +96,20 @@ describe("SW-003 API workflow", () => {
     const same = await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } });
     const afterSame = RunViewSchema.parse(same.json());
     expect(afterSame.decisions[0]?.humanDecision).toBe("same_entity");
+    expect(afterSame.decisions[0]).toMatchObject({
+      matcherVersion: "explainable-matcher-v0.2.0",
+      candidateEngineVersion: "candidate-engine-v0.2.0",
+      matchScore: 0.72,
+      systemProposal: "needs_review",
+    });
+    const humanEvidence = await app.inject({ method: "GET", url: `/api/runs/${runId}/evaluation-evidence` });
+    expect(humanEvidence.json()).toMatchObject({
+      source: { type: "HUMAN_REVIEW_LABELS", representative: false },
+      labeledCandidateCount: 1, sameLabels: 1, differentLabels: 0,
+      systemProposalAgreementRate: null,
+      labels: [{ matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", humanLabel: "SAME" }],
+    });
+    expect(humanEvidence.json().source.caveat).toContain("may not represent the full dataset distribution");
     expect(afterSame.summary?.onlyB).toBe(1);
     expect(afterSame.conflicts).toHaveLength(1);
     expect(afterSame.conflicts[0]?.resolution).toBeNull();

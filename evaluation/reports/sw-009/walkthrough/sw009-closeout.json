@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Samewise opened at the normal reconciliation product",
+    "Evaluation navigation opened the dedicated product screen",
+    "frozen holdout fixture identity is visible",
+    "synthetic source type is explicit",
+    "candidate and matcher versions are visible",
+    "SW-005F weak-identifier evidence is also surfaced",
+    "candidate recall has its exact denominator",
+    "auto-match precision has its exact denominator",
+    "review rate has its row-level denominator",
+    "end-to-end recovery has its exact denominator",
+    "pipeline decomposition is rendered",
+    "all accepted matcher gates are visible and passed",
+    "compatible baseline comparison is explicit",
+    "baseline and v0.2 review-rate delta is rendered",
+    "top-1 delta is rendered",
+    "undefined baseline precision is not rendered as zero",
+    "score-band analysis is visible",
+    "the UI makes no probability claim",
+    "candidate-stage miss evidence is inspectable",
+    "hidden truth is strongly marked evaluation-only",
+    "error rendering is bounded by API pagination",
+    "false-unmatched outcomes are inspectable",
+    "hard-negative cases are inspectable",
+    "hard-negative example was not auto-matched",
+    "threshold what-if updates retrospective counts",
+    "threshold control cannot deploy configuration",
+    "human-review sampling caveat is visible",
+    "normal reconciliation remains available after evaluation",
+    "no browser console errors",
+    "no browser HTTP errors"
+  ],
+  "browserConsoleErrors": [],
+  "browserHttpErrors": [],
+  "screenshots": [
+    "C:\\Users\\rekha\\OneDrive\\Documents\\ChatGPT\\Samewise\\evaluation\\reports\\sw-009\\walkthrough\\sw009-evaluation.png"
+  ]
+}

@@ -1,4 +1,23 @@
 export {
+  EVALUATION_SNAPSHOT_VERSION,
+  EVALUATION_VERSION,
+  EvaluationCatalogSchema,
+  EvaluationComparisonSchema,
+  EvaluationErrorPageSchema,
+  EvaluationErrorSchema,
+  EvaluationMetricSchema,
+  EvaluationSnapshotSchema,
+  EvaluationSourceTypeSchema,
+  HumanReviewEvidenceSchema,
+  type EvaluationCatalog,
+  type EvaluationComparison,
+  type EvaluationError,
+  type EvaluationErrorPage,
+  type EvaluationMetric,
+  type EvaluationSnapshot,
+  type HumanReviewEvidence,
+} from "./evaluation.js";
+export {
   createHealthResponse,
   HEALTH_RESPONSE_CONTRACT_VERSION,
   HealthResponseSchema,
