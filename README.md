@@ -2,8 +2,8 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
-SW-007 adds a purpose-built, keyboard-first ambiguous-identity review workspace
-on top of the frozen SW-006 candidate engine and explainable matcher:
+SW-008 adds deterministic, provenance-retaining field survivorship and a gated
+trusted merged output on top of the frozen SW-006 matcher and SW-007 review workspace:
 
 1. Upload immutable Dataset A and Dataset B CSV files.
 2. Inspect Python-generated profiles and limited representative samples.
@@ -15,8 +15,12 @@ on top of the frozen SW-006 candidate engine and explainable matcher:
    explicit collision context.
 6. Record **Same entity**, **Different entity**, or **Defer** with mouse or keyboard;
    decisions auto-advance and an eligible recent decision can be undone safely.
-7. Only after identity confirmation, explicitly choose **Use A** or **Use B** for a conflict.
-8. Export a formula-safe reconciliation CSV that preserves unresolved values honestly.
+7. Only after identity confirmation, manually choose **Use A**, **Use B**, or
+   **Keep both**, or configure a safe per-field rule.
+8. Preview a versioned rule before explicitly applying it; unresolvable cases and
+   existing manual choices remain untouched.
+9. Export a formula-safe reconciliation report at any time. Export trusted merged
+   output only when identity and relevant field conflicts are fully resolved.
 
 Identity and survivorship are separate state transitions. Confirming identity never chooses a field value.
 
@@ -66,8 +70,13 @@ Uploaded bytes are written once beneath the ignored `.samewise-data/<run-id>/` d
 | `POST` | `/api/runs/:runId/candidates/:candidateId/decisions` | Record Same/Different identity |
 | `PATCH` | `/api/runs/:runId/review-items/:aRowId` | Defer or return one unresolved A-side review item |
 | `POST` | `/api/runs/:runId/review-undo` | Undo the most recent eligible human identity decision |
-| `POST` | `/api/runs/:runId/conflicts/:conflictId/resolutions` | Record Use A/Use B resolution |
-| `GET` | `/api/runs/:runId/export` | Download reconciliation CSV |
+| `POST` | `/api/runs/:runId/conflicts/:conflictId/resolutions` | Record or explicitly replace Use A/Use B/Keep Both |
+| `DELETE` | `/api/runs/:runId/conflicts/:conflictId/resolution` | Clear current resolution and retain history |
+| `PUT` | `/api/runs/:runId/survivorship-policy` | Configure a validated versioned policy without applying it |
+| `POST` | `/api/runs/:runId/survivorship-preview` | Preview one configured field rule and bulk counts |
+| `POST` | `/api/runs/:runId/survivorship-apply` | Explicitly apply a rule without overwriting manual resolutions |
+| `GET` | `/api/runs/:runId/export` | Download the always-available reconciliation report |
+| `GET` | `/api/runs/:runId/trusted-export` | Download trusted merged output only when readiness passes |
 
 Uploads use a CSV content type plus an `X-File-Name` header. The development limit is 2 MiB per file.
 
@@ -127,12 +136,19 @@ definitions and failure decomposition are in `evaluation/reports/sw-006/README.m
 ## Verify
 
 ```text
+uv sync --project services/matcher --locked
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm --filter @samewise/web build
 pnpm verify
 ```
+
+`uv` remains the Python dependency manager. Root verification prefers `uv` when
+it is available on `PATH`; after the normal sync above it can also use the
+project-local `services/matcher/.venv` directly on Windows or POSIX. If neither
+is available, verification stops with the required setup command instead of
+creating a temporary command shim.
 
 Normal tests mock the OpenAI boundary and require no network or API key. To run one opt-in live development evaluation against only the visible organization fixtures:
 
@@ -173,6 +189,28 @@ uv run --project services/matcher samewise-matcher candidates benchmark --root .
   transferability.
 - AI schema mapping is process-local, requires human review, and is not a substitute for deterministic row matching.
 - No authentication, database, queue, worker, or production observability platform.
+- Survivorship policy, current resolutions, and compact history are process-local.
+- Prefer newest accepts explicit mapped ISO date/timestamp strings; it never infers
+  business time from upload time or arbitrary locale date text.
+- Multiple effective links are exported separately rather than collapsed into a
+  multi-record golden entity.
+
+## Survivorship semantics
+
+Identity and survivorship are separate. SAME alone creates no selected value.
+Supported field strategies are Use A, Use B, Keep Both, Prefer non-null, Prefer
+newest, and Prefer trusted source. Missing for non-null rules means only an empty or
+whitespace-only parsed string; literals such as `NULL` and `N/A` remain source data.
+Trusted-source rules are per mapped comparison field and have no implicit fallback.
+Newest requires an explicit mapped date field and leaves missing, malformed, or tied
+timestamps unresolved.
+
+KEEP BOTH is not a delimiter-concatenated canonical value. Trusted CSV leaves the
+canonical field empty and emits dedicated `<field>__A`, `<field>__B`, and resolution
+metadata columns. See [docs/sw-008-survivorship.md](docs/sw-008-survivorship.md).
+
+Synthetic tests establish deterministic rule correctness. They are not a claim of
+real-world survivorship accuracy.
 
 ## Repository map
 

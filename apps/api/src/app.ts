@@ -4,14 +4,17 @@ import {
   ManualMappingSchema,
   MappingSuggestionDecisionSchema,
   MappingSuggestionResponseSchema,
+  ResolutionPreviewSchema,
+  RuleApplicationResponseSchema,
   RunViewSchema,
+  SurvivorshipPolicyInputSchema,
   createHealthResponse,
 } from "@samewise/contracts";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
-import { exportRun, MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
+import { exportRun, exportTrustedRun, MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
 
 interface BuildAppOptions {
   dataRoot?: string;
@@ -146,10 +149,44 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.post("/api/runs/:runId/conflicts/:conflictId/resolutions", async (request) => {
     const { runId, conflictId } = routeParams(request.params);
     const action = objectBody(request.body).action;
-    if (!runId || !conflictId || (action !== "use_a" && action !== "use_b")) throw new WorkflowError("invalid_request", "A valid field-resolution action is required.");
-    const view = RunViewSchema.parse(store.resolveConflict(runId, conflictId, action));
+    const replace = objectBody(request.body).replace;
+    if (!runId || !conflictId || (action !== "use_a" && action !== "use_b" && action !== "keep_both") || (replace !== undefined && typeof replace !== "boolean")) throw new WorkflowError("invalid_request", "A valid field-resolution action is required.");
+    const view = RunViewSchema.parse(store.resolveConflict(runId, conflictId, action, replace === true));
     app.log.info({ runId, stage: "resolution", conflictId, action }, "field resolution recorded");
     return view;
+  });
+
+  app.delete("/api/runs/:runId/conflicts/:conflictId/resolution", async (request) => {
+    const { runId, conflictId } = routeParams(request.params);
+    if (!runId || !conflictId) throw new WorkflowError("invalid_request", "Run ID and conflict ID are required.");
+    const view = RunViewSchema.parse(store.clearResolution(runId, conflictId));
+    app.log.info({ runId, stage: "resolution", conflictId }, "field resolution cleared");
+    return view;
+  });
+
+  app.put("/api/runs/:runId/survivorship-policy", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const policy = SurvivorshipPolicyInputSchema.parse(request.body);
+    const view = RunViewSchema.parse(store.setSurvivorshipPolicy(runId, policy));
+    app.log.info({ runId, stage: "resolution", policyVersion: view.survivorshipPolicy?.policyVersion }, "survivorship policy configured without applying it");
+    return view;
+  });
+
+  app.post("/api/runs/:runId/survivorship-preview", async (request) => {
+    const { runId } = routeParams(request.params);
+    const ruleId = objectBody(request.body).ruleId;
+    if (!runId || typeof ruleId !== "string" || !ruleId) throw new WorkflowError("invalid_request", "A configured survivorship rule is required.");
+    return ResolutionPreviewSchema.parse(store.previewSurvivorshipRule(runId, ruleId));
+  });
+
+  app.post("/api/runs/:runId/survivorship-apply", async (request) => {
+    const { runId } = routeParams(request.params);
+    const ruleId = objectBody(request.body).ruleId;
+    if (!runId || typeof ruleId !== "string" || !ruleId) throw new WorkflowError("invalid_request", "A configured survivorship rule is required.");
+    const result = store.applySurvivorshipRule(runId, ruleId);
+    app.log.info({ runId, stage: "resolution", ruleId, policyVersion: result.policyVersion, appliedCount: result.appliedCount }, "survivorship rule explicitly applied");
+    return RuleApplicationResponseSchema.parse({ ...result, run: RunViewSchema.parse(result.run) });
   });
 
   app.get("/api/runs/:runId/export", async (request, reply) => {
@@ -159,6 +196,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     app.log.info({ runId, stage: "export" }, "reconciliation export created");
     reply.header("Content-Type", "text/csv; charset=utf-8");
     reply.header("Content-Disposition", `attachment; filename="samewise-${runId}.csv"`);
+    return csv;
+  });
+
+  app.get("/api/runs/:runId/trusted-export", async (request, reply) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const csv = exportTrustedRun(store.get(runId));
+    app.log.info({ runId, stage: "trusted_export" }, "trusted merged export created");
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="samewise-trusted-${runId}.csv"`);
     return csv;
   });
 

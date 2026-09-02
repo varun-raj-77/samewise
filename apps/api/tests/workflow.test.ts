@@ -101,7 +101,7 @@ describe("SW-003 API workflow", () => {
     expect(afterSame.conflicts[0]?.resolution).toBeNull();
 
     const resolved = await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${afterSame.conflicts[0]!.conflictId}/resolutions`, payload: { action: "use_a" } });
-    expect(RunViewSchema.parse(resolved.json()).conflicts[0]?.resolution?.action).toBe("use_a");
+    expect(RunViewSchema.parse(resolved.json()).conflicts[0]?.resolution?.strategy).toBe("use_a");
     const exported = await app.inject({ method: "GET", url: `/api/runs/${runId}/export` });
     expect(exported.statusCode).toBe(200);
     expect(exported.body).toContain("identity_decision_source");
@@ -109,6 +109,94 @@ describe("SW-003 API workflow", () => {
     expect(exported.body).toContain("'=SUM(1,2)");
     const after = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect(after).toEqual(before);
+  });
+
+  it("previews and explicitly applies a versioned per-field rule only after identity confirmation", async () => {
+    const { runId, result } = await setup();
+    expect(result.conflicts).toEqual([]);
+    const configuredBeforeIdentity = RunViewSchema.parse((await app.inject({ method: "PUT", url: `/api/runs/${runId}/survivorship-policy`, payload: { fieldPolicies: [{ semanticField: "status", strategy: "prefer_trusted_source", trustedSource: "B" }] } })).json());
+    const rule = configuredBeforeIdentity.survivorshipPolicy!.fieldPolicies[0]!;
+    const unpreviewedApply = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId: rule.ruleId } });
+    expect(unpreviewedApply.statusCode).toBe(409);
+    expect(unpreviewedApply.json().error.code).toBe("survivorship_preview_required");
+    const emptyPreview = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-preview`, payload: { ruleId: rule.ruleId } });
+    expect(emptyPreview.json()).toMatchObject({ affectedCount: 0, resolvableCount: 0 });
+    const emptyApply = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId: rule.ruleId } });
+    expect(emptyApply.json()).toMatchObject({ appliedCount: 0 });
+    expect(RunViewSchema.parse(emptyApply.json().run).conflicts).toEqual([]);
+
+    const afterSame = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    expect(afterSame.conflicts[0]?.resolution).toBeNull();
+    const preview = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-preview`, payload: { ruleId: rule.ruleId } });
+    expect(preview.json()).toMatchObject({ affectedCount: 1, resolvableCount: 1, unresolvedCount: 0, items: [{ outcome: "would_resolve", chosenSource: "B", chosenValue: "inactive" }] });
+    expect(RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json()).conflicts[0]?.resolution).toBeNull();
+    const applied = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId: rule.ruleId } });
+    const appliedView = RunViewSchema.parse(applied.json().run);
+    expect(applied.json()).toMatchObject({ appliedCount: 1, unresolvedCount: 0 });
+    expect(appliedView.conflicts[0]?.resolution).toMatchObject({ resolutionSource: "rule", strategy: "prefer_trusted_source", chosenSource: "B", chosenValue: "inactive", policyVersion: configuredBeforeIdentity.survivorshipPolicy!.policyVersion, inputSnapshot: { aValue: "=SUM(1,2)", bValue: "inactive" } });
+    await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-preview`, payload: { ruleId: rule.ruleId } });
+    const repeated = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId: rule.ruleId } });
+    expect(repeated.json()).toMatchObject({ appliedCount: 0, skippedCount: 1 });
+  });
+
+  it("preserves manual precedence, supports explicit change/clear, and retains compact history", async () => {
+    const { runId } = await setup();
+    const afterSame = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    const conflictId = afterSame.conflicts[0]!.conflictId;
+    const useA = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictId}/resolutions`, payload: { action: "use_a" } })).json());
+    expect(useA.conflicts[0]?.resolution?.chosenSource).toBe("A");
+    const accidentalReplace = await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictId}/resolutions`, payload: { action: "use_b" } });
+    expect(accidentalReplace.statusCode).toBe(409);
+    const useB = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictId}/resolutions`, payload: { action: "use_b", replace: true } })).json());
+    expect(useB.conflicts[0]).toMatchObject({ status: "resolved", resolution: { chosenSource: "B" }, resolutionHistory: [{ chosenSource: "A" }] });
+    const cleared = RunViewSchema.parse((await app.inject({ method: "DELETE", url: `/api/runs/${runId}/conflicts/${conflictId}/resolution` })).json());
+    expect(cleared.conflicts[0]).toMatchObject({ status: "unresolved", resolution: null });
+    expect(cleared.conflicts[0]?.resolutionHistory).toHaveLength(2);
+
+    const configured = RunViewSchema.parse((await app.inject({ method: "PUT", url: `/api/runs/${runId}/survivorship-policy`, payload: { fieldPolicies: [{ semanticField: "status", strategy: "prefer_trusted_source", trustedSource: "B" }] } })).json());
+    const ruleId = configured.survivorshipPolicy!.fieldPolicies[0]!.ruleId;
+    const wouldResolve = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-preview`, payload: { ruleId } });
+    expect(wouldResolve.json()).toMatchObject({ resolvableCount: 1 });
+    const manualAgain = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictId}/resolutions`, payload: { action: "use_a" } })).json());
+    const staleApply = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId } });
+    expect(staleApply.statusCode).toBe(409);
+    expect(staleApply.json().error.code).toBe("survivorship_preview_required");
+    const preview = await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-preview`, payload: { ruleId } });
+    expect(preview.json()).toMatchObject({ skippedManualCount: 1, items: [{ outcome: "skipped_manual" }] });
+    await app.inject({ method: "POST", url: `/api/runs/${runId}/survivorship-apply`, payload: { ruleId } });
+    expect(RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json()).conflicts[0]?.resolution?.resolutionId).toBe(manualAgain.conflicts[0]?.resolution?.resolutionId);
+  });
+
+  it("gates trusted output, treats KEEP BOTH as deliberate, preserves source-only provenance, and defends formulas", async () => {
+    const { runId } = await setup();
+    expect((await app.inject({ method: "GET", url: `/api/runs/${runId}/export` })).statusCode).toBe(200);
+    const identityBlocked = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(identityBlocked.statusCode).toBe(409);
+    expect(identityBlocked.json().error.message).toContain("identity review");
+    const same = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    const conflictBlocked = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(conflictBlocked.statusCode).toBe(409);
+    expect(conflictBlocked.json().error.message).toContain("comparison-field");
+    const kept = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${same.conflicts[0]!.conflictId}/resolutions`, payload: { action: "keep_both" } })).json());
+    expect(kept.trustedExportReadiness.ready).toBe(true);
+    expect(kept.conflicts[0]?.resolution).toMatchObject({ strategy: "keep_both", chosenValue: null, keptValues: [{ source: "A", value: "=SUM(1,2)" }, { source: "B", value: "inactive" }] });
+    const trusted = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(trusted.statusCode).toBe(200);
+    expect(trusted.body).toContain("Status__A,Status__B,Status__resolution");
+    expect(trusted.body).toContain("keep_both,keep_both");
+    expect(trusted.body).toContain("'=SUM(1,2)");
+    expect(trusted.body).toContain("source_only_b");
+    expect(trusted.body).toContain("trusted-merged-export-v1");
+  });
+
+  it("rejects an invalid policy atomically and leaves the last valid policy intact", async () => {
+    const { runId } = await setup();
+    const valid = RunViewSchema.parse((await app.inject({ method: "PUT", url: `/api/runs/${runId}/survivorship-policy`, payload: { fieldPolicies: [{ semanticField: "status", strategy: "prefer_non_null" }] } })).json());
+    const invalid = await app.inject({ method: "PUT", url: `/api/runs/${runId}/survivorship-policy`, payload: { fieldPolicies: [{ semanticField: "unknown", strategy: "prefer_non_null" }] } });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().error.code).toBe("invalid_survivorship_policy");
+    const preserved = RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    expect(preserved.survivorshipPolicy?.policyVersion).toBe(valid.survivorshipPolicy?.policyVersion);
   });
 
   it("records DIFFERENT ENTITY without creating field conflicts", async () => {

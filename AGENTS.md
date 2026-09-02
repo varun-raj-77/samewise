@@ -17,3 +17,7 @@ These constraints are permanent unless a documented architecture decision change
 - Preserve the current architecture unless a documented decision changes it.
 - Changes require tests proportional to their behavior and risk.
 - User-facing match explanations must be derived from real matcher evidence, never invented prose.
+- Survivorship rules are closed, deterministic strategies; do not execute user or model-generated code.
+- Saving a survivorship policy must never apply it. Preview and explicit apply remain separate actions.
+- Manual field resolutions take precedence until explicitly changed or cleared.
+- Reconciliation reports may expose unresolved state; outputs labeled trusted must gate unresolved identity and required field conflicts.

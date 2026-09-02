@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.dev/contracts/survivorship/1.0.0.json",
+  "title": "SamewiseSurvivorshipBoundary",
+  "type": "object",
+  "x-contract-version": "1.0.0",
+  "$defs": {
+    "strategy": { "enum": ["use_a", "use_b", "keep_both", "prefer_non_null", "prefer_newest", "prefer_trusted_source"] },
+    "ruleStrategy": { "enum": ["keep_both", "prefer_non_null", "prefer_newest", "prefer_trusted_source"] },
+    "fieldPolicyInput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["semanticField", "strategy"],
+      "properties": {
+        "semanticField": { "type": "string", "minLength": 1 },
+        "strategy": { "$ref": "#/$defs/ruleStrategy" },
+        "trustedSource": { "enum": ["A", "B"] },
+        "timestampMappingId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fieldPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ruleId", "semanticField", "strategy"],
+      "properties": {
+        "ruleId": { "type": "string", "minLength": 1 }, "semanticField": { "type": "string", "minLength": 1 },
+        "strategy": { "$ref": "#/$defs/ruleStrategy" }, "trustedSource": { "enum": ["A", "B"] }, "timestampMappingId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "schemaVersion", "policyVersion", "fieldPolicies", "configuredAt"],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" }, "schemaVersion": { "const": "survivorship-policy-v1" }, "policyVersion": { "type": "string", "minLength": 1 },
+        "fieldPolicies": { "type": "array", "items": { "$ref": "#/$defs/fieldPolicy" } }, "configuredAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "resolution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resolutionId", "strategy", "resolutionSource", "chosenSource", "chosenValue", "keptValues", "reasonCode", "reason", "policyVersion", "ruleId", "inputSnapshot", "resolvedAt"],
+      "properties": {
+        "resolutionId": { "type": "string", "minLength": 1 }, "strategy": { "$ref": "#/$defs/strategy" },
+        "resolutionSource": { "enum": ["manual", "rule", "keep_both"] },
+        "chosenSource": { "type": ["string", "null"], "enum": ["A", "B", null] }, "chosenValue": { "type": ["string", "null"] },
+        "keptValues": { "type": "array", "maxItems": 2, "items": { "type": "object", "additionalProperties": false, "required": ["source", "value"], "properties": { "source": { "enum": ["A", "B"] }, "value": { "type": "string" } } } },
+        "reasonCode": { "type": "string", "minLength": 1 }, "reason": { "type": "string", "minLength": 1 },
+        "policyVersion": { "type": ["string", "null"] }, "ruleId": { "type": ["string", "null"] },
+        "inputSnapshot": { "type": "object", "additionalProperties": false, "required": ["aValue", "bValue", "aTimestamp", "bTimestamp"], "properties": { "aValue": { "type": "string" }, "bValue": { "type": "string" }, "aTimestamp": { "type": ["string", "null"] }, "bTimestamp": { "type": ["string", "null"] } } },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "trustedExportReadiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ready", "unresolvedIdentityCount", "unresolvedConflictCount", "eligibleConfirmedCount", "onlyACount", "onlyBCount", "blockers"],
+      "properties": {
+        "ready": { "type": "boolean" }, "unresolvedIdentityCount": { "type": "integer", "minimum": 0 }, "unresolvedConflictCount": { "type": "integer", "minimum": 0 },
+        "eligibleConfirmedCount": { "type": "integer", "minimum": 0 }, "onlyACount": { "type": "integer", "minimum": 0 }, "onlyBCount": { "type": "integer", "minimum": 0 },
+        "blockers": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/fieldPolicyInput" },
+    { "$ref": "#/$defs/policy" },
+    { "$ref": "#/$defs/resolution" },
+    { "$ref": "#/$defs/trustedExportReadiness" }
+  ]
+}

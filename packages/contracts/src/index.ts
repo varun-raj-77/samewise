@@ -5,6 +5,30 @@ export {
   type HealthResponse,
 } from "./health-response.js";
 export {
+  FieldPolicyInputSchema,
+  FieldPolicySchema,
+  FieldResolutionSchema as SurvivorshipFieldResolutionSchema,
+  ResolutionPreviewItemSchema,
+  ResolutionPreviewSchema,
+  RuleStrategySchema,
+  SURVIVORSHIP_CONTRACT_VERSION,
+  SURVIVORSHIP_POLICY_SCHEMA_VERSION,
+  SurvivorshipPolicyInputSchema,
+  SurvivorshipPolicySchema,
+  SurvivorshipStrategySchema,
+  TRUSTED_EXPORT_VERSION,
+  TrustedExportReadinessSchema,
+  type FieldPolicy,
+  type FieldPolicyInput,
+  type ResolutionPreview,
+  type ResolutionPreviewItem,
+  type RuleStrategy,
+  type SurvivorshipPolicy,
+  type SurvivorshipPolicyInput,
+  type SurvivorshipStrategy,
+  type TrustedExportReadiness,
+} from "./survivorship.js";
+export {
   CandidatePairSchema,
   CANDIDATE_ENGINE_VERSION,
   BLOCKING_NORMALIZATION_VERSION,
@@ -30,6 +54,7 @@ export {
   ReviewProgressSchema,
   ReviewQueueItemSchema,
   ReviewUndoSchema,
+  RuleApplicationResponseSchema,
   RunViewSchema,
   WORKFLOW_CONTRACT_VERSION,
   type CandidatePair,
@@ -45,6 +70,7 @@ export {
   type ReviewProgress,
   type ReviewQueueItem,
   type ReviewUndo,
+  type RuleApplicationResponse,
   type RunView,
 } from "./workflow.js";
 export {

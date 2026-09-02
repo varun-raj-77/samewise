@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  FieldResolutionSchema,
+  SurvivorshipPolicySchema,
+  TrustedExportReadinessSchema,
+} from "./survivorship.js";
 
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
 export const MATCHER_VERSION = "explainable-matcher-v0.2.0" as const;
@@ -126,15 +131,6 @@ export const IdentityDecisionSchema = z.object({
 }).strict();
 export type IdentityDecision = z.infer<typeof IdentityDecisionSchema>;
 
-export const FieldResolutionSchema = z.object({
-  resolutionId: z.string().min(1),
-  chosenSource: DatasetSideSchema,
-  chosenValue: z.string(),
-  action: z.enum(["use_a", "use_b"]),
-  resolvedAt: z.string().datetime(),
-}).strict();
-export type FieldResolution = z.infer<typeof FieldResolutionSchema>;
-
 export const FieldConflictSchema = z.object({
   conflictId: z.string().min(1),
   runId: z.string().min(1),
@@ -145,7 +141,11 @@ export const FieldConflictSchema = z.object({
   bColumn: z.string().min(1),
   aValue: z.string(),
   bValue: z.string(),
+  identityDecisionId: z.string().min(1).nullable(),
+  identitySource: z.enum(["human", "system_matcher"]),
+  status: z.enum(["unresolved", "resolved"]),
   resolution: FieldResolutionSchema.nullable(),
+  resolutionHistory: z.array(FieldResolutionSchema),
 }).strict();
 export type FieldConflict = z.infer<typeof FieldConflictSchema>;
 
@@ -237,6 +237,8 @@ export const RunViewSchema = z.object({
   candidates: z.array(CandidatePairSchema),
   decisions: z.array(IdentityDecisionSchema),
   conflicts: z.array(FieldConflictSchema),
+  survivorshipPolicy: SurvivorshipPolicySchema.nullable(),
+  trustedExportReadiness: TrustedExportReadinessSchema,
   reviewQueue: z.array(ReviewQueueItemSchema),
   reviewProgress: ReviewProgressSchema,
   reviewUndo: ReviewUndoSchema.nullable(),
@@ -244,6 +246,19 @@ export const RunViewSchema = z.object({
   onlyB: MatcherResultSchema.shape.onlyB,
 }).strict();
 export type RunView = z.infer<typeof RunViewSchema>;
+
+export const RuleApplicationResponseSchema = z.object({
+  run: RunViewSchema,
+  policyVersion: z.string().min(1),
+  ruleId: z.string().min(1),
+  appliedCount: z.number().int().nonnegative(),
+  unresolvedCount: z.number().int().nonnegative(),
+  skippedCount: z.number().int().nonnegative(),
+}).strict();
+export type RuleApplicationResponse = z.infer<typeof RuleApplicationResponseSchema>;
+
+export { FieldResolutionSchema };
+export type FieldResolution = z.infer<typeof FieldResolutionSchema>;
 
 export const ErrorResponseSchema = z.object({
   error: z.object({ code: z.string().min(1), message: z.string().min(1) }).strict(),

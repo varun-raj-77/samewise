@@ -28,7 +28,9 @@ function runView(reviewQueue: ReviewQueueItem[]): RunView {
     contractVersion: "1.0.0", runId: "run", stage: "review", datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null,
     matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: null, summary: { matched: 0, needsReview: reviewQueue.length, onlyA: 0, onlyB: 0 },
     candidates: reviewQueue.map((item, index) => ({ ...first, candidateId: item.topCandidateId, aRowId: item.aRowId, bRowId: item.topBRowId, aRecord: { name: index === 1 ? "Target organization" : "Acme" }, evidence: [{ ...first.evidence[0]!, aValue: index === 1 ? "Target organization" : "Acme" }] })),
-    decisions: [], conflicts: [], reviewQueue, reviewProgress: { total: reviewQueue.length, reviewed: 0, remaining: reviewQueue.length, deferred: 0 }, reviewUndo: null, onlyA: [], onlyB: [],
+    decisions: [], conflicts: [], survivorshipPolicy: null,
+    trustedExportReadiness: { ready: false, unresolvedIdentityCount: reviewQueue.length, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["Identity review remains."] },
+    reviewQueue, reviewProgress: { total: reviewQueue.length, reviewed: 0, remaining: reviewQueue.length, deferred: 0 }, reviewUndo: null, onlyA: [], onlyB: [],
   };
 }
 

@@ -13,7 +13,7 @@
     "evidenceOutcome": { "enum": ["exact", "similar", "conflict", "missing_one", "missing_both"] },
     "candidateBand": { "enum": ["auto_match", "needs_review"] },
     "humanDecision": { "enum": ["same_entity", "different_entity"] },
-    "resolutionAction": { "enum": ["use_a", "use_b"] },
+    "resolutionAction": { "enum": ["use_a", "use_b", "keep_both", "prefer_non_null", "prefer_newest", "prefer_trusted_source"] },
     "matcherVersion": { "const": "explainable-matcher-v0.2.0" },
     "columnProfile": {
       "type": "object",
@@ -140,19 +140,21 @@
     },
     "fieldResolution": {
       "type": "object", "additionalProperties": false,
-      "required": ["resolutionId", "chosenSource", "chosenValue", "action", "resolvedAt"],
+      "required": ["resolutionId", "strategy", "resolutionSource", "chosenSource", "chosenValue", "keptValues", "reasonCode", "reason", "policyVersion", "ruleId", "inputSnapshot", "resolvedAt"],
       "properties": {
-        "resolutionId": { "type": "string", "minLength": 1 }, "chosenSource": { "$ref": "#/$defs/datasetSide" },
-        "chosenValue": { "type": "string" }, "action": { "$ref": "#/$defs/resolutionAction" }, "resolvedAt": { "type": "string", "format": "date-time" }
+        "resolutionId": { "type": "string", "minLength": 1 }, "strategy": { "$ref": "#/$defs/resolutionAction" }, "resolutionSource": { "enum": ["manual", "rule", "keep_both"] },
+        "chosenSource": { "type": ["string", "null"], "enum": ["A", "B", null] }, "chosenValue": { "type": ["string", "null"] },
+        "keptValues": { "type": "array" }, "reasonCode": { "type": "string" }, "reason": { "type": "string" }, "policyVersion": { "type": ["string", "null"] }, "ruleId": { "type": ["string", "null"] }, "inputSnapshot": { "type": "object" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
       }
     },
     "fieldConflict": {
       "type": "object", "additionalProperties": false,
-      "required": ["conflictId", "runId", "candidateId", "mappingId", "label", "aColumn", "bColumn", "aValue", "bValue", "resolution"],
+      "required": ["conflictId", "runId", "candidateId", "mappingId", "label", "aColumn", "bColumn", "aValue", "bValue", "identityDecisionId", "identitySource", "status", "resolution", "resolutionHistory"],
       "properties": {
         "conflictId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 }, "candidateId": { "type": "string", "minLength": 1 },
         "mappingId": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "aColumn": { "type": "string", "minLength": 1 }, "bColumn": { "type": "string", "minLength": 1 },
-        "aValue": { "type": "string" }, "bValue": { "type": "string" }, "resolution": { "oneOf": [{ "$ref": "#/$defs/fieldResolution" }, { "type": "null" }] }
+        "aValue": { "type": "string" }, "bValue": { "type": "string" }, "identityDecisionId": { "type": ["string", "null"] }, "identitySource": { "enum": ["human", "system_matcher"] }, "status": { "enum": ["unresolved", "resolved"] }, "resolution": { "oneOf": [{ "$ref": "#/$defs/fieldResolution" }, { "type": "null" }] }, "resolutionHistory": { "type": "array", "items": { "$ref": "#/$defs/fieldResolution" } }
       }
     },
     "reviewEvidenceSummary": {
@@ -221,7 +223,7 @@
     },
     "runView": {
       "type": "object", "additionalProperties": false,
-      "required": ["contractVersion", "runId", "stage", "datasets", "mappings", "mappingVersion", "semanticMappingProvenance", "matcherVersion", "matcherProvenance", "summary", "candidates", "decisions", "conflicts", "reviewQueue", "reviewProgress", "reviewUndo", "onlyA", "onlyB"],
+      "required": ["contractVersion", "runId", "stage", "datasets", "mappings", "mappingVersion", "semanticMappingProvenance", "matcherVersion", "matcherProvenance", "summary", "candidates", "decisions", "conflicts", "survivorshipPolicy", "trustedExportReadiness", "reviewQueue", "reviewProgress", "reviewUndo", "onlyA", "onlyB"],
       "properties": {
         "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 },
         "stage": { "enum": ["upload", "profile", "mapping", "results", "review", "resolution", "export"] },
@@ -235,11 +237,21 @@
         "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidatePair" } },
         "decisions": { "type": "array", "items": { "$ref": "#/$defs/identityDecision" } },
         "conflicts": { "type": "array", "items": { "$ref": "#/$defs/fieldConflict" } },
+        "survivorshipPolicy": { "oneOf": [{ "$ref": "../survivorship/1.0.0.json#/$defs/policy" }, { "type": "null" }] },
+        "trustedExportReadiness": { "$ref": "../survivorship/1.0.0.json#/$defs/trustedExportReadiness" },
         "reviewQueue": { "type": "array", "items": { "$ref": "#/$defs/reviewQueueItem" } },
         "reviewProgress": { "$ref": "#/$defs/reviewProgress" },
         "reviewUndo": { "oneOf": [{ "$ref": "#/$defs/reviewUndo" }, { "type": "null" }] },
         "onlyA": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } },
         "onlyB": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } }
+      }
+    },
+    "ruleApplicationResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run", "policyVersion", "ruleId", "appliedCount", "unresolvedCount", "skippedCount"],
+      "properties": {
+        "run": { "$ref": "#/$defs/runView" }, "policyVersion": { "type": "string", "minLength": 1 }, "ruleId": { "type": "string", "minLength": 1 },
+        "appliedCount": { "type": "integer", "minimum": 0 }, "unresolvedCount": { "type": "integer", "minimum": 0 }, "skippedCount": { "type": "integer", "minimum": 0 }
       }
     },
     "profileRequest": {
@@ -266,6 +278,7 @@
     { "$ref": "#/$defs/datasetProfile" },
     { "$ref": "#/$defs/matcherResult" },
     { "$ref": "#/$defs/runView" },
+    { "$ref": "#/$defs/ruleApplicationResponse" },
     { "$ref": "#/$defs/profileRequest" },
     { "$ref": "#/$defs/matchRequest" }
   ]

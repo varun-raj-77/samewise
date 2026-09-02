@@ -6,11 +6,11 @@ Samewise begins with three executable surfaces and one shared contract package. 
 
 ### `apps/web`
 
-The React/Vite application owns a seven-step upload-to-export workflow. It validates API run views and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps server state in `RunView` while selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its fixed-height queue window renders only the visible range plus overscan.
+The React/Vite application owns a seven-step upload-to-export workflow. It validates API run views and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps server state in `RunView` while selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its fixed-height queue window renders only the visible range plus overscan. A separate survivorship workspace owns conflict counts, manual actions, policy configuration, read-only preview, explicit bulk application, provenance, and trusted-export readiness; it exposes no identity controls.
 
 ### `apps/api`
 
-The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, and field resolutions, and creates reconciliation exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
+The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation and gated trusted exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
 
 Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v1` input from its authoritative profiles using only column name, inferred type, null rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs, canonical entities, schema truth, identity truth, and corruption provenance. The API uses a versioned developer prompt and strict structured output, then independently validates referenced columns, enums, confidence, allowlisted hints, duplicates, and mapping/unmapped consistency. Provider failures do not mutate proposals or confirmed mappings.
 
@@ -124,4 +124,10 @@ Schema-mapping evaluation compares proposed column pairs with hidden SW-002 sche
 
 ## Identity and resolution state
 
-`IdentityDecision` captures the candidate, system proposal, human decision, matcher version, evidence shown, and timestamp. A same-entity decision may create `FieldConflict` records for comparison mappings; it cannot create a `FieldResolution`. Resolution is a later endpoint call that records Use A/Use B, the chosen source/value, and its own timestamp. Export consumes both states and emits unresolved conflicts without a trusted value.
+`IdentityDecision` captures the candidate, system proposal, human decision, matcher version, evidence shown, and timestamp. A same-entity decision may create `FieldConflict` records for comparison mappings; it cannot create a `FieldResolution`. Resolution is a later manual action or explicit application of a previewed closed-enum rule. It records source, raw snapshots, reason, rule/policy version, relevant configured timestamps, and time. Prior current resolutions move into compact history on explicit replace/clear.
+
+Policy validation and evaluation stay in Node because the matcher does not consume
+survivorship state. Saving policy is non-mutating; preview calculates every outcome
+before apply commits resolvable records. Manual resolutions are skipped. The
+readiness projection gates trusted CSV when review items or effective field
+conflicts remain unresolved. Reconciliation CSV remains available and truthful.

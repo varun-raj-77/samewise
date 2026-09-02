@@ -34,6 +34,18 @@ DIFFERENT leaves other alternatives available; DEFER preserves unresolved identi
 The queue distinguishes system proposals from human confirmations and reports
 reviewed, remaining, deferred, and filtered counts from the live run.
 
+The SW-008 survivorship product starts only after an effective identity link. Raw
+A/B comparison values remain visible and unresolved until a manual Use A, Use B,
+or Keep Both action, or the explicit application of a previewed deterministic rule.
+Policies support conservative non-null selection, explicitly mapped recency, and
+per-field trusted sources. Rule-created values retain their policy version and never
+masquerade as manual choices.
+
+The reconciliation report remains available with unresolved identity or fields.
+Trusted merged output is a separate gated CSV: all review items and relevant field
+conflicts must be resolved. A-only and B-only rows retain source-only provenance;
+KEEP BOTH retains dedicated source columns instead of inventing a canonical value.
+
 ## Evaluation foundation
 
 Ground truth is created before matcher development so future changes can be compared against known identity relationships, including source-only entities, hard negatives, and duplicate source rows. The product-visible CSVs never contain canonical identifiers, corruption labels, or partner hints. Canonical entities, source-to-canonical mappings, schema mapping truth, and provenance are evaluation-only artifacts.
@@ -64,3 +76,7 @@ Suppose file A contains `Acme Incorporated` with phone `555-0100`, while file B 
 The identity question is: do these two records describe the same organization? Evidence may support “yes,” “no,” or human review.
 
 Only after a “same entity” decision does survivorship ask: which phone value should appear in the reconciled result? The answer may depend on source authority, freshness, or a human decision. A strong identity match does not itself choose the winning phone number.
+
+Deterministic synthetic rule tests can prove that “newer A selects A” under an
+explicit policy. They cannot prove that the newer business value is true, and
+Samewise does not report that as survivorship accuracy.

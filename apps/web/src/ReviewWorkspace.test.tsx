@@ -43,7 +43,8 @@ function run(candidates: CandidatePair[], reviewQueue: ReviewQueueItem[], overri
     matcherVersion: "explainable-matcher-v0.2.0",
     matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
     summary: { matched: reviewed, needsReview: remaining + deferred, onlyA: 0, onlyB: candidates.length },
-    candidates, decisions: [], conflicts: [], reviewQueue,
+    candidates, decisions: [], conflicts: [], survivorshipPolicy: null,
+    trustedExportReadiness: { ready: false, unresolvedIdentityCount: remaining + deferred, unresolvedConflictCount: 0, eligibleConfirmedCount: reviewed, onlyACount: 0, onlyBCount: 0, blockers: ["Identity review remains."] }, reviewQueue,
     reviewProgress: { total: reviewQueue.length, reviewed, remaining, deferred }, reviewUndo: null,
     onlyA: [], onlyB: [], ...overrides,
   };
@@ -95,7 +96,7 @@ describe("SW-007 review workspace", () => {
       queueItem("A2", [active]),
     ], {
       decisions: [decision],
-      conflicts: [{ conflictId: "conflict-c11-status", runId: "run-review", candidateId: "c11", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", resolution: null }],
+      conflicts: [{ conflictId: "conflict-c11-status", runId: "run-review", candidateId: "c11", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", identityDecisionId: decision.decisionId, identitySource: "human", status: "unresolved", resolution: null, resolutionHistory: [] }],
       reviewProgress: { total: 2, reviewed: 1, remaining: 1, deferred: 0 },
     });
     renderWorkspace(value);
@@ -132,7 +133,7 @@ describe("SW-007 review workspace", () => {
     renderWorkspace(initial, { onDecision });
     fireEvent.keyDown(window, { key: "d" });
     await waitFor(() => expect(onDecision).toHaveBeenCalledWith("c11", "different_entity"));
-    expect(screen.getByRole("heading", { name: "Are A1 and B2 the same entity?" })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Are A1 and B2 the same entity?" })).toHaveFocus());
     expect(screen.getByText(/Different entity recorded for A1 and B1/)).toBeInTheDocument();
   });
 
@@ -169,8 +170,8 @@ describe("SW-007 review workspace", () => {
     renderWorkspace(initial, { onUndo });
     fireEvent.keyDown(window, { key: "u" });
     await waitFor(() => expect(onUndo).toHaveBeenCalledOnce());
-    expect(screen.getByText(/Review decision for A1 and B1 was undone/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Are A1 and B1 the same entity?" })).toHaveFocus();
+    expect(await screen.findByText(/Review decision for A1 and B1 was undone/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Are A1 and B1 the same entity?" })).toHaveFocus());
   });
 
   it("shows non-color collision context and keeps actions as accessible buttons", () => {

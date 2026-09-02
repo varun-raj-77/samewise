@@ -23,7 +23,8 @@ function runView(overrides: Partial<RunView> = {}): RunView {
     matcherVersion: "explainable-matcher-v0.2.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
     matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
     candidates: [{ candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] }],
-    decisions: [], conflicts: [],
+    decisions: [], conflicts: [], survivorshipPolicy: null,
+    trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["1 identity review item(s) remain unresolved."] },
     reviewQueue: [{ aRowId: "A1", candidateIds: ["candidate-1-1"], topCandidateId: "candidate-1-1", topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement", contribution: 0.72 }, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: 0 }],
     reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null,
     onlyA: [], onlyB: [], ...overrides,
@@ -150,9 +151,10 @@ describe("Samewise vertical slice", () => {
     const conflictRun = runView({
       stage: "resolution",
       decisions: [{ decisionId: "d1", runId: "run-1", candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review", humanDecision: "same_entity", matcherVersion: "explainable-matcher-v0.2.0", evidenceShown: [evidence], decidedAt: "2026-08-30T12:00:00.000Z" }],
-      conflicts: [{ conflictId: "c1", runId: "run-1", candidateId: "candidate-1-1", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", resolution: null }],
+      conflicts: [{ conflictId: "c1", runId: "run-1", candidateId: "candidate-1-1", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", identityDecisionId: "d1", identitySource: "human", status: "unresolved", resolution: null, resolutionHistory: [] }],
+      trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["1 comparison-field conflict(s) remain unresolved."] },
     });
-    const resolvedRun = runView({ ...conflictRun, conflicts: [{ ...conflictRun.conflicts[0]!, resolution: { resolutionId: "r1", chosenSource: "A", chosenValue: "active", action: "use_a", resolvedAt: "2026-08-30T12:01:00.000Z" } }] });
+    const resolvedRun = runView({ ...conflictRun, conflicts: [{ ...conflictRun.conflicts[0]!, status: "resolved", resolution: { resolutionId: "r1", strategy: "use_a", resolutionSource: "manual", chosenSource: "A", chosenValue: "active", keptValues: [], reasonCode: "use_a", reason: "A user explicitly selected Dataset A.", policyVersion: null, ruleId: null, inputSnapshot: { aValue: "active", bValue: "inactive", aTimestamp: null, bTimestamp: null }, resolvedAt: "2026-08-30T12:01:00.000Z" } }], trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } });
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(conflictRun), { status: 200, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify(resolvedRun), { status: 200, headers: { "Content-Type": "application/json" } })));
@@ -162,10 +164,10 @@ describe("Samewise vertical slice", () => {
     expect((await screen.findByText("1 field conflict")).parentElement).toHaveTextContent("Zero values were selected automatically.");
     fireEvent.click(screen.getByRole("button", { name: "Resolve values separately" }));
     expect(screen.getByRole("heading", { name: "Identity is settled. Values are not." })).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use A" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Use A" }));
-    await waitFor(() => expect(screen.getByText("Resolved · use A")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/manual · use a/i)).toBeInTheDocument());
   });
 
   it("shows a safe API error state", async () => {
@@ -183,5 +185,13 @@ describe("Samewise vertical slice", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1");
     expect(window.location.search).toContain("run=run-1");
     expect(window.location.search).toContain("screen=review");
+  });
+
+  it("keeps the reconciliation report available while trusted merged output is blocked", () => {
+    render(<App initialRun={runView()} initialScreen="export" />);
+    expect(screen.getByText("Trusted output").parentElement).toHaveTextContent("Blocked");
+    expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("identity review item");
   });
 });

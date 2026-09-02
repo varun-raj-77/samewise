@@ -18,8 +18,12 @@ import {
   type MappingSuggestionDecision,
   type MappingSuggestionResponse,
   type ReviewQueueItem,
+  type ResolutionPreview,
   type RunView,
   type SemanticMappingProposal,
+  type SurvivorshipPolicy,
+  type SurvivorshipPolicyInput,
+  type TrustedExportReadiness,
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
@@ -29,6 +33,13 @@ import {
   validateModelOutput,
   type SemanticMapper,
 } from "./semantic-mapper.js";
+import {
+  buildSurvivorshipPolicy,
+  manualResolution,
+  previewRuleForConflict,
+  resolutionFromPreview,
+  SurvivorshipPolicyError,
+} from "./survivorship.js";
 
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
 
@@ -48,6 +59,8 @@ interface RunState {
   deferredARowIds: Set<string>;
   undoStack: UndoEntry[];
   mappingProposal?: SemanticMappingProposal;
+  survivorshipPolicy?: SurvivorshipPolicy;
+  previewedRuleIds: Set<string>;
 }
 
 interface UndoEntry {
@@ -73,7 +86,7 @@ function safeOriginalFilename(value: string): string {
   return name.slice(0, 200);
 }
 
-function comparisonConflicts(run: RunState, candidate: CandidatePair): FieldConflict[] {
+function comparisonConflicts(run: RunState, candidate: CandidatePair, decisionId: string | null, identitySource: "human" | "system_matcher"): FieldConflict[] {
   return run.mappings
     .filter((mapping) => mapping.role === "comparison")
     .filter((mapping) => candidate.aRecord[mapping.aColumn] !== candidate.bRecord[mapping.bColumn])
@@ -87,7 +100,11 @@ function comparisonConflicts(run: RunState, candidate: CandidatePair): FieldConf
       bColumn: mapping.bColumn,
       aValue: candidate.aRecord[mapping.aColumn] ?? "",
       bValue: candidate.bRecord[mapping.bColumn] ?? "",
+      identityDecisionId: decisionId,
+      identitySource,
+      status: "unresolved",
       resolution: null,
+      resolutionHistory: [],
     }));
 }
 
@@ -110,6 +127,7 @@ export class WorkflowStore {
       conflicts: new Map(),
       deferredARowIds: new Set(),
       undoStack: [],
+      previewedRuleIds: new Set(),
     };
     this.runs.set(run.runId, run);
     return this.view(run);
@@ -175,6 +193,8 @@ export class WorkflowStore {
     delete run.result;
     run.decisions.clear();
     run.conflicts.clear();
+    delete run.survivorshipPolicy;
+    run.previewedRuleIds.clear();
     run.deferredARowIds.clear();
     run.undoStack.length = 0;
     run.stage = "mapping";
@@ -307,8 +327,9 @@ export class WorkflowStore {
     run.conflicts.clear();
     run.deferredARowIds.clear();
     run.undoStack.length = 0;
+    run.previewedRuleIds.clear();
     for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "auto_match")) {
-      for (const conflict of comparisonConflicts(run, candidate)) run.conflicts.set(conflict.conflictId, conflict);
+      for (const conflict of comparisonConflicts(run, candidate, null, "system_matcher")) run.conflicts.set(conflict.conflictId, conflict);
     }
     run.stage = "results";
     return this.view(run);
@@ -319,6 +340,9 @@ export class WorkflowStore {
     const candidate = run.result?.candidates.find((item) => item.candidateId === candidateId);
     if (!candidate) throw new WorkflowError("candidate_not_found", "Candidate was not found.", 404);
     if (run.decisions.has(candidateId)) throw new WorkflowError("decision_exists", "This candidate already has a recorded decision.", 409);
+    if (humanDecision === "different_entity" && [...run.conflicts.values()].some((conflict) => conflict.candidateId === candidateId && conflict.resolution)) {
+      throw new WorkflowError("identity_change_blocked_by_resolutions", "This identity link has dependent field resolutions. Clear them before rejecting the identity.", 409);
+    }
     if (humanDecision === "same_entity") {
       const existingSame = [...run.decisions.values()].some((decision) => decision.aRowId === candidate.aRowId && decision.humanDecision === "same_entity");
       if (existingSame) throw new WorkflowError("identity_already_confirmed", "This A row already has a confirmed identity.", 409);
@@ -338,9 +362,15 @@ export class WorkflowStore {
     run.decisions.set(candidateId, decision);
     const createdConflictIds: string[] = [];
     if (humanDecision === "same_entity") {
-      for (const conflict of comparisonConflicts(run, candidate)) {
+      for (const conflict of comparisonConflicts(run, candidate, decision.decisionId, "human")) {
         if (!run.conflicts.has(conflict.conflictId)) createdConflictIds.push(conflict.conflictId);
-        run.conflicts.set(conflict.conflictId, conflict);
+        const existing = run.conflicts.get(conflict.conflictId);
+        if (existing) {
+          existing.identityDecisionId = decision.decisionId;
+          existing.identitySource = "human";
+        } else {
+          run.conflicts.set(conflict.conflictId, conflict);
+        }
       }
       run.stage = run.conflicts.size ? "resolution" : "review";
     } else {
@@ -349,6 +379,7 @@ export class WorkflowStore {
     const wasDeferred = run.deferredARowIds.delete(candidate.aRowId);
     run.undoStack.push({ candidateId, decisionId: decision.decisionId, createdConflictIds, wasDeferred });
     if (run.undoStack.length > 20) run.undoStack.shift();
+    run.previewedRuleIds.clear();
     return this.view(run);
   }
 
@@ -362,6 +393,7 @@ export class WorkflowStore {
     if (deferred) run.deferredARowIds.add(aRowId);
     else run.deferredARowIds.delete(aRowId);
     run.stage = "review";
+    run.previewedRuleIds.clear();
     return this.view(run);
   }
 
@@ -386,52 +418,132 @@ export class WorkflowStore {
     if (entry.wasDeferred) run.deferredARowIds.add(decision.aRowId);
     run.undoStack.pop();
     run.stage = "review";
+    run.previewedRuleIds.clear();
     return this.view(run);
   }
 
-  resolveConflict(runId: string, conflictId: string, action: "use_a" | "use_b"): RunView {
+  resolveConflict(runId: string, conflictId: string, action: "use_a" | "use_b" | "keep_both", replace = false): RunView {
     const run = this.requireRun(runId);
     const conflict = run.conflicts.get(conflictId);
     if (!conflict) throw new WorkflowError("conflict_not_found", "Field conflict was not found.", 404);
-    if (conflict.resolution) throw new WorkflowError("resolution_exists", "This conflict is already resolved.", 409);
-    conflict.resolution = {
-      resolutionId: `resolution-${randomUUID()}`,
-      chosenSource: action === "use_a" ? "A" : "B",
-      chosenValue: action === "use_a" ? conflict.aValue : conflict.bValue,
-      action,
-      resolvedAt: new Date().toISOString(),
-    };
+    if (!this.effectiveLinks(run).some((candidate) => candidate.candidateId === conflict.candidateId)) {
+      throw new WorkflowError("identity_not_confirmed", "Field resolution requires an effective confirmed identity link.", 409);
+    }
+    if (conflict.resolution && !replace) throw new WorkflowError("resolution_exists", "This conflict is already resolved. Explicitly replace or clear it first.", 409);
+    if (conflict.resolution) conflict.resolutionHistory.push(conflict.resolution);
+    conflict.resolution = manualResolution(conflict, action);
+    conflict.status = "resolved";
+    run.stage = "resolution";
+    run.previewedRuleIds.clear();
+    return this.view(run);
+  }
+
+  clearResolution(runId: string, conflictId: string): RunView {
+    const run = this.requireRun(runId);
+    const conflict = run.conflicts.get(conflictId);
+    if (!conflict) throw new WorkflowError("conflict_not_found", "Field conflict was not found.", 404);
+    if (!conflict.resolution) throw new WorkflowError("resolution_missing", "This conflict is already unresolved.", 409);
+    conflict.resolutionHistory.push(conflict.resolution);
+    conflict.resolution = null;
+    conflict.status = "unresolved";
+    run.stage = "resolution";
+    run.previewedRuleIds.clear();
+    return this.view(run);
+  }
+
+  setSurvivorshipPolicy(runId: string, input: SurvivorshipPolicyInput): RunView {
+    const run = this.requireRun(runId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before configuring survivorship.");
+    try {
+      const policy = buildSurvivorshipPolicy(input, run.mappings);
+      run.survivorshipPolicy = policy;
+      run.previewedRuleIds.clear();
+    } catch (error) {
+      if (error instanceof SurvivorshipPolicyError) throw new WorkflowError("invalid_survivorship_policy", error.message);
+      throw error;
+    }
     run.stage = "resolution";
     return this.view(run);
   }
 
+  previewSurvivorshipRule(runId: string, ruleId: string): ResolutionPreview {
+    const run = this.requireRun(runId);
+    const policy = run.survivorshipPolicy;
+    const rule = policy?.fieldPolicies.find((item) => item.ruleId === ruleId);
+    if (!policy || !rule) throw new WorkflowError("survivorship_rule_not_found", "Configured survivorship rule was not found.", 404);
+    const effectiveCandidateIds = new Set(this.effectiveLinks(run).map((candidate) => candidate.candidateId));
+    const items = [...run.conflicts.values()]
+      .filter((conflict) => conflict.mappingId === rule.semanticField && effectiveCandidateIds.has(conflict.candidateId))
+      .sort((left, right) => left.conflictId.localeCompare(right.conflictId))
+      .map((conflict) => {
+        const candidate = run.result!.candidates.find((item) => item.candidateId === conflict.candidateId)!;
+        return previewRuleForConflict(conflict, candidate, rule, run.mappings);
+      });
+    const preview: ResolutionPreview = {
+      contractVersion: "1.0.0",
+      runId,
+      policyVersion: policy.policyVersion,
+      ruleId,
+      semanticField: rule.semanticField,
+      strategy: rule.strategy,
+      affectedCount: items.length,
+      resolvableCount: items.filter((item) => item.outcome === "would_resolve").length,
+      unresolvedCount: items.filter((item) => item.outcome === "unresolved").length,
+      skippedManualCount: items.filter((item) => item.outcome === "skipped_manual").length,
+      items,
+    };
+    run.previewedRuleIds.add(ruleId);
+    return preview;
+  }
+
+  applySurvivorshipRule(runId: string, ruleId: string): { run: RunView; policyVersion: string; ruleId: string; appliedCount: number; unresolvedCount: number; skippedCount: number } {
+    const run = this.requireRun(runId);
+    const policy = run.survivorshipPolicy;
+    const rule = policy?.fieldPolicies.find((item) => item.ruleId === ruleId);
+    if (!policy || !rule) throw new WorkflowError("survivorship_rule_not_found", "Configured survivorship rule was not found.", 404);
+    if (!run.previewedRuleIds.has(ruleId)) throw new WorkflowError("survivorship_preview_required", "Preview this rule against the current conflict state before applying it.", 409);
+    const preview = this.previewSurvivorshipRule(runId, ruleId);
+    const mutations = preview.items.filter((item) => item.outcome === "would_resolve").map((item) => {
+      const conflict = run.conflicts.get(item.conflictId)!;
+      return { conflict, resolution: resolutionFromPreview(item, conflict, rule, policy.policyVersion) };
+    });
+    for (const mutation of mutations) {
+      mutation.conflict.resolution = mutation.resolution;
+      mutation.conflict.status = "resolved";
+    }
+    run.stage = "resolution";
+    run.previewedRuleIds.clear();
+    return {
+      run: this.view(run),
+      policyVersion: policy.policyVersion,
+      ruleId,
+      appliedCount: mutations.length,
+      unresolvedCount: preview.unresolvedCount,
+      skippedCount: preview.items.length - mutations.length - preview.unresolvedCount,
+    };
+  }
+
   get(runId: string): RunView { return this.view(this.requireRun(runId)); }
+
+  private effectiveLinks(run: RunState): CandidatePair[] {
+    const candidates = run.result?.candidates ?? [];
+    const humanSameByA = new Map(
+      [...run.decisions.values()].filter((decision) => decision.humanDecision === "same_entity").map((decision) => [decision.aRowId, decision]),
+    );
+    const rejectedCandidates = new Set(
+      [...run.decisions.values()].filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId),
+    );
+    return [
+      ...candidates.filter((candidate) => humanSameByA.get(candidate.aRowId)?.candidateId === candidate.candidateId),
+      ...candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameByA.has(candidate.aRowId) && !rejectedCandidates.has(candidate.candidateId)),
+    ];
+  }
 
   private view(run: RunState): RunView {
     const result = run.result;
     const candidates = result?.candidates ?? [];
     const aRows = new Set(candidates.map((candidate) => candidate.aRowId));
-    const humanSameByA = new Map(
-      [...run.decisions.values()]
-        .filter((decision) => decision.humanDecision === "same_entity")
-        .map((decision) => [decision.aRowId, decision]),
-    );
-    const rejectedCandidates = new Set(
-      [...run.decisions.values()]
-        .filter((decision) => decision.humanDecision === "different_entity")
-        .map((decision) => decision.candidateId),
-    );
-    const effectiveLinks = [
-      ...candidates.filter((candidate) => {
-        const decision = humanSameByA.get(candidate.aRowId);
-        return decision?.candidateId === candidate.candidateId;
-      }),
-      ...candidates.filter((candidate) =>
-        candidate.rank === 1
-        && candidate.band === "auto_match"
-        && !humanSameByA.has(candidate.aRowId)
-        && !rejectedCandidates.has(candidate.candidateId)),
-    ];
+    const effectiveLinks = this.effectiveLinks(run);
     const matchedA = new Set<string>();
     const matchedB = new Set<string>();
     for (const candidate of effectiveLinks) {
@@ -469,6 +581,21 @@ export class WorkflowStore {
     const undoEntry = run.undoStack.at(-1);
     const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateId) : undefined;
     const undoBlocked = undoEntry?.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution) ?? false;
+    const effectiveCandidateIds = new Set(effectiveLinks.map((candidate) => candidate.candidateId));
+    const visibleConflicts = [...run.conflicts.values()].filter((conflict) => effectiveCandidateIds.has(conflict.candidateId));
+    const readiness: TrustedExportReadiness = {
+      ready: Boolean(result) && remaining === 0 && deferred === 0 && visibleConflicts.every((conflict) => conflict.resolution !== null),
+      unresolvedIdentityCount: remaining + deferred,
+      unresolvedConflictCount: visibleConflicts.filter((conflict) => !conflict.resolution).length,
+      eligibleConfirmedCount: effectiveLinks.length,
+      onlyACount: onlyA.length,
+      onlyBCount: onlyB.length,
+      blockers: [
+        ...(!result ? ["The matcher has not completed."] : []),
+        ...(remaining + deferred > 0 ? [`${remaining + deferred} identity review item(s) remain unresolved.`] : []),
+        ...(visibleConflicts.some((conflict) => !conflict.resolution) ? [`${visibleConflicts.filter((conflict) => !conflict.resolution).length} comparison-field conflict(s) remain unresolved.`] : []),
+      ],
+    };
     return {
       contractVersion: WORKFLOW_CONTRACT_VERSION,
       runId: run.runId,
@@ -492,7 +619,9 @@ export class WorkflowStore {
       summary: result ? { matched: matchedA.size, needsReview: reviewA.size, onlyA: onlyA.length, onlyB: onlyB.length } : null,
       candidates,
       decisions: [...run.decisions.values()],
-      conflicts: [...run.conflicts.values()],
+      conflicts: visibleConflicts,
+      survivorshipPolicy: run.survivorshipPolicy ?? null,
+      trustedExportReadiness: readiness,
       reviewQueue,
       reviewProgress: { total: reviewQueue.length, reviewed, remaining, deferred },
       reviewUndo: undoDecision ? {
@@ -600,29 +729,43 @@ function csvCell(value: string): string {
 export function exportRun(view: RunView): string {
   if (!view.summary || !view.matcherVersion) throw new WorkflowError("run_not_matched", "Run the matcher before exporting.");
   const comparisonMappings = view.mappings.filter((mapping) => mapping.role === "comparison");
-  const headers = ["a_row_id", "b_row_id", "identity_status", "identity_decision_source", "matcher_version"];
+  const headers = ["a_row_id", "b_row_id", "identity_status", "identity_decision_source", "matcher_version", "candidate_engine_version", "mapping_version", "source_a_sha256", "source_b_sha256", "survivorship_policy_version", "export_version"];
   for (const mapping of view.mappings) headers.push(`a_${mapping.label}`, `b_${mapping.label}`);
-  for (const mapping of comparisonMappings) headers.push(`resolved_${mapping.label}`, `resolution_status_${mapping.label}`);
+  for (const mapping of comparisonMappings) headers.push(
+    `resolved_${mapping.label}`,
+    `resolution_status_${mapping.label}`,
+    `resolution_source_${mapping.label}`,
+    `resolution_reason_${mapping.label}`,
+    `survivorship_policy_version_${mapping.label}`,
+  );
   const rows: string[][] = [];
   const linkedA = new Set<string>();
   const linkedB = new Set<string>();
-  const primary = view.candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match");
   const humanSame = view.decisions.filter((decision) => decision.humanDecision === "same_entity");
+  const humanSameA = new Set(humanSame.map((decision) => decision.aRowId));
+  const rejected = new Set(view.decisions.filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId));
   const links = [
-    ...primary.filter((candidate) => !view.decisions.some((decision) => decision.candidateId === candidate.candidateId && decision.humanDecision === "different_entity"))
-      .map((candidate) => ({ candidate, source: "system_matcher" })),
     ...humanSame.map((decision) => ({ candidate: view.candidates.find((candidate) => candidate.candidateId === decision.candidateId)!, source: "human" })),
+    ...view.candidates
+      .filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameA.has(candidate.aRowId) && !rejected.has(candidate.candidateId))
+      .map((candidate) => ({ candidate, source: "system_matcher" })),
   ].filter((link) => link.candidate);
   for (const { candidate, source } of links) {
     if (linkedA.has(candidate.aRowId)) continue;
     linkedA.add(candidate.aRowId); linkedB.add(candidate.bRowId);
-    const row = [candidate.aRowId, candidate.bRowId, "same_entity", source, view.matcherVersion];
+    const row = [candidate.aRowId, candidate.bRowId, "same_entity", source, view.matcherVersion, view.matcherProvenance?.candidateEngineVersion ?? "", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.survivorshipPolicy?.policyVersion ?? "manual-only", "reconciliation-export-v2"];
     for (const mapping of view.mappings) row.push(candidate.aRecord[mapping.aColumn] ?? "", candidate.bRecord[mapping.bColumn] ?? "");
     for (const mapping of comparisonMappings) {
       const conflict = view.conflicts.find((item) => item.candidateId === candidate.candidateId && item.mappingId === mapping.mappingId);
-      if (conflict?.resolution) row.push(conflict.resolution.chosenValue, `resolved_use_${conflict.resolution.chosenSource.toLowerCase()}`);
-      else if (conflict) row.push("", "unresolved");
-      else row.push(candidate.aRecord[mapping.aColumn] ?? candidate.bRecord[mapping.bColumn] ?? "", "agreed");
+      if (conflict?.resolution) row.push(
+        conflict.resolution.chosenValue ?? "",
+        conflict.resolution.strategy,
+        conflict.resolution.resolutionSource,
+        conflict.resolution.reason,
+        conflict.resolution.policyVersion ?? "",
+      );
+      else if (conflict) row.push("", "unresolved", "unresolved", "No survivorship decision has been applied.", "");
+      else row.push(candidate.aRecord[mapping.aColumn] ?? candidate.bRecord[mapping.bColumn] ?? "", "agreed", "equal_sources", "Source values are equal.", "");
     }
     rows.push(row);
   }
@@ -634,23 +777,118 @@ export function exportRun(view: RunView): string {
       .sort((left, right) => left.rank - right.rank)[0];
     if (!candidate) continue;
     linkedA.add(candidate.aRowId); linkedB.add(candidate.bRowId);
-    const row = [candidate.aRowId, candidate.bRowId, "needs_review", "pending_human_review", view.matcherVersion];
+    const row = [candidate.aRowId, candidate.bRowId, "needs_review", "pending_human_review", view.matcherVersion, view.matcherProvenance?.candidateEngineVersion ?? "", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.survivorshipPolicy?.policyVersion ?? "manual-only", "reconciliation-export-v2"];
     for (const mapping of view.mappings) row.push(candidate.aRecord[mapping.aColumn] ?? "", candidate.bRecord[mapping.bColumn] ?? "");
-    row.push(...comparisonMappings.flatMap(() => ["", "pending_identity"]));
+    row.push(...comparisonMappings.flatMap(() => ["", "pending_identity", "unresolved", "Identity is not resolved.", ""]));
     rows.push(row);
   }
   for (const item of view.onlyA) {
     if (linkedA.has(item.rowId)) continue;
-    const row = [item.rowId, "", "only_a", "none", view.matcherVersion];
+    const row = [item.rowId, "", "only_a", "none", view.matcherVersion, view.matcherProvenance?.candidateEngineVersion ?? "", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.survivorshipPolicy?.policyVersion ?? "manual-only", "reconciliation-export-v2"];
     for (const mapping of view.mappings) row.push(item.record[mapping.aColumn] ?? "", "");
-    row.push(...comparisonMappings.flatMap(() => ["", "not_applicable"]));
+    row.push(...comparisonMappings.flatMap(() => ["", "not_applicable", "source_only_a", "No cross-source conflict.", ""]));
     rows.push(row);
   }
   for (const item of view.onlyB) {
     if (linkedB.has(item.rowId)) continue;
-    const row = ["", item.rowId, "only_b", "none", view.matcherVersion];
+    const row = ["", item.rowId, "only_b", "none", view.matcherVersion, view.matcherProvenance?.candidateEngineVersion ?? "", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.survivorshipPolicy?.policyVersion ?? "manual-only", "reconciliation-export-v2"];
     for (const mapping of view.mappings) row.push("", item.record[mapping.bColumn] ?? "");
-    row.push(...comparisonMappings.flatMap(() => ["", "not_applicable"]));
+    row.push(...comparisonMappings.flatMap(() => ["", "not_applicable", "source_only_b", "No cross-source conflict.", ""]));
+    rows.push(row);
+  }
+  return `${[headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+}
+
+export function exportTrustedRun(view: RunView): string {
+  if (!view.summary || !view.matcherVersion) throw new WorkflowError("run_not_matched", "Run the matcher before exporting.");
+  if (!view.trustedExportReadiness.ready) {
+    throw new WorkflowError("trusted_export_not_ready", `Trusted merged output is blocked: ${view.trustedExportReadiness.blockers.join(" ")}`, 409);
+  }
+  const comparisonMappings = view.mappings.filter((mapping) => mapping.role === "comparison");
+  const headers = [
+    "entity_provenance",
+    "a_row_id",
+    "b_row_id",
+    "identity_source",
+    "mapping_version",
+    "source_a_sha256",
+    "source_b_sha256",
+    "candidate_engine_version",
+    "matcher_version",
+    "survivorship_policy_version",
+    "export_version",
+  ];
+  for (const mapping of comparisonMappings) headers.push(
+    mapping.label,
+    `${mapping.label}__A`,
+    `${mapping.label}__B`,
+    `${mapping.label}__resolution`,
+    `${mapping.label}__resolution_source`,
+    `${mapping.label}__reason`,
+  );
+  const rows: string[][] = [];
+  const humanSame = view.decisions.filter((decision) => decision.humanDecision === "same_entity");
+  const humanSameA = new Set(humanSame.map((decision) => decision.aRowId));
+  const rejected = new Set(view.decisions.filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId));
+  const links = [
+    ...humanSame.map((decision) => ({ candidate: view.candidates.find((candidate) => candidate.candidateId === decision.candidateId)!, source: "human" })),
+    ...view.candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameA.has(candidate.aRowId) && !rejected.has(candidate.candidateId)).map((candidate) => ({ candidate, source: "system_matcher" })),
+  ].filter((link) => link.candidate);
+  const linkedA = new Set<string>();
+  const linkedB = new Set<string>();
+  for (const { candidate, source } of links) {
+    if (linkedA.has(candidate.aRowId)) continue;
+    linkedA.add(candidate.aRowId);
+    linkedB.add(candidate.bRowId);
+    const row = [
+      "confirmed_cross_source",
+      candidate.aRowId,
+      candidate.bRowId,
+      source,
+      view.mappingVersion,
+      view.datasets.A?.sha256 ?? "",
+      view.datasets.B?.sha256 ?? "",
+      view.matcherProvenance?.candidateEngineVersion ?? "",
+      view.matcherVersion,
+      view.survivorshipPolicy?.policyVersion ?? "manual-only",
+      "trusted-merged-export-v1",
+    ];
+    for (const mapping of comparisonMappings) {
+      const aValue = candidate.aRecord[mapping.aColumn] ?? "";
+      const bValue = candidate.bRecord[mapping.bColumn] ?? "";
+      const conflict = view.conflicts.find((item) => item.candidateId === candidate.candidateId && item.mappingId === mapping.mappingId);
+      if (!conflict) {
+        row.push(aValue, aValue, bValue, "agreed", "equal_sources", "Source values are equal.");
+      } else {
+        const resolution = conflict.resolution!;
+        row.push(
+          resolution.chosenValue ?? "",
+          aValue,
+          bValue,
+          resolution.strategy,
+          resolution.resolutionSource,
+          resolution.reason,
+        );
+      }
+    }
+    rows.push(row);
+  }
+  for (const item of view.onlyA) {
+    if (linkedA.has(item.rowId)) continue;
+    const row = ["source_only_a", item.rowId, "", "none", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.matcherProvenance?.candidateEngineVersion ?? "", view.matcherVersion, view.survivorshipPolicy?.policyVersion ?? "manual-only", "trusted-merged-export-v1"];
+    for (const mapping of comparisonMappings) {
+      const value = item.record[mapping.aColumn] ?? "";
+      row.push(value, value, "", "source_only_a", "source_only_a", "No cross-source conflict.");
+    }
+    rows.push(row);
+  }
+  for (const item of view.onlyB) {
+    if (linkedB.has(item.rowId)) continue;
+    const row = ["source_only_b", "", item.rowId, "none", view.mappingVersion, view.datasets.A?.sha256 ?? "", view.datasets.B?.sha256 ?? "", view.matcherProvenance?.candidateEngineVersion ?? "", view.matcherVersion, view.survivorshipPolicy?.policyVersion ?? "manual-only", "trusted-merged-export-v1"];
+    for (const mapping of comparisonMappings) {
+      const value = item.record[mapping.bColumn] ?? "";
+      row.push(value, "", value, "source_only_b", "source_only_b", "No cross-source conflict.");
+    }
     rows.push(row);
   }
   return `${[headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
