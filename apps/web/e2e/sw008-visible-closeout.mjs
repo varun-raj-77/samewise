@@ -131,8 +131,8 @@ const applyRule = async (expectedStatus = 200) => {
 
 try {
   await page.goto("http://localhost:5173", { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: "Start with two messy CSV files." }).waitFor();
-  check("Samewise opened in a headed rendered React browser");
+  await page.getByRole("heading", { name: "Upload datasets" }).waitFor();
+  check("Samewise opened in a rendered Chromium browser");
 
   await page.getByLabel("Dataset A CSV").setInputFiles(sourceA);
   await page.getByLabel("Dataset B CSV").setInputFiles(sourceB);
@@ -164,6 +164,17 @@ try {
   await page.getByRole("heading", { name: "Evidence first, uncertainty visible." }).waitFor();
   const matched = await fetchRun();
   report.initialSummary = matched.summary;
+
+  await page.getByRole("button", { name: "Prepare export" }).click();
+  await page.getByRole("heading", { name: "Report everything. Trust only what is ready." }).waitFor();
+  check("reconciliation and manifest remain available while identity is unresolved",
+    await page.getByRole("button", { name: "Download reconciliation report" }).isEnabled()
+    && await page.getByRole("button", { name: "Download provenance manifest" }).isEnabled());
+  check("trusted output shows the exact unresolved-identity blocker",
+    await page.getByRole("button", { name: "Download trusted merged output" }).isDisabled()
+    && await page.getByRole("status").getByText(/identity review item\(s\) remain unresolved/).isVisible());
+  await page.getByRole("button", { name: "Reconciliation", exact: true }).click();
+  await page.getByRole("heading", { name: "Evidence first, uncertainty visible." }).waitFor();
 
   const autoContext = matched.candidates.find((candidate) => candidate.aRowId === "A000007" && candidate.bRowId === "B000012");
   const humanSame = matched.candidates.find((candidate) => candidate.aRowId === "A000009" && candidate.bRowId === "B000015");
@@ -318,7 +329,7 @@ try {
   const reconciliationPath = join(artifactRoot, "reconciliation-unresolved.csv");
   await reconciliation.saveAs(reconciliationPath);
   const reconciliationCsv = await readFile(reconciliationPath, "utf8");
-  check("reconciliation report remains downloadable with unresolved provenance", reconciliationCsv.includes("unresolved") && reconciliationCsv.includes("reconciliation-export-v2"));
+  check("reconciliation report remains downloadable with unresolved provenance", reconciliationCsv.includes("unresolved") && reconciliationCsv.includes("reconciliation-export-v3.0.0"));
 
   await page.getByRole("button", { name: "Review conflicts" }).click();
   await clickResolution(statusEqual, "Use A");
@@ -341,8 +352,48 @@ try {
   const trustedCsv = await readFile(trustedPath, "utf8");
   check("trusted CSV has deterministic KEEP BOTH columns and resolution marker", trustedCsv.includes("Updated at__A") && trustedCsv.includes("Updated at__B") && trustedCsv.includes("keep_both"));
   check("trusted CSV preserves source-only A and B provenance", trustedCsv.includes("source_only_a") && trustedCsv.includes("source_only_b"));
-  check("trusted CSV contains run/source/policy/export provenance", trustedCsv.includes(sourceHashesBefore[0]) && trustedCsv.includes(sourceHashesBefore[1]) && trustedCsv.includes("trusted-merged-export-v1"));
+  check("trusted CSV contains run/source/policy/export provenance", trustedCsv.includes(sourceHashesBefore[0]) && trustedCsv.includes(sourceHashesBefore[1]) && trustedCsv.includes("trusted-merged-export-v2.0.0"));
   check("development trusted CSV contains no unguarded formula-leading cells", !/(^|\r?\n|,)[=+\-@]/m.test(trustedCsv));
+
+  const manifestDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download provenance manifest" }).click();
+  const manifestDownload = await manifestDownloadPromise;
+  const manifestPath = join(artifactRoot, "run-manifest.json");
+  await manifestDownload.saveAs(manifestPath);
+  const manifestText = await readFile(manifestPath, "utf8");
+  const manifest = JSON.parse(manifestText);
+  const stableArtifacts = await page.evaluate(async (id) => {
+    const [reportOne, reportTwo, trustedOne, trustedTwo, manifestOne, manifestTwo] = await Promise.all([
+      fetch(`/api/runs/${id}/export`).then((response) => response.text()),
+      fetch(`/api/runs/${id}/export`).then((response) => response.text()),
+      fetch(`/api/runs/${id}/trusted-export`).then((response) => response.text()),
+      fetch(`/api/runs/${id}/trusted-export`).then((response) => response.text()),
+      fetch(`/api/runs/${id}/manifest`).then((response) => response.text()),
+      fetch(`/api/runs/${id}/manifest`).then((response) => response.text()),
+    ]);
+    return { reportOne, reportTwo, trustedOne, trustedTwo, manifestOne, manifestTwo };
+  }, runId);
+  check("unchanged authoritative state re-exports byte-identical artifacts",
+    stableArtifacts.reportOne === stableArtifacts.reportTwo
+    && stableArtifacts.trustedOne === stableArtifacts.trustedTwo
+    && stableArtifacts.manifestOne === stableArtifacts.manifestTwo);
+  const reconciliationArtifact = manifest.export.artifacts.find((artifact) => artifact.kind === "reconciliation_report");
+  const trustedArtifact = manifest.export.artifacts.find((artifact) => artifact.kind === "trusted_merged_output");
+  check("manifest hashes match exact reconciliation and trusted bytes",
+    reconciliationArtifact?.sha256 === createHash("sha256").update(stableArtifacts.reportOne).digest("hex")
+    && trustedArtifact?.sha256 === createHash("sha256").update(stableArtifacts.trustedOne).digest("hex"));
+  check("manifest retains source, mapping, candidate, matcher, identity, and survivorship provenance",
+    manifest.manifestVersion === "run-manifest-v1.0.0"
+    && manifest.sourceDatasets.A.sha256 === sourceHashesBefore[0]
+    && manifest.sourceDatasets.B.sha256 === sourceHashesBefore[1]
+    && manifest.semanticMapping.mappingVersion === "confirmed-mappings-v1"
+    && manifest.candidateGeneration.candidateEngineVersion === "candidate-engine-v0.2.0"
+    && manifest.matcher.matcherVersion === "explainable-matcher-v0.2.0"
+    && manifest.identity.humanSameCount >= 1
+    && manifest.survivorship.keepBothCount >= 1);
+  check("ordinary run manifest excludes hidden synthetic truth, prompts, secrets, and server paths",
+    !/canonicalEntityId|groundTruth|corruptionProvenance|OPENAI_API_KEY|developerPrompt|[A-Z]:\\/i.test(manifestText)
+    && manifest.evaluation.applicable === false);
 
   report.developmentRunId = runId;
   await page.goto("http://localhost:5173", { waitUntil: "networkidle" });

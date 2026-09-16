@@ -3,11 +3,20 @@ import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { MATCHER_VERSION, RunViewSchema, type MatcherResult } from "@samewise/contracts";
+import {
+  MATCHER_VERSION,
+  RECONCILIATION_EXPORT_VERSION,
+  RUN_MANIFEST_VERSION,
+  RunManifestSchema,
+  RunViewSchema,
+  TRUSTED_EXPORT_VERSION,
+  type MatcherResult,
+} from "@samewise/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { MatcherRunner } from "../src/matcher-process.js";
+import { exportRun } from "../src/workflow-store.js";
 
 const aBytes = Buffer.from("id,name,status\nA1,Acme Corp,=SUM(1,2)\n");
 const bBytes = Buffer.from("id,organization,status\nB1,Acme Corporation,inactive\nB2,Other,active\n");
@@ -200,7 +209,118 @@ describe("SW-003 API workflow", () => {
     expect(trusted.body).toContain("keep_both,keep_both");
     expect(trusted.body).toContain("'=SUM(1,2)");
     expect(trusted.body).toContain("source_only_b");
-    expect(trusted.body).toContain("trusted-merged-export-v1");
+    expect(trusted.body).toContain(TRUSTED_EXPORT_VERSION);
+  });
+
+  it("creates deterministic artifacts and a versioned manifest with exact content hashes", async () => {
+    const { runId, result } = await setup();
+    const firstReport = await app.inject({ method: "GET", url: `/api/runs/${runId}/export` });
+    const secondReport = await app.inject({ method: "GET", url: `/api/runs/${runId}/export` });
+    expect(secondReport.body).toBe(firstReport.body);
+    expect(firstReport.headers["content-disposition"]).toMatch(/^attachment; filename="samewise-run-[A-Za-z0-9-]+-reconciliation\.csv"$/);
+
+    const firstManifestResponse = await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` });
+    const secondManifestResponse = await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` });
+    expect(secondManifestResponse.body).toBe(firstManifestResponse.body);
+    const manifest = RunManifestSchema.parse(JSON.parse(firstManifestResponse.body));
+    expect(manifest.manifestVersion).toBe(RUN_MANIFEST_VERSION);
+    expect(manifest.run.status).toBe("identity_unresolved");
+    expect(manifest.sourceDatasets.A).toMatchObject({ originalFilename: "a.csv", sha256: createHash("sha256").update(aBytes).digest("hex"), rowCount: 1 });
+    expect(manifest.sourceDatasets.B).toMatchObject({ originalFilename: "b.csv", sha256: createHash("sha256").update(bBytes).digest("hex"), rowCount: 2 });
+    expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v1", ai: null });
+    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: null });
+    expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.2.0" });
+    expect(manifest.identity).toMatchObject({ systemEstablishedLinkCount: 0, humanSameCount: 0, humanDifferentCount: 0, pendingCount: 1, deferredCount: 0 });
+    expect(manifest.evaluation).toMatchObject({ applicable: false, snapshotId: null });
+    expect(manifest.export.artifacts).toHaveLength(1);
+    expect(manifest.export.artifacts[0]).toMatchObject({ version: RECONCILIATION_EXPORT_VERSION, sha256: createHash("sha256").update(firstReport.body).digest("hex"), byteLength: Buffer.byteLength(firstReport.body) });
+    const serialized = JSON.stringify(manifest);
+    expect(serialized).not.toContain(dataRoot);
+    expect(serialized).not.toMatch(/OPENAI_API_KEY|canonicalEntityId|corruptionProvenance|groundTruth/i);
+    expect(result.datasets.A?.sha256).toBe(manifest.sourceDatasets.A.sha256);
+
+    const same = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${same.conflicts[0]!.conflictId}/resolutions`, payload: { action: "use_b" } });
+    const trustedOne = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    const trustedTwo = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(trustedTwo.body).toBe(trustedOne.body);
+    const readyManifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
+    expect(readyManifest.run.status).toBe("trusted_ready");
+    expect(readyManifest.identity).toMatchObject({ humanSameCount: 1, pendingCount: 0 });
+    expect(readyManifest.survivorship).toMatchObject({ manualResolutionCount: 1, ruleGeneratedResolutionCount: 0, unresolvedConflictCount: 0 });
+    expect(readyManifest.export.artifacts[1]).toMatchObject({ version: TRUSTED_EXPORT_VERSION, sha256: createHash("sha256").update(trustedOne.body).digest("hex") });
+  });
+
+  it("exports human DIFFERENT and deferred identity as explicit audit states", async () => {
+    const deferredRun = await setup();
+    await app.inject({ method: "PATCH", url: `/api/runs/${deferredRun.runId}/review-items/A1`, payload: { deferred: true } });
+    const deferred = await app.inject({ method: "GET", url: `/api/runs/${deferredRun.runId}/export` });
+    expect(deferred.body).toContain("deferred,human_defer");
+    expect(deferred.body).toContain("Identity review was explicitly deferred.");
+
+    const differentRun = await setup();
+    await app.inject({ method: "POST", url: `/api/runs/${differentRun.runId}/candidates/candidate-1-1/decisions`, payload: { decision: "different_entity" } });
+    const different = await app.inject({ method: "GET", url: `/api/runs/${differentRun.runId}/export` });
+    expect(different.body).toContain("different_entity,human,decision-");
+    expect(different.body).toContain("identity_different");
+    expect(different.body).toContain("only_a");
+    expect(different.body).toContain("only_b");
+  });
+
+  it("quotes CSV correctly, preserves Unicode, defends every formula prefix, and leaves negative numbers intact", async () => {
+    for (const dangerous of ["=cmd", "+cmd", "-cmd", "@cmd", "=HYPERLINK(\"x,y\")\nMünchen"]) {
+      const base = baseMatcherResult();
+      matcherResultOverride = { ...base, candidates: [{ ...base.candidates[0]!, aRecord: { ...base.candidates[0]!.aRecord, status: dangerous } }] };
+      const { runId } = await setup();
+      const same = RunViewSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+      await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${same.conflicts[0]!.conflictId}/resolutions`, payload: { action: "use_a" } });
+      const report = (await app.inject({ method: "GET", url: `/api/runs/${runId}/export` })).body;
+      const trusted = (await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` })).body;
+      expect(report).toContain(`'${dangerous[0]}`);
+      expect(trusted).toContain(`'${dangerous[0]}`);
+      if (dangerous.includes("München")) {
+        expect(report).toContain("München");
+        expect(report).toContain('""x,y""');
+        expect(report).toContain("\n");
+      }
+    }
+
+    const base = baseMatcherResult();
+    matcherResultOverride = { ...base, candidates: [{ ...base.candidates[0]!, aRecord: { ...base.candidates[0]!.aRecord, status: "-42.5" } }] };
+    const { runId } = await setup();
+    const report = (await app.inject({ method: "GET", url: `/api/runs/${runId}/export` })).body;
+    expect(report).toContain("-42.5");
+    expect(report).not.toContain("'-42.5");
+  });
+
+  it("generates a deterministic 10,000-row reconciliation artifact without an export-only scaling abstraction", async () => {
+    const { result } = await setup();
+    const large = {
+      ...result,
+      summary: { matched: 0, needsReview: 0, onlyA: 10_000, onlyB: 0 },
+      candidates: [], decisions: [], conflicts: [], reviewQueue: [],
+      reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 },
+      onlyA: Array.from({ length: 10_000 }, (_, index) => ({ rowId: `A${index.toString().padStart(5, "0")}`, record: { name: `Entity ${index}`, status: index % 2 ? "active" : "inactive" } })),
+      onlyB: [],
+    };
+    const first = exportRun(RunViewSchema.parse(large));
+    const second = exportRun(RunViewSchema.parse(large));
+    expect(first).toBe(second);
+    expect(first.split("\r\n")).toHaveLength(10_002);
+  });
+
+  it("treats traversal-like upload names as metadata and never reuses them for artifact filenames", async () => {
+    const created = RunViewSchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
+    const uploaded = await app.inject({
+      method: "POST", url: `/api/runs/${created.runId}/datasets/A`,
+      headers: { "content-type": "text/csv", "x-file-name": encodeURIComponent("../../server/unsafe.csv") }, payload: aBytes,
+    });
+    const view = RunViewSchema.parse(uploaded.json());
+    expect(view.datasets.A?.originalFilename).toBe("unsafe.csv");
+    const names = await readdir(join(dataRoot, created.runId));
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^dataset-[a-f0-9-]+\.csv$/);
+    expect(names[0]).not.toContain("unsafe");
   });
 
   it("rejects an invalid policy atomically and leaves the last valid policy intact", async () => {

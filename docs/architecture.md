@@ -15,7 +15,7 @@ separate source type with a visible nonrepresentative-sampling caveat.
 
 ### `apps/api`
 
-The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation and gated trusted exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
+The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation, gated trusted, and provenance-manifest exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
 
 Dedicated evaluation routes validate and cache checked-in catalog metadata and load
 error pages separately. They are not a truth service for ordinary uploaded runs.
@@ -24,6 +24,22 @@ The API can create and match normal runs when evaluation artifacts are unavailab
 Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v1` input from its authoritative profiles using only column name, inferred type, null rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs, canonical entities, schema truth, identity truth, and corruption provenance. The API uses a versioned developer prompt and strict structured output, then independently validates referenced columns, enums, confidence, allowlisted hints, duplicates, and mapping/unmapped consistency. Provider failures do not mutate proposals or confirmed mappings.
 
 Uploaded source bytes are saved once under generated names in ignored `.samewise-data/<run-id>/` directories and fingerprinted with SHA-256. Original filenames are metadata only and never become filesystem paths. Source bytes are not rewritten by mapping, matching, review, resolution, or export. This is local development artifact handling, not an object-storage design.
+
+### Export snapshot boundary
+
+One synchronous export request derives an `export-snapshot-v1.0.0` descriptor from
+the authoritative current `RunView`, renders the reconciliation CSV and (only when
+ready) trusted CSV, and hashes those exact UTF-8 bytes before rendering
+`run-manifest-v1.0.0`. The manifest is not self-hashed, avoiding circular content.
+It embeds no generation timestamp, raw datasets, filesystem paths, environment
+values, prompt payloads, or evaluation-only hidden truth. Existing decision and
+resolution timestamps are retained because they are authoritative run state.
+
+CSV generation uses deterministic headers and category/identifier ordering. All
+cells share one escaping and formula-defense path. Export filenames derive only
+from the server-generated run ID. The artifacts are regenerated rather than stored;
+unchanged process-local state therefore produces byte-identical content, while a
+later decision or resolution intentionally produces a new snapshot hash.
 
 ### `services/matcher`
 

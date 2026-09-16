@@ -7,6 +7,7 @@ import {
   MappingSuggestionResponseSchema,
   HumanReviewEvidenceSchema,
   ResolutionPreviewSchema,
+  RunManifestSchema,
   RuleApplicationResponseSchema,
   RunViewSchema,
   SurvivorshipPolicyInputSchema,
@@ -17,7 +18,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
-import { exportRun, exportTrustedRun, MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
+import { MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
 
 interface BuildAppOptions {
   dataRoot?: string;
@@ -232,21 +233,36 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.get("/api/runs/:runId/export", async (request, reply) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const csv = exportRun(store.get(runId));
+    const artifact = store.exportSnapshot(runId).reconciliation;
     app.log.info({ runId, stage: "export" }, "reconciliation export created");
     reply.header("Content-Type", "text/csv; charset=utf-8");
-    reply.header("Content-Disposition", `attachment; filename="samewise-${runId}.csv"`);
-    return csv;
+    reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
+    return artifact.content;
   });
 
   app.get("/api/runs/:runId/trusted-export", async (request, reply) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const csv = exportTrustedRun(store.get(runId));
+    const artifact = store.exportSnapshot(runId).trusted;
+    if (!artifact) {
+      const view = store.get(runId);
+      throw new WorkflowError("trusted_export_not_ready", `Trusted merged output is blocked: ${view.trustedExportReadiness.blockers.join(" ")}`, 409);
+    }
     app.log.info({ runId, stage: "trusted_export" }, "trusted merged export created");
     reply.header("Content-Type", "text/csv; charset=utf-8");
-    reply.header("Content-Disposition", `attachment; filename="samewise-trusted-${runId}.csv"`);
-    return csv;
+    reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
+    return artifact.content;
+  });
+
+  app.get("/api/runs/:runId/manifest", async (request, reply) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const artifact = store.exportSnapshot(runId).manifest;
+    RunManifestSchema.parse(artifact.value);
+    app.log.info({ runId, stage: "manifest_export" }, "run provenance manifest created");
+    reply.header("Content-Type", "application/json; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
+    return artifact.content;
   });
 
   app.setErrorHandler((error, _request, reply) => {

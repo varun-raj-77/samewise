@@ -1,4 +1,13 @@
 export {
+  EXPORT_SNAPSHOT_VERSION,
+  ExportArtifactSchema,
+  RECONCILIATION_EXPORT_VERSION,
+  RUN_MANIFEST_VERSION,
+  RunManifestSchema,
+  type ExportArtifact,
+  type RunManifest,
+} from "./export.js";
+export {
   EVALUATION_SNAPSHOT_VERSION,
   EVALUATION_VERSION,
   EvaluationCatalogSchema,

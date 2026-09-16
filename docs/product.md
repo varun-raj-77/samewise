@@ -46,6 +46,14 @@ Trusted merged output is a separate gated CSV: all review items and relevant fie
 conflicts must be resolved. A-only and B-only rows retain source-only provenance;
 KEEP BOTH retains dedicated source columns instead of inventing a canonical value.
 
+SW-010 makes the result portable without pretending unresolved work is complete.
+The Export screen separates the reconciliation report, gated trusted merged output,
+and a machine-readable run provenance manifest. The manifest binds exact CSV hashes
+to immutable source fingerprints and the mapping, candidate, matcher, identity, and
+survivorship state used to produce them. Re-export from unchanged authoritative
+state is deterministic. Ordinary product manifests state that no Evaluation
+snapshot is attached; they never import hidden synthetic truth.
+
 ## Evaluation foundation
 
 Ground truth is created before matcher development so future changes can be compared against known identity relationships, including source-only entities, hard negatives, and duplicate source rows. The product-visible CSVs never contain canonical identifiers, corruption labels, or partner hints. Canonical entities, source-to-canonical mappings, schema mapping truth, and provenance are evaluation-only artifacts.

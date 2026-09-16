@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.dev/schemas/run-manifest/1.0.0.json",
+  "title": "Samewise Run Provenance Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestVersion", "run", "sourceDatasets", "semanticMapping", "candidateGeneration", "matcher", "identity", "survivorship", "evaluation", "export"],
+  "properties": {
+    "manifestVersion": { "const": "run-manifest-v1.0.0" },
+    "run": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runId", "status", "stage", "snapshot", "relevantTimestamps"],
+      "properties": {
+        "runId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["matched", "identity_unresolved", "conflicts_unresolved", "trusted_ready"] },
+        "stage": { "type": "string", "minLength": 1 },
+        "snapshot": { "type": "object", "additionalProperties": false, "required": ["descriptorVersion", "authoritativeStateSha256"], "properties": { "descriptorVersion": { "const": "export-snapshot-v1.0.0" }, "authoritativeStateSha256": { "$ref": "#/$defs/sha256" } } },
+        "relevantTimestamps": { "type": "object", "additionalProperties": false, "required": ["mappingProposalCreatedAt", "firstIdentityDecisionAt", "lastIdentityDecisionAt", "policyConfiguredAt", "lastResolutionAt"], "properties": { "mappingProposalCreatedAt": { "$ref": "#/$defs/nullableDateTime" }, "firstIdentityDecisionAt": { "$ref": "#/$defs/nullableDateTime" }, "lastIdentityDecisionAt": { "$ref": "#/$defs/nullableDateTime" }, "policyConfiguredAt": { "$ref": "#/$defs/nullableDateTime" }, "lastResolutionAt": { "$ref": "#/$defs/nullableDateTime" } } }
+      }
+    },
+    "sourceDatasets": { "type": "object", "additionalProperties": false, "required": ["A", "B"], "properties": { "A": { "$ref": "#/$defs/datasetA" }, "B": { "$ref": "#/$defs/datasetB" } } },
+    "semanticMapping": {
+      "type": "object", "additionalProperties": false, "required": ["mappingVersion", "confirmedMappings", "ai"],
+      "properties": {
+        "mappingVersion": { "type": "string", "minLength": 1 },
+        "confirmedMappings": { "type": "array", "items": { "$ref": "../workflow/1.0.0.json#/$defs/manualMapping" } },
+        "ai": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/semanticAi" }] }
+      }
+    },
+    "candidateGeneration": { "type": "object", "additionalProperties": false, "required": ["candidateEngineVersion", "blockingNormalizationVersion", "candidateConfigVersion", "candidateConfigAvailability"], "properties": { "candidateEngineVersion": { "type": "string", "minLength": 1 }, "blockingNormalizationVersion": { "type": "string", "minLength": 1 }, "candidateConfigVersion": { "type": ["string", "null"] }, "candidateConfigAvailability": { "const": "not_retained_by_product_run" } } },
+    "matcher": { "type": "object", "additionalProperties": false, "required": ["featurePipelineVersion", "matcherVersion", "matcherConfigVersion", "matcherConfig", "scoreSemanticsVersion"], "properties": { "featurePipelineVersion": { "type": "string", "minLength": 1 }, "matcherVersion": { "type": "string", "minLength": 1 }, "matcherConfigVersion": { "type": "string", "minLength": 1 }, "matcherConfig": { "type": "object" }, "scoreSemanticsVersion": { "type": "string", "minLength": 1 } } },
+    "identity": { "$ref": "#/$defs/identitySummary" },
+    "survivorship": { "$ref": "#/$defs/survivorshipSummary" },
+    "evaluation": { "type": "object", "additionalProperties": false, "required": ["applicable", "snapshotId", "snapshotVersion", "reason"], "properties": { "applicable": { "const": false }, "snapshotId": { "type": "null" }, "snapshotVersion": { "type": "null" }, "reason": { "const": "No versioned evaluation snapshot is attached to this ordinary product run." } } },
+    "export": { "type": "object", "additionalProperties": false, "required": ["artifacts"], "properties": { "artifacts": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "#/$defs/artifact" } } } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableDateTime": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] },
+    "datasetA": { "allOf": [{ "$ref": "#/$defs/dataset" }, { "properties": { "side": { "const": "A" } } }] },
+    "datasetB": { "allOf": [{ "$ref": "#/$defs/dataset" }, { "properties": { "side": { "const": "B" } } }] },
+    "dataset": { "type": "object", "additionalProperties": false, "required": ["side", "datasetId", "originalFilename", "sha256", "rowCount", "profileSchemaVersion"], "properties": { "side": { "enum": ["A", "B"] }, "datasetId": { "type": "string", "minLength": 1 }, "originalFilename": { "type": "string", "minLength": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "rowCount": { "type": "integer", "minimum": 0 }, "profileSchemaVersion": { "type": "string", "minLength": 1 } } },
+    "semanticAi": { "type": "object", "additionalProperties": false, "required": ["provider", "model", "promptVersion", "structuredOutputSchemaVersion", "requestVersion", "responseId", "proposalId", "createdAt", "suggestionDecisions"], "properties": { "provider": { "type": "string", "minLength": 1 }, "model": { "type": "string", "minLength": 1 }, "promptVersion": { "type": "string", "minLength": 1 }, "structuredOutputSchemaVersion": { "type": "string", "minLength": 1 }, "requestVersion": { "type": "string", "minLength": 1 }, "responseId": { "type": "string", "minLength": 1 }, "proposalId": { "type": "string", "minLength": 1 }, "createdAt": { "type": "string", "format": "date-time" }, "suggestionDecisions": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["suggestionId", "status", "proposedAColumn", "proposedBColumn", "finalMappingId"], "properties": { "suggestionId": { "type": "string", "minLength": 1 }, "status": { "enum": ["pending", "accepted", "rejected", "edited"] }, "proposedAColumn": { "type": "string", "minLength": 1 }, "proposedBColumn": { "type": "string", "minLength": 1 }, "finalMappingId": { "type": ["string", "null"] } } } } } },
+    "identitySummary": { "type": "object", "additionalProperties": false, "required": ["systemEstablishedLinkCount", "humanSameCount", "humanDifferentCount", "pendingCount", "deferredCount", "collisionRelatedCount"], "properties": { "systemEstablishedLinkCount": { "$ref": "#/$defs/count" }, "humanSameCount": { "$ref": "#/$defs/count" }, "humanDifferentCount": { "$ref": "#/$defs/count" }, "pendingCount": { "$ref": "#/$defs/count" }, "deferredCount": { "$ref": "#/$defs/count" }, "collisionRelatedCount": { "$ref": "#/$defs/count" } } },
+    "survivorshipSummary": { "type": "object", "additionalProperties": false, "required": ["policySchemaVersion", "policyVersion", "configuredFieldPolicies", "manualResolutionCount", "ruleGeneratedResolutionCount", "keepBothCount", "unresolvedConflictCount"], "properties": { "policySchemaVersion": { "type": "string", "minLength": 1 }, "policyVersion": { "type": ["string", "null"] }, "configuredFieldPolicies": { "type": "array", "items": { "type": "object" } }, "manualResolutionCount": { "$ref": "#/$defs/count" }, "ruleGeneratedResolutionCount": { "$ref": "#/$defs/count" }, "keepBothCount": { "$ref": "#/$defs/count" }, "unresolvedConflictCount": { "$ref": "#/$defs/count" } } },
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["kind", "version", "filename", "mediaType", "sha256", "byteLength"], "properties": { "kind": { "enum": ["reconciliation_report", "trusted_merged_output"] }, "version": { "type": "string", "minLength": 1 }, "filename": { "type": "string", "minLength": 1 }, "mediaType": { "const": "text/csv; charset=utf-8" }, "sha256": { "$ref": "#/$defs/sha256" }, "byteLength": { "type": "integer", "minimum": 0 } } },
+    "count": { "type": "integer", "minimum": 0 }
+  }
+}

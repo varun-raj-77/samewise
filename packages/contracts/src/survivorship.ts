@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SURVIVORSHIP_CONTRACT_VERSION = "1.0.0" as const;
 export const SURVIVORSHIP_POLICY_SCHEMA_VERSION = "survivorship-policy-v1" as const;
-export const TRUSTED_EXPORT_VERSION = "trusted-merged-export-v1" as const;
+export const TRUSTED_EXPORT_VERSION = "trusted-merged-export-v2.0.0" as const;
 
 export const SurvivorshipStrategySchema = z.enum([
   "use_a",

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   MATCHER_VERSION,
   MappingSuggestionResponseSchema,
+  RunManifestSchema,
   RunViewSchema,
   type MatcherResult,
   type SemanticMappingModelOutput,
@@ -147,6 +148,16 @@ describe("SW-004 semantic mapping API", () => {
     expect(MappingSuggestionResponseSchema.parse(rejected.json()).confirmedMappings).toHaveLength(1);
     expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(200);
     expect(consumed.map((item) => [item.aColumn, item.bColumn])).toEqual([["name", "organization"]]);
+    const manifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
+    expect(manifest.semanticMapping.ai).toMatchObject({
+      provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v1",
+      structuredOutputSchemaVersion: "1.0.0", requestVersion: "metadata-first-v1",
+      suggestionDecisions: expect.arrayContaining([
+        expect.objectContaining({ suggestionId: nameSuggestion!.suggestionId, status: "accepted" }),
+        expect.objectContaining({ suggestionId: statusSuggestion!.suggestionId, status: "rejected", finalMappingId: null }),
+      ]),
+    });
+    expect(JSON.stringify(manifest)).not.toContain("DO_NOT_FORWARD_ENTIRE_ROW");
 
     await app.close();
     const remapOutput = { ...validOutput, mappings: [validOutput.mappings[0]!] };

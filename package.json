@@ -22,6 +22,7 @@
     "acceptance:sw007:browser": "node apps/web/e2e/sw007-visible-closeout.mjs",
     "acceptance:sw008:browser": "node apps/web/e2e/sw008-visible-closeout.mjs",
     "acceptance:sw009:browser": "node apps/web/e2e/sw009-visible-closeout.mjs",
+    "acceptance:sw010:browser": "node apps/web/e2e/sw010-visible-closeout.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm python:lint && pnpm python:test"
   },
   "devDependencies": {

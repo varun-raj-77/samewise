@@ -2,8 +2,9 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
-SW-009 adds a versioned evaluation product and matcher-version comparison on top of
-the frozen SW-006 matcher, SW-007 review workspace, and SW-008 survivorship flow:
+SW-010 completes the export and provenance surface on top of the frozen SW-006
+matcher, SW-007 review workspace, SW-008 survivorship flow, and SW-009 evaluation
+product:
 
 1. Upload immutable Dataset A and Dataset B CSV files.
 2. Inspect Python-generated profiles and limited representative samples.
@@ -24,6 +25,9 @@ the frozen SW-006 matcher, SW-007 review workspace, and SW-008 survivorship flow
 10. Open Evaluation to inspect frozen stage metrics, compatible version deltas,
     score-band evidence, gates, and paged failure examples without exposing hidden
     truth to ordinary reconciliation.
+11. Download a deterministic run manifest that identifies source fingerprints,
+    mapping/matcher/policy versions, decision summaries, artifact names, and exact
+    SHA-256 hashes for the CSV bytes.
 
 Identity and survivorship are separate state transitions. Confirming identity never chooses a field value.
 
@@ -80,6 +84,7 @@ Uploaded bytes are written once beneath the ignored `.samewise-data/<run-id>/` d
 | `POST` | `/api/runs/:runId/survivorship-apply` | Explicitly apply a rule without overwriting manual resolutions |
 | `GET` | `/api/runs/:runId/export` | Download the always-available reconciliation report |
 | `GET` | `/api/runs/:runId/trusted-export` | Download trusted merged output only when readiness passes |
+| `GET` | `/api/runs/:runId/manifest` | Download the deterministic run provenance manifest and CSV hashes |
 
 Uploads use a CSV content type plus an `X-File-Name` header. The development limit is 2 MiB per file.
 
@@ -220,6 +225,10 @@ uv run --project services/matcher samewise-matcher candidates benchmark --root .
   business time from upload time or arbitrary locale date text.
 - Multiple effective links are exported separately rather than collapsed into a
   multi-record golden entity.
+- Export artifacts are generated on request from current process-local state; they
+  are not persisted, signed, or permanently frozen after download.
+- Ordinary product runs do not retain a standalone candidate-configuration object,
+  so the manifest records that limitation instead of inventing a config version.
 
 ## Survivorship semantics
 
@@ -237,6 +246,29 @@ metadata columns. See [docs/sw-008-survivorship.md](docs/sw-008-survivorship.md)
 
 Synthetic tests establish deterministic rule correctness. They are not a claim of
 real-world survivorship accuracy.
+
+## Export and provenance semantics
+
+Samewise exposes three distinct artifacts. `reconciliation-export-v3.0.0` is an
+audit report and remains available while identity or field work is unresolved. It
+records system matches, human SAME/DIFFERENT decisions, deferred/pending identity,
+source-only records, conflict/resolution IDs, and manual versus deterministic-rule
+resolution origin. `trusted-merged-export-v2.0.0` is emitted only when the SW-008
+readiness gate passes. `run-manifest-v1.0.0` describes the authoritative current
+run snapshot and hashes the exact UTF-8 CSV bytes.
+
+Exports have deterministic headers and row ordering, CRLF CSV records, standard
+comma/quote/multiline escaping, and spreadsheet formula-injection defense for `=`,
+`+`, `-`, and `@`; plain negative numeric values remain numeric text. Null or absent
+source values are empty CSV cells. Re-exporting unchanged authoritative state is
+byte-identical. No wall-clock export timestamp is embedded.
+
+KEEP BOTH leaves the canonical value empty and retains `<field>__A`, `<field>__B`,
+and `<field>__resolution` plus provenance columns. A survivorship selection is an
+explicit policy or human choice, not objective truth. Ordinary manifests never
+attach synthetic canonical IDs, hidden identity labels, or corruption provenance;
+those remain in versioned Evaluation artifacts. See
+[docs/sw-010-export-provenance.md](docs/sw-010-export-provenance.md).
 
 ## Repository map
 

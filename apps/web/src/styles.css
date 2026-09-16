@@ -163,6 +163,17 @@ h2 { color: var(--text-primary); font-size: 20px; letter-spacing: -.02em; }
 .export-card { display: grid; grid-template-columns: repeat(3, 1fr); padding: 22px; }
 .export-card div { display: grid; gap: 8px; }
 .export-card strong { font-size: 21px; }
+.export-run-context { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 22px 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--border-subtle); }
+.export-run-context span { display: grid; gap: 7px; padding: 14px; background: var(--surface-1); }
+.export-run-context small, .export-artifact small { color: var(--text-muted); }
+.export-run-context code, .export-artifact code { overflow-wrap: anywhere; color: var(--text-secondary); font-size: 11px; }
+.export-artifact-list { display: grid; gap: 12px; }
+.export-artifact { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 18px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--surface-1); }
+.export-artifact div { display: grid; gap: 5px; }
+.export-artifact strong { font-size: 18px; }
+.export-artifact p { max-width: 690px; margin: 2px 0 0; color: var(--text-secondary); }
+.export-artifact button { flex: 0 0 auto; }
+.warning ul { margin: 8px 0 0; padding-left: 20px; }
 .warning { border-left: 3px solid var(--semantic-warning); background: rgba(245, 158, 11, .08); color: var(--semantic-warning); }
 .error-banner { border-left: 3px solid var(--semantic-danger); background: rgba(239, 68, 68, .09); color: var(--semantic-danger); }
 .busy { position: absolute; top: 22px; right: 35px; color: var(--text-secondary); font-size: 12px; }
@@ -181,7 +192,8 @@ h2 { color: var(--text-primary); font-size: 20px; letter-spacing: -.02em; }
   .mapping-row { grid-template-columns: 1fr 1fr; }
   .mapping-row > span { display: none; }
   .evidence-table > div { grid-template-columns: 1fr; }
-  .export-card { grid-template-columns: 1fr; gap: 20px; }
+  .export-card, .export-run-context { grid-template-columns: 1fr; gap: 1px; }
+  .export-artifact { align-items: stretch; flex-direction: column; }
 }
 
 @media (max-width: 620px) {

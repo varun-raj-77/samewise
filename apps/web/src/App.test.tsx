@@ -200,9 +200,30 @@ describe("Samewise vertical slice", () => {
 
   it("keeps the reconciliation report available while trusted merged output is blocked", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
-    expect(screen.getByText("Trusted output").parentElement).toHaveTextContent("Blocked");
+    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Blocked");
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Download provenance manifest" })).toBeEnabled();
+    expect(screen.getByText("reconciliation-export-v3.0.0")).toBeInTheDocument();
+    expect(screen.getByText("trusted-merged-export-v2.0.0")).toBeInTheDocument();
+    expect(screen.getByText("run-manifest-v1.0.0")).toBeInTheDocument();
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+    expect(screen.getByText(`${"a".repeat(12)}…`)).toBeInTheDocument();
+    expect(screen.getByText(`${"b".repeat(12)}…`)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("identity review item");
+  });
+
+  it("enables trusted output only after the server readiness gate passes", () => {
+    render(<App initialRun={runView({ trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
+    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Ready");
+    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeEnabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps trusted output blocked with an exact unresolved field-conflict reason", () => {
+    render(<App initialRun={runView({ trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 3, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["3 comparison-field conflict(s) remain unresolved."] } })} initialScreen="export" />);
+    expect(screen.getByRole("status")).toHaveTextContent("3 comparison-field conflict(s) remain unresolved.");
+    expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
   });
 });
