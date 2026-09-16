@@ -4,9 +4,9 @@
   gap: 8px;
   margin: 0 0 22px;
   padding: 14px;
-  border: 1px solid #294159;
+  border: 1px solid var(--border-subtle);
   border-radius: 9px;
-  background: #0b1d2e;
+  background: var(--surface-1);
 }
 
 .candidate-provenance strong {
@@ -17,8 +17,8 @@
 .candidate-provenance span {
   padding: 5px 8px;
   border-radius: 5px;
-  background: #122b3f;
-  color: #8fb1c9;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -34,7 +34,7 @@
 .evidence-table em {
   display: block;
   margin-top: 5px;
-  color: #8ca1b5;
+  color: var(--text-muted);
   font-size: 11px;
   font-style: normal;
 }
@@ -42,7 +42,7 @@
 .evidence-table > div > p {
   grid-column: 1 / -1;
   margin: 2px 0 0;
-  color: #718aa1;
+  color: var(--text-muted);
   font-size: 10px;
 }
 
@@ -51,3 +51,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.candidate-provenance { border-color: var(--border-subtle); border-radius: 8px; background: var(--surface-1); }
+.candidate-provenance span { background: var(--surface-hover); color: var(--text-secondary); }
+.evidence-table em, .evidence-table > div > p { color: var(--text-muted); }
