@@ -19,12 +19,15 @@ def test_stage_benchmark_is_machine_readable_and_truth_is_reported() -> None:
         ManualMapping.model_validate(item) for item in mappings_payload["mappings"]
     ]
     candidate_config = CandidateEngineConfig.model_validate_json(
-        (ROOT / "evaluation/configs/candidate-engine-v0.2.0.json").read_text(
+        (ROOT / "evaluation/configs/candidate-engine-v0.3.0.json").read_text(
             encoding="utf-8"
         )
     )
     matcher_config = MatcherConfig.model_validate_json(
-        (ROOT / "evaluation/configs/matcher-v0.2.0.json").read_text(
+        (
+            ROOT
+            / "evaluation/configs/matcher-v0.2.0-candidate-v0.3.0.json"
+        ).read_text(
             encoding="utf-8"
         )
     )

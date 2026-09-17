@@ -115,7 +115,7 @@ class CandidatePair(StrictModel):
 class MatcherResult(StrictModel):
     contractVersion: Literal["1.0.0"]
     matcherVersion: Literal["baseline-matcher-v0.1.0", "explainable-matcher-v0.2.0"]
-    candidateEngineVersion: Literal["candidate-engine-v0.2.0"]
+    candidateEngineVersion: Literal["candidate-engine-v0.3.0"]
     blockingNormalizationVersion: Literal["blocking-normalization-v0.1.0"]
     featurePipelineVersion: Literal[
         "baseline-feature-pipeline-v0.1.0", "feature-pipeline-v0.1.0"

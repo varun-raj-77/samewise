@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from samewise_matcher.candidate_engine import GeneratedCandidate
+from samewise_matcher.candidate_engine import CandidateEngineConfig, GeneratedCandidate
 from samewise_matcher.explainable_matcher import (
     MatcherConfig,
     build_match_result,
@@ -39,7 +39,10 @@ BLOCKING = [BlockingEvidenceView(blockerId="name_token_v1", keyHash="0123456789a
 def test_default_product_config_matches_frozen_versioned_file() -> None:
     root = Path(__file__).resolve().parents[3]
     frozen = MatcherConfig.model_validate_json(
-        (root / "evaluation/configs/matcher-v0.2.0.json").read_text()
+        (
+            root
+            / "evaluation/configs/matcher-v0.2.0-candidate-v0.3.0.json"
+        ).read_text()
     )
     assert MatcherConfig() == frozen
     assert frozen.frozen
@@ -391,3 +394,48 @@ def test_cached_row_normalization_preserves_uncached_score_evidence() -> None:
         "feature_extraction_seconds",
         "scoring_seconds",
     }
+
+
+def test_single_generic_identity_exact_match_routes_to_review_not_source_only(
+    tmp_path: Path,
+) -> None:
+    a_path, b_path = tmp_path / "a.csv", tmp_path / "b.csv"
+    _write(a_path, "record_id,stable_id\nA-IV-701,VEND-7001\n")
+    _write(b_path, "record_id,stable_id\nB-IV-301,VEND-7001\n")
+
+    stable_id = ManualMapping(
+        mappingId="stable-id",
+        label="Stable ID",
+        aColumn="stable_id",
+        bColumn="stable_id",
+        role="identity",
+        normalizer="text",
+    )
+    result = match_csvs_explainable(a_path, b_path, [stable_id])
+
+    assert result.onlyA == []
+    assert len(result.candidates) == 1
+    candidate = result.candidates[0]
+    assert (candidate.aRowId, candidate.bRowId) == ("A-IV-701", "B-IV-301")
+    assert candidate.band == "needs_review"
+    assert candidate.matchScore == 1
+    assert candidate.evidence[0].evidenceClass == "exact_agreement"
+    assert result.matcherConfig["decisions"]["minimumAutoAgreementFields"] == 2
+
+
+def test_candidate_config_version_must_match_frozen_matcher_provenance(
+    tmp_path: Path,
+) -> None:
+    a_path, b_path = tmp_path / "a.csv", tmp_path / "b.csv"
+    _write(a_path, "id,stable-id\nA1,VEND-7001\n")
+    _write(b_path, "id,stable-id\nB1,VEND-7001\n")
+
+    with pytest.raises(ValueError, match="must match frozen matcher provenance"):
+        match_csvs_explainable(
+            a_path,
+            b_path,
+            [mapping("stable-id")],
+            candidate_config=CandidateEngineConfig(
+                engineVersion="candidate-engine-v0.2.0"
+            ),
+        )

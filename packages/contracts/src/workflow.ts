@@ -8,7 +8,7 @@ import {
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
 export const WORKFLOW_PROJECTION_CONTRACT_VERSION = "1.0.0" as const;
 export const MATCHER_VERSION = "explainable-matcher-v0.2.0" as const;
-export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.2.0" as const;
+export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.3.0" as const;
 export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
 export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0" as const;
 export const MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0" as const;

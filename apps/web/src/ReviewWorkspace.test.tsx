@@ -14,7 +14,7 @@ const candidates = [candidate("c11", "B1", 1, 0.8), candidate("c12", "B2", 2, 0.
 const summaries = candidates.map((item) => ({ candidateId: item.candidateId, bRowId: item.bRowId, rank: item.rank, matchScore: item.matchScore, band: item.band, collision: item.collision, strongContradiction: false, strongestPositive: { mappingId: "name", label: "Name", evidenceClass: "partial_agreement" as const, contribution: 0.8 }, strongestContradiction: null, humanDecision: null }));
 
 function run(overrides: Partial<RunSummary> = {}): RunSummary {
-  return { contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-review", stage: "review", datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null, matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: {} }, summary: { matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 }, survivorshipPolicy: null, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 2, blockers: ["review"] }, reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null, conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, ...overrides };
+  return { contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-review", stage: "review", datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null, matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: {} }, summary: { matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 }, survivorshipPolicy: null, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 2, blockers: ["review"] }, reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null, conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, ...overrides };
 }
 
 function reviewPage() {
@@ -23,7 +23,7 @@ function reviewPage() {
 
 function detail(candidateId = "c11") {
   const selected = candidates.find((item) => item.candidateId === candidateId)!;
-  return { contractVersion: "1.0.0", runId: "run-review", candidate: selected, alternatives: summaries, reviewState: "needs_review", deferred: false, collisionARowIds: candidateId === "c11" ? ["A2"] : [], effectiveCollisionARowIds: [], humanDecision: null, conflicts: [], matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0" };
+  return { contractVersion: "1.0.0", runId: "run-review", candidate: selected, alternatives: summaries, reviewState: "needs_review", deferred: false, collisionARowIds: candidateId === "c11" ? ["A2"] : [], effectiveCollisionARowIds: [], humanDecision: null, conflicts: [], matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0" };
 }
 
 function fetchSuccess() {

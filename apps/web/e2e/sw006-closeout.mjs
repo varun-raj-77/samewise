@@ -79,7 +79,7 @@ try {
   const runResponse = await fetch(`http://127.0.0.1:3000/api/runs/${report.runId}`);
   const run = await runResponse.json();
   report.summary = run.summary;
-  check("frozen matcher provenance is retained", run.mappingVersion === "confirmed-mappings-v1" && run.matcherProvenance.matcherVersion === "explainable-matcher-v0.2.0" && run.matcherProvenance.candidateEngineVersion === "candidate-engine-v0.2.0" && run.matcherProvenance.featurePipelineVersion === "feature-pipeline-v0.1.0" && run.matcherProvenance.matcherConfig.frozen === true);
+  check("frozen matcher provenance is retained", run.mappingVersion === "confirmed-mappings-v1" && run.matcherProvenance.matcherVersion === "explainable-matcher-v0.2.0" && run.matcherProvenance.candidateEngineVersion === "candidate-engine-v0.3.0" && run.matcherProvenance.featurePipelineVersion === "feature-pipeline-v0.1.0" && run.matcherProvenance.matcherConfig.frozen === true);
   check("dev result bands are factual", run.summary.matched === 11 && run.summary.needsReview === 8 && run.summary.onlyA === 4 && run.summary.onlyB === 11);
   check("an obvious multi-field proposal exists", run.candidates.some((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && candidate.matchScore >= 0.8));
   check("a visible missing-field case exists", run.candidates.some((candidate) => candidate.evidence.some((item) => item.evidenceClass.startsWith("missing_"))));

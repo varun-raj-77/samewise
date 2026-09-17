@@ -40,8 +40,8 @@ identity truth or optional corruption provenance. Benchmark output includes
 SW-005F adds `fixtures generate-weak-config` and `candidates falsify`. Falsification
 runs full, exact-only, no-exact, and leave-one-family-out variants, then performs
 hidden-truth strong/weak stratification, suppression analysis, and hard-negative
-coverage. `candidate-engine-v0.1.0` remains runnable; product matching defaults to
-`candidate-engine-v0.2.0`.
+coverage. Earlier candidate-engine versions remain runnable for historical
+reproduction; product matching defaults to `candidate-engine-v0.3.0`.
 
 Matcher evaluation has a guarded two-phase workflow:
 

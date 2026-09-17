@@ -120,7 +120,7 @@ def test_weak_identifier_falsification_snapshot(tmp_path: Path) -> None:
         ManualMapping.model_validate(item) for item in mapping_payload["mappings"]
     ]
     candidate_config = CandidateEngineConfig.model_validate_json(
-        (ROOT / "evaluation/configs/candidate-engine-v0.2.0.json").read_text(
+        (ROOT / "evaluation/configs/candidate-engine-v0.3.0.json").read_text(
             encoding="utf-8"
         )
     )

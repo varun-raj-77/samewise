@@ -54,7 +54,7 @@ function matcherWithCapture(capture: (mappings: Parameters<MatcherRunner["match"
     },
     async match(input): Promise<MatcherResult> {
       capture(input.mappings);
-      return { contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true }, candidates: [], onlyA: [], onlyB: [] };
+      return { contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true }, candidates: [], onlyA: [], onlyB: [] };
     },
   };
 }

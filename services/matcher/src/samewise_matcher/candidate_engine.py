@@ -24,7 +24,7 @@ from samewise_matcher.blocking_normalization import (
 )
 from samewise_matcher.workflow_models import ManualMapping
 
-CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.2.0"
+CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.3.0"
 BlockerId = Literal[
     "exact_strong_v1",
     "name_token_v1",
@@ -70,9 +70,11 @@ class StrictModel(BaseModel):
 
 
 class CandidateEngineConfig(StrictModel):
-    engineVersion: Literal["candidate-engine-v0.1.0", "candidate-engine-v0.2.0"] = (
-        CANDIDATE_ENGINE_VERSION
-    )
+    engineVersion: Literal[
+        "candidate-engine-v0.1.0",
+        "candidate-engine-v0.2.0",
+        "candidate-engine-v0.3.0",
+    ] = CANDIDATE_ENGINE_VERSION
     normalizationVersion: Literal["blocking-normalization-v0.1.0"] = (
         NORMALIZATION_VERSION
     )
@@ -106,7 +108,11 @@ class BlockerDiagnostics(StrictModel):
 
 
 class CandidateGenerationResult(StrictModel):
-    engineVersion: Literal["candidate-engine-v0.1.0", "candidate-engine-v0.2.0"]
+    engineVersion: Literal[
+        "candidate-engine-v0.1.0",
+        "candidate-engine-v0.2.0",
+        "candidate-engine-v0.3.0",
+    ]
     normalizationVersion: Literal["blocking-normalization-v0.1.0"]
     config: CandidateEngineConfig
     aRowCount: int = Field(ge=0)
@@ -224,6 +230,16 @@ def record_blocking_keys(
             normalized = normalize_address(raw)
             if normalized:
                 address_values.append(normalized)
+        elif (
+            kind == "other"
+            and config.engineVersion == "candidate-engine-v0.3.0"
+            and "exact_strong_v1" in keys
+        ):
+            normalized = normalize_text(raw)
+            if normalized:
+                keys["exact_strong_v1"].add(
+                    f"{mapping.mappingId}:generic-exact:{normalized}"
+                )
 
     for name, tokens in name_values:
         compact = re_sub_nonword(name)

@@ -17,6 +17,7 @@ def mapping(
     a_column: str,
     b_column: str,
     normalizer: str = "text",
+    role: str = "identity",
 ) -> ManualMapping:
     return ManualMapping.model_validate(
         {
@@ -24,7 +25,7 @@ def mapping(
             "label": mapping_id,
             "aColumn": a_column,
             "bColumn": b_column,
-            "role": "identity",
+            "role": role,
             "normalizer": normalizer,
         }
     )
@@ -106,7 +107,7 @@ def test_v2_compact_name_context_recovers_spacing_without_broad_bucket() -> None
     old_result = generate(a, b, mappings, old)
     assert old_result.engineVersion == "candidate-engine-v0.1.0"
     new_result = generate(a, b, mappings, new)
-    assert new_result.engineVersion == "candidate-engine-v0.2.0"
+    assert new_result.engineVersion == "candidate-engine-v0.3.0"
     blockers = {
         evidence.blockerId for evidence in new_result.candidates[0].blockingEvidence
     }
@@ -130,6 +131,119 @@ def test_empty_strong_values_never_form_keys_or_candidates() -> None:
     result = generate(
         [{"id": "A1", "email": ""}],
         [{"id": "B1", "email": ""}],
+        [item],
+        config,
+    )
+    assert result.candidates == []
+
+
+def test_equal_generic_identity_value_generates_mapping_specific_exact_candidate() -> (
+    None
+):
+    item = mapping("stable-id", "stable_id", "stable_id")
+    result = generate(
+        [{"record_id": "A-IV-701", "stable_id": "VEND-7001"}],
+        [{"record_id": "B-IV-301", "stable_id": "vend 7001"}],
+        [item],
+    )
+    assert pairs(result) == {("A-IV-701", "B-IV-301")}
+    assert [item.blockerId for item in result.candidates[0].blockingEvidence] == [
+        "exact_strong_v1"
+    ]
+
+
+def test_different_generic_identity_values_do_not_generate_candidate() -> None:
+    item = mapping("stable-id", "stable_id", "stable_id")
+    result = generate(
+        [{"id": "A1", "stable_id": "VEND-7001"}],
+        [{"id": "B1", "stable_id": "VEND-7002"}],
+        [item],
+    )
+    assert result.candidates == []
+
+
+@pytest.mark.parametrize(("left", "right"), [("", ""), ("   ", "\t")])
+def test_missing_or_blank_generic_identity_values_do_not_generate_candidate(
+    left: str, right: str
+) -> None:
+    item = mapping("stable-id", "stable_id", "stable_id")
+    result = generate(
+        [{"id": "A1", "stable_id": left}],
+        [{"id": "B1", "stable_id": right}],
+        [item],
+    )
+    assert result.candidates == []
+
+
+def test_generic_exact_keys_do_not_collide_across_unrelated_mappings() -> None:
+    mappings = [
+        mapping("generic-one", "left_one", "right_one"),
+        mapping("generic-two", "left_two", "right_two"),
+    ]
+    result = generate(
+        [{"id": "A1", "left_one": "shared", "left_two": "left-only"}],
+        [{"id": "B1", "right_one": "right-only", "right_two": "shared"}],
+        mappings,
+    )
+    assert result.candidates == []
+
+
+def test_generic_comparison_mapping_does_not_generate_identity_candidate() -> None:
+    mappings = [
+        mapping("stable-id", "stable_id", "stable_id"),
+        mapping("comparison-code", "code", "code", role="comparison"),
+    ]
+    result = generate(
+        [{"id": "A1", "stable_id": "left", "code": "shared"}],
+        [{"id": "B1", "stable_id": "right", "code": "shared"}],
+        mappings,
+    )
+    assert result.candidates == []
+
+
+def test_recognized_blockers_are_unchanged_in_v3() -> None:
+    mappings = [
+        mapping("phone", "phone", "phone", "phone"),
+        mapping("organization-name", "name", "name"),
+    ]
+    a = [{"id": "A1", "phone": "555-010-1000", "name": "Acme Medical"}]
+    b = [{"id": "B1", "phone": "5550101000", "name": "Acme Medcial"}]
+    old = generate(
+        a,
+        b,
+        mappings,
+        CandidateEngineConfig(engineVersion="candidate-engine-v0.2.0"),
+    )
+    new = generate(a, b, mappings)
+    assert pairs(old) == pairs(new) == {("A1", "B1")}
+    assert old.candidates[0].blockingEvidence == new.candidates[0].blockingEvidence
+    assert old.blockerDiagnostics == new.blockerDiagnostics
+
+
+def test_generic_exact_bucket_uses_existing_whole_bucket_suppression() -> None:
+    config = CandidateEngineConfig(
+        enabledBlockers=("exact_strong_v1",),
+        maxBucketSizePerSide=2,
+        maxBucketPairCount=100,
+    )
+    item = mapping("stable-id", "stable_id", "stable_id")
+    a = [{"id": f"A{i}", "stable_id": "shared"} for i in range(3)]
+    b = [{"id": f"B{i}", "stable_id": "shared"} for i in range(3)]
+    result = generate(a, b, [item], config)
+    assert result.candidates == []
+    assert result.blockerDiagnostics[0].keysSuppressed == 1
+    assert result.blockerDiagnostics[0].relationshipsSuppressed == 9
+
+
+def test_v2_does_not_claim_v3_generic_exact_membership_semantics() -> None:
+    config = CandidateEngineConfig(
+        engineVersion="candidate-engine-v0.2.0",
+        enabledBlockers=("exact_strong_v1",),
+    )
+    item = mapping("stable-id", "stable_id", "stable_id")
+    result = generate(
+        [{"id": "A1", "stable_id": "VEND-7001"}],
+        [{"id": "B1", "stable_id": "VEND-7001"}],
         [item],
         config,
     )

@@ -92,7 +92,7 @@ class MatcherConfig(StrictModel):
     featurePipelineVersion: Literal["feature-pipeline-v0.1.0"] = (
         FEATURE_PIPELINE_VERSION
     )
-    candidateEngineVersion: Literal["candidate-engine-v0.2.0"] = (
+    candidateEngineVersion: Literal["candidate-engine-v0.3.0"] = (
         CANDIDATE_ENGINE_VERSION
     )
     blockingNormalizationVersion: Literal["blocking-normalization-v0.1.0"] = (
@@ -539,13 +539,25 @@ def score_rows(
         _row_id(row, b_headers, "B", index): row for index, row in enumerate(b_rows)
     }
     if candidate_mode == "candidate_engine":
+        effective_candidate_config = candidate_config or CandidateEngineConfig()
+        if effective_candidate_config.engineVersion != config.candidateEngineVersion:
+            raise ValueError(
+                "Candidate engine config version must match frozen matcher provenance"
+            )
+        if (
+            effective_candidate_config.normalizationVersion
+            != config.blockingNormalizationVersion
+        ):
+            raise ValueError(
+                "Blocking normalization version must match frozen matcher provenance"
+            )
         generated = generate_candidates(
             a_headers,
             a_rows,
             b_headers,
             b_rows,
             mappings,
-            candidate_config,
+            effective_candidate_config,
         ).candidates
     else:
         generated = [

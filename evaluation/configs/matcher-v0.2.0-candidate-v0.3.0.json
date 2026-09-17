@@ -4,8 +4,8 @@
   "featurePipelineVersion": "feature-pipeline-v0.1.0",
   "candidateEngineVersion": "candidate-engine-v0.3.0",
   "blockingNormalizationVersion": "blocking-normalization-v0.1.0",
-  "frozen": false,
-  "tunedOnFixture": null,
+  "frozen": true,
+  "tunedOnFixture": "organizations-matcher-tune-1200-v1",
   "weights": {
     "name": 2.0,
     "phone": 1.5,
@@ -29,9 +29,9 @@
     "other": 0.25
   },
   "decisions": {
-    "autoMatchThreshold": 0.82,
-    "reviewThreshold": 0.3,
-    "minimumTopCandidateMargin": 0.1,
+    "autoMatchThreshold": 0.5,
+    "reviewThreshold": 0.25,
+    "minimumTopCandidateMargin": 0.04,
     "minimumAutoAgreementFields": 2,
     "alternativeFloor": 0.25,
     "alternativeWindow": 0.3,

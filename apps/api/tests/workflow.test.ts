@@ -31,7 +31,7 @@ let matcherResultOverride: MatcherResult | undefined;
 function baseMatcherResult(): MatcherResult {
   return {
     contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
-    candidateEngineVersion: "candidate-engine-v0.2.0",
+    candidateEngineVersion: "candidate-engine-v0.3.0",
     blockingNormalizationVersion: "blocking-normalization-v0.1.0",
     featurePipelineVersion: "feature-pipeline-v0.1.0",
     matcherConfigVersion: "matcher-config-v0.2.0",
@@ -108,7 +108,7 @@ describe("SW-003 API workflow", () => {
     expect(result.mappingVersion).toBe("confirmed-mappings-v1");
     expect(result.matcherProvenance).toMatchObject({
       matcherVersion: MATCHER_VERSION,
-      candidateEngineVersion: "candidate-engine-v0.2.0",
+      candidateEngineVersion: "candidate-engine-v0.3.0",
       featurePipelineVersion: "feature-pipeline-v0.1.0",
       matcherConfigVersion: "matcher-config-v0.2.0",
     });
@@ -125,7 +125,7 @@ describe("SW-003 API workflow", () => {
     expect(detailAfterSame.humanDecision?.humanDecision).toBe("same_entity");
     expect(detailAfterSame.humanDecision).toMatchObject({
       matcherVersion: "explainable-matcher-v0.2.0",
-      candidateEngineVersion: "candidate-engine-v0.2.0",
+      candidateEngineVersion: "candidate-engine-v0.3.0",
       matchScore: 0.72,
       systemProposal: "needs_review",
     });
@@ -134,7 +134,7 @@ describe("SW-003 API workflow", () => {
       source: { type: "HUMAN_REVIEW_LABELS", representative: false },
       labeledCandidateCount: 1, sameLabels: 1, differentLabels: 0,
       systemProposalAgreementRate: null,
-      labels: [{ matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", humanLabel: "SAME" }],
+      labels: [{ matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", humanLabel: "SAME" }],
     });
     expect(humanEvidence.json().source.caveat).toContain("may not represent the full dataset distribution");
     expect(afterSame.summary?.onlyB).toBe(1);
@@ -151,6 +151,73 @@ describe("SW-003 API workflow", () => {
     expect(exported.body).toContain("'=SUM(1,2)");
     const after = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect(after).toEqual(before);
+  });
+
+  it("keeps an exact generic identity pair in review instead of exporting source-only rows", async () => {
+    const stableMatcher: MatcherRunner = {
+      async profile(input) {
+        return {
+          contractVersion: "1.0.0", datasetId: input.datasetId, side: input.side,
+          originalFilename: input.originalFilename, sha256: input.sha256, rowCount: 1,
+          columns: ["record_id", "stable_id"].map((name) => ({ name, inferredType: "string" as const, nullCount: 0, nullRate: 0, distinctCount: 1, distinctRate: 1, samples: [name] })),
+        };
+      },
+      async match() {
+        return {
+          contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
+          candidateEngineVersion: "candidate-engine-v0.3.0",
+          blockingNormalizationVersion: "blocking-normalization-v0.1.0",
+          featurePipelineVersion: "feature-pipeline-v0.1.0",
+          matcherConfigVersion: "matcher-config-v0.2.0",
+          matcherConfig: { frozen: true, decisions: { minimumAutoAgreementFields: 2 } },
+          candidates: [{
+            candidateId: "candidate-stable-id", aRowId: "A-IV-701", bRowId: "B-IV-301",
+            aRecord: { record_id: "A-IV-701", stable_id: "VEND-7001" },
+            bRecord: { record_id: "B-IV-301", stable_id: "VEND-7001" },
+            rank: 1, matchScore: 1, runnerUpMargin: 1, band: "needs_review", collision: false,
+            strongContradiction: false,
+            blockingEvidence: [{ blockerId: "exact_strong_v1", keyHash: "0123456789abcdef" }],
+            positiveEvidence: 0.5, conflictEvidence: 0, totalWeight: 0.5,
+            evidence: [{
+              mappingId: "stable-id", label: "Stable ID", aColumn: "stable_id", bColumn: "stable_id",
+              aValue: "VEND-7001", bValue: "VEND-7001", normalizedA: "vend 7001", normalizedB: "vend 7001",
+              fieldKind: "other", featurePipelineVersion: "feature-pipeline-v0.1.0",
+              features: [{ name: "normalized_exact", value: 1 }], outcome: "exact", evidenceClass: "exact_agreement",
+              weight: 0.5, positiveContribution: 0.5, conflictContribution: 0, contribution: 0.5,
+              explanationCode: "other_exact", explanation: "Stable ID has exact normalized agreement.",
+            }],
+          }],
+          onlyA: [],
+          onlyB: [{ rowId: "B-IV-301", record: { record_id: "B-IV-301", stable_id: "VEND-7001" } }],
+        };
+      },
+    };
+    const hotfixRoot = await mkdtemp(join(tmpdir(), "samewise-hotfix-"));
+    const hotfixApp = buildApp({ dataRoot: hotfixRoot, matcher: stableMatcher });
+    try {
+      const created = RunSummarySchema.parse((await hotfixApp.inject({ method: "POST", url: "/api/runs" })).json());
+      for (const [side, row] of [["A", "A-IV-701"], ["B", "B-IV-301"]] as const) {
+        const upload = await hotfixApp.inject({
+          method: "POST", url: `/api/runs/${created.runId}/datasets/${side}`,
+          headers: { "content-type": "text/csv", "x-file-name": `${side.toLowerCase()}.csv` },
+          payload: Buffer.from(`record_id,stable_id\n${row},VEND-7001\n`),
+        });
+        expect(upload.statusCode).toBe(201);
+      }
+      await hotfixApp.inject({
+        method: "PUT", url: `/api/runs/${created.runId}/mappings`,
+        payload: { mappings: [{ mappingId: "stable-id", label: "Stable ID", aColumn: "stable_id", bColumn: "stable_id", role: "identity", normalizer: "text" }] },
+      });
+      const matched = RunSummarySchema.parse((await hotfixApp.inject({ method: "POST", url: `/api/runs/${created.runId}/match` })).json());
+      expect(matched.summary).toMatchObject({ matched: 0, needsReview: 1, onlyA: 0 });
+      expect(matched.trustedExportReadiness).toMatchObject({ ready: false, unresolvedIdentityCount: 1 });
+      const exported = (await hotfixApp.inject({ method: "GET", url: `/api/runs/${created.runId}/export` })).body;
+      expect(exported).toContain("A-IV-701,B-IV-301,needs_review,pending_human_review");
+      expect(exported).not.toContain("source_only_a");
+      expect(exported).not.toContain("source_only_b");
+    } finally {
+      await hotfixApp.close();
+    }
   });
 
   it("serves compact, bounded projections and byte-equivalent candidate evidence", async () => {
@@ -175,7 +242,7 @@ describe("SW-003 API workflow", () => {
 
     const detail = await candidateDetail(runId);
     expect(detail.candidate).toEqual(baseMatcherResult().candidates[0]);
-    expect(detail).toMatchObject({ matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.2.0" });
+    expect(detail).toMatchObject({ matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.3.0" });
     const serialized = JSON.stringify(detail);
     expect(serialized).not.toMatch(/canonicalEntityId|corruptionProvenance|groundTruth|OPENAI_API_KEY/i);
     expect((await app.inject({ method: "GET", url: `/api/runs/${runId}/candidates/not-in-this-run` })).statusCode).toBe(404);
@@ -281,7 +348,7 @@ describe("SW-003 API workflow", () => {
     expect(manifest.sourceDatasets.A).toMatchObject({ originalFilename: "a.csv", sha256: createHash("sha256").update(aBytes).digest("hex"), rowCount: 1 });
     expect(manifest.sourceDatasets.B).toMatchObject({ originalFilename: "b.csv", sha256: createHash("sha256").update(bBytes).digest("hex"), rowCount: 2 });
     expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v1", ai: null });
-    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: null });
+    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: null });
     expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.2.0" });
     expect(manifest.identity).toMatchObject({ systemEstablishedLinkCount: 0, humanSameCount: 0, humanDifferentCount: 0, pendingCount: 1, deferredCount: 0 });
     expect(manifest.evaluation).toMatchObject({ applicable: false, snapshotId: null });

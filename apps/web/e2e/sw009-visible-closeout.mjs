@@ -44,7 +44,7 @@ try {
   check("Evaluation navigation opened the dedicated product screen");
   check("frozen holdout fixture identity is visible", await page.getByText("organizations-matcher-holdout-1200-v1").isVisible());
   check("synthetic source type is explicit", await page.getByText("SYNTHETIC GROUND TRUTH").isVisible());
-  check("candidate and matcher versions are visible", await page.getByText("candidate-engine-v0.2.0").first().isVisible() && await page.getByText("explainable-matcher-v0.2.0").first().isVisible());
+  check("candidate and matcher versions are visible", await page.getByText("candidate-engine-v0.3.0").first().isVisible() && await page.getByText("explainable-matcher-v0.2.0").first().isVisible());
   check("SW-005F weak-identifier evidence is also surfaced", await page.getByRole("heading", { name: "SW-005F weak-identifier falsification" }).isVisible());
 
   const metricArticle = (name) => page.getByRole("heading", { name }).locator("..");

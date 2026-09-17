@@ -387,7 +387,7 @@ try {
     && manifest.sourceDatasets.A.sha256 === sourceHashesBefore[0]
     && manifest.sourceDatasets.B.sha256 === sourceHashesBefore[1]
     && manifest.semanticMapping.mappingVersion === "confirmed-mappings-v1"
-    && manifest.candidateGeneration.candidateEngineVersion === "candidate-engine-v0.2.0"
+    && manifest.candidateGeneration.candidateEngineVersion === "candidate-engine-v0.3.0"
     && manifest.matcher.matcherVersion === "explainable-matcher-v0.2.0"
     && manifest.identity.humanSameCount >= 1
     && manifest.survivorship.keepBothCount >= 1);

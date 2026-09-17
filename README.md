@@ -125,10 +125,11 @@ Uploads use a CSV content type plus an `X-File-Name` header. The development lim
 ## Candidate generation and explainable scoring
 
 All-pairs comparison grows as **O(N×M)**: 100,000 rows on each side imply 10
-billion comparisons. Product matching now uses `candidate-engine-v0.2.0`, which
+billion comparisons. Product matching now uses `candidate-engine-v0.3.0`, which
 builds hash/inverted indices and unions five independent passes: exact normalized
-phone/email/domain, meaningful name token, name character prefix, location plus
-name, and address number plus name. The v2 contextual passes include conservative
+phone/email/domain plus mapping-specific generic identity equality, meaningful name
+token, name character prefix, location plus name, and address number plus name. The
+v2 contextual passes include conservative
 exact compact-name composites that recover spacing/suffix variants without relaxing
 bucket limits. Empty keys are never indexed. Whole blocking
 buckets above the versioned 20-row-per-side or 100-relationship limits are
@@ -252,7 +253,7 @@ Generate a configured fixture and benchmark candidate retention:
 
 ```text
 uv run --project services/matcher samewise-matcher fixtures generate-config --config evaluation/benchmark-configs/organizations-candidates-1k.json --output-root .samewise-data/generated-1k
-uv run --project services/matcher samewise-matcher candidates benchmark --root .samewise-data/generated-1k --fixture organizations-candidates-1k-v1 --mappings evaluation/configs/organizations-confirmed-mappings-v1.json --config evaluation/configs/candidate-engine-v0.2.0.json --output-dir .samewise-data/benchmarks/organizations-candidates-1k-v1
+uv run --project services/matcher samewise-matcher candidates benchmark --root .samewise-data/generated-1k --fixture organizations-candidates-1k-v1 --mappings evaluation/configs/organizations-confirmed-mappings-v1.json --config evaluation/configs/candidate-engine-v0.3.0.json --output-dir .samewise-data/benchmarks/organizations-candidates-1k-v1
 ```
 
 ## Current limitations

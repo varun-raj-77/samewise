@@ -136,7 +136,7 @@ same-run matcher.
 ## Commands
 
 ```text
-samewise-matcher evaluation run --root . --fixture organizations-matcher-holdout-1200-v1 --mappings evaluation/configs/organizations-confirmed-mappings-v1.json --candidate-config evaluation/configs/candidate-engine-v0.2.0.json --matcher-config evaluation/configs/matcher-v0.2.0.json --gates evaluation/configs/matcher-quality-gates-v1.0.0.json --output-dir evaluation/reports/sw-009
+samewise-matcher evaluation run --root . --fixture organizations-matcher-holdout-1200-v1 --mappings evaluation/configs/organizations-confirmed-mappings-v1.json --candidate-config evaluation/configs/candidate-engine-v0.3.0.json --matcher-config evaluation/configs/matcher-v0.2.0-candidate-v0.3.0.json --gates evaluation/configs/matcher-quality-gates-v1.0.0.json --output-dir evaluation/reports/sw-009
 
 samewise-matcher evaluation compare --snapshot-a <snapshot.json> --snapshot-b <snapshot.json> --output-dir <comparison-dir>
 
