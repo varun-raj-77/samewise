@@ -1,0 +1,508 @@
+{
+  "artifactVersion": "sw-013-scenario-results-v1",
+  "comparisonScope": "Samewise executed; competitors documentary unless explicitly noted",
+  "generatedBy": "evaluation/competitors/sw-013/validate.py",
+  "scenarios": [
+    {
+      "competitorComparison": {
+        "advantage": "COMPETITOR",
+        "competitor": "Power Query",
+        "competitorCapability": "Exact joins over one or multiple columns plus anti/full outer joins.",
+        "confidence": "HIGH",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://learn.microsoft.com/en-us/power-query/merge-queries-overview",
+        "notes": "A stable-key join needs no entity-resolution workbench."
+      },
+      "powerQueryExpectation": "RED: an exact join plus anti joins solves this directly; Samewise adds little.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "37d38877e6ba52a805cce1c6046532d450d0ab068e8518bd07abada992f89328"
+      },
+      "samewiseResult": {
+        "autoMatched": 2,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 0,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 0,
+          "minimum": 0
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 0,
+        "onlyA": 1,
+        "onlyB": 1,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S01",
+      "scenarioName": "Clean exact join"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "COMPETITOR",
+        "competitor": "Power Query",
+        "competitorCapability": "Repeatable transformations followed by a multi-column exact merge.",
+        "confidence": "HIGH",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://learn.microsoft.com/en-us/power-query/applied-steps",
+        "notes": "Case, whitespace, punctuation, and formatting can be normalized deterministically."
+      },
+      "powerQueryExpectation": "RED: Power Query transformations and a multi-column join are likely sufficient.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "95c3a963e6eabe4629cb3ae13ca075fbc556c5eebab2d7fd44b51976fef6d26f"
+      },
+      "samewiseResult": {
+        "autoMatched": 1,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 0,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 0,
+          "minimum": 0
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 0,
+        "onlyA": 1,
+        "onlyB": 1,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S02",
+      "scenarioName": "Normalized multi-field join"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "TIE",
+        "competitor": "Power Query",
+        "competitorCapability": "Fuzzy text merge with threshold, similarity score, transformation table, and multiple returned matches.",
+        "confidence": "MEDIUM",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://learn.microsoft.com/en-us/power-query/merge-queries-fuzzy-match",
+        "notes": "Power Query was not executed; the case is intentionally simple and documentary capability appears sufficient."
+      },
+      "powerQueryExpectation": "RED/YELLOW: Power Query fuzzy merge is likely adequate; Samewise adds value only if review or audit requirements matter.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "e5bb0fdee36587d204d58b843dad98d38db4cf04406382abb22ceb18e57f7d4d"
+      },
+      "samewiseResult": {
+        "autoMatched": 1,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 0,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 0,
+          "minimum": 0
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 0,
+        "onlyA": 0,
+        "onlyB": 1,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S03",
+      "scenarioName": "Simple fuzzy text match"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "SAMEWISE",
+        "competitor": "Power Query",
+        "competitorCapability": "Fuzzy merge exposes an aggregate similarity score, but current documentation does not describe Samewise-style weighted per-field positive and contradictory evidence.",
+        "confidence": "MEDIUM",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://learn.microsoft.com/en-us/power-query/merge-queries-fuzzy-match",
+        "notes": "Samewise was executed and routed the contradiction to review; Power Query was not executed."
+      },
+      "powerQueryExpectation": "GREEN candidate: one fuzzy similarity value does not represent field-specific contradiction; documentary comparison only.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "cc8b893377771c3dd6e80d2885d70721f36852ce348f7f11c0eb93c5834269c8"
+      },
+      "samewiseResult": {
+        "autoMatched": 0,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 1,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 1,
+        "onlyA": 0,
+        "onlyB": 3,
+        "productComparisonFieldConflictsAfterIdentity": [
+          {
+            "aRowId": "A-CO-401",
+            "bRowId": "B-CO-601",
+            "field": "updated_at"
+          }
+        ],
+        "rawConflictingFieldsAfterIdentity": [
+          {
+            "aRowId": "A-CO-401",
+            "bRowId": "B-CO-601",
+            "field": "phone"
+          },
+          {
+            "aRowId": "A-CO-401",
+            "bRowId": "B-CO-601",
+            "field": "updated_at"
+          }
+        ],
+        "retainedAlternatives": 2,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S04",
+      "scenarioName": "Multi-field contradictory evidence"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "INCONCLUSIVE",
+        "competitor": "DataMatch Enterprise",
+        "competitorCapability": "Configurable composite matching, column scores, match review, selected-for-later review, and manual Not Duplicate decisions.",
+        "confidence": "MEDIUM",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://dataladder.com/knowledge-based/match-results/",
+        "notes": "DataMatch materially overlaps the claimed review value; alternative-ranking ergonomics were not executed."
+      },
+      "powerQueryExpectation": "GREEN candidate: ranked alternatives plus field-level evidence support a safer human decision; Power Query was not executed.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "2153ab4edebc168785d485d2459282926b66e75a11cebfaf0b74dd84d673730f"
+      },
+      "samewiseResult": {
+        "autoMatched": 0,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 1,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 1,
+        "onlyA": 0,
+        "onlyB": 2,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 1,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S05",
+      "scenarioName": "Near-tie ambiguity"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "COMPETITOR",
+        "competitor": "dedupe Python",
+        "competitorCapability": "RecordLink supports one-to-one and many-to-one constraints after scoring.",
+        "confidence": "HIGH",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://docs.dedupe.io/en/latest/API-documentation.html",
+        "notes": "Samewise surfaces collision context but explicitly does not solve global assignment."
+      },
+      "powerQueryExpectation": "GREEN candidate for workflow visibility: Samewise surfaces the collision but does not solve global assignment.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "3b037d94c8a97195cd8df3b61018f4bdbfde8be2a79fcfb8bf43d47b5959bc85"
+      },
+      "samewiseResult": {
+        "autoMatched": 0,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 2,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 2,
+        "onlyA": 0,
+        "onlyB": 2,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 2
+      },
+      "scenarioId": "S06",
+      "scenarioName": "Competing/colliding matches"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "COMPETITOR",
+        "competitor": "DataMatch Enterprise",
+        "competitorCapability": "Master-record selection, field-level overwrite rules, golden-record creation, and export.",
+        "confidence": "HIGH",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://dataladder.com/guide/getting-started-with-datamatch-enterprise/",
+        "notes": "DataMatch is broader and at least conceptually stronger. Samewise also cannot apply survivorship to values mapped only as identity evidence."
+      },
+      "powerQueryExpectation": "YELLOW: Samewise separates identity from survivorship, but DataMatch documents strong golden-record and field-level survivorship capabilities.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "0193bf9c790f7744213962f18c03e7dd3913377f9dcc91c9a27e5b85a065c79e"
+      },
+      "samewiseResult": {
+        "autoMatched": 0,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 1,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 1,
+        "onlyA": 0,
+        "onlyB": 1,
+        "productComparisonFieldConflictsAfterIdentity": [
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "contact_name"
+          },
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "updated_at"
+          }
+        ],
+        "rawConflictingFieldsAfterIdentity": [
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "address"
+          },
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "phone"
+          },
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "contact_name"
+          },
+          {
+            "aRowId": "A-IV-701",
+            "bRowId": "B-IV-301",
+            "field": "updated_at"
+          }
+        ],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S07",
+      "scenarioName": "Identity versus field conflict"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "COMPETITOR",
+        "competitor": "Splink",
+        "competitorCapability": "Label-based precision/recall, prediction-error inspection, threshold selection, ROC, and model diagnostics.",
+        "confidence": "HIGH",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://moj-analytical-services.github.io/splink/api_docs/evaluation.html",
+        "notes": "Samewise adds frozen product snapshots and compatibility gates, but not greater statistical evaluation rigor."
+      },
+      "powerQueryExpectation": "YELLOW/GREEN for Samewise's existing versioned evaluation product; competitor regression-gate equivalence remains unverified.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "909b08e687b2aee3ad003a82f9d3ec2c51181d53107b55bd6b3987cda47715d1"
+      },
+      "samewiseResult": {
+        "autoMatched": 3,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 0,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 0,
+          "minimum": 0
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S08",
+      "scenarioName": "Matcher change/regression"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "INCONCLUSIVE",
+        "competitor": "DataMatch Enterprise",
+        "competitorCapability": "Reusable projects, exported profiling, traceable configurable logic, scheduling, and export are documented; deterministic source/artifact hashes were not verified.",
+        "confidence": "LOW",
+        "evidenceMode": "NOT VERIFIED",
+        "evidenceSource": "https://dataladder.com/products/datamatch-enterprise/",
+        "notes": "Samewise deterministic manifests are executed locally, but documentary absence is not proof of competitor absence."
+      },
+      "powerQueryExpectation": "YELLOW/GREEN: Power Query retains repeatable applied steps, while Samewise adds deterministic run manifests and artifact hashes; exact equivalence was not executed.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "0f4fc3df2a229ee17be5351d60b5f2b2a810e9c734717e218eed52e419fc2b11"
+      },
+      "samewiseResult": {
+        "autoMatched": 1,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 1,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 1,
+        "onlyA": 0,
+        "onlyB": 1,
+        "productComparisonFieldConflictsAfterIdentity": [],
+        "rawConflictingFieldsAfterIdentity": [],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 0
+      },
+      "scenarioId": "S09",
+      "scenarioName": "Audit and reproducibility"
+    },
+    {
+      "competitorComparison": {
+        "advantage": "INCONCLUSIVE",
+        "competitor": "DataMatch Enterprise",
+        "competitorCapability": "Match results, groups/pairs, column scores, selection for later review, manual Not Duplicate, entity graphs, and match review are documented.",
+        "confidence": "MEDIUM",
+        "evidenceMode": "DOCUMENTED CAPABILITY",
+        "evidenceSource": "https://dataladder.com/knowledge-based/match-results/",
+        "notes": "Samewise queue/keyboard/defer/undo/collision workflow is implemented; DataMatch throughput ergonomics were not executed, so no unique-workflow claim is justified."
+      },
+      "powerQueryExpectation": "GREEN candidate for workflow quality, not matcher accuracy: Samewise has queue, evidence, keyboard actions, defer, undo, progress, collision context, and survivorship handoff.",
+      "samewiseEvidence": {
+        "candidateEngineVersion": "candidate-engine-v0.2.0",
+        "matcherConfigVersion": "matcher-config-v0.2.0",
+        "matcherVersion": "explainable-matcher-v0.2.0",
+        "mode": "EXECUTED",
+        "outputSha256": "1c83630ab9cdc38fa51a071a15b0a189d6c35fc73821562837fe9b845f878255"
+      },
+      "samewiseResult": {
+        "autoMatched": 1,
+        "candidateMisses": 0,
+        "candidateRecall": 1.0,
+        "decisionsRequired": 3,
+        "evidenceFieldsVisiblePerDecision": {
+          "maximum": 8,
+          "minimum": 8
+        },
+        "falseAutoMatches": 0,
+        "needsReview": 3,
+        "onlyA": 0,
+        "onlyB": 4,
+        "productComparisonFieldConflictsAfterIdentity": [
+          {
+            "aRowId": "A-RT-101",
+            "bRowId": "B-RT-501",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-102",
+            "bRowId": "B-RT-501",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-103",
+            "bRowId": "B-RT-503",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-104",
+            "bRowId": "B-RT-504",
+            "field": "updated_at"
+          }
+        ],
+        "rawConflictingFieldsAfterIdentity": [
+          {
+            "aRowId": "A-RT-101",
+            "bRowId": "B-RT-501",
+            "field": "address"
+          },
+          {
+            "aRowId": "A-RT-101",
+            "bRowId": "B-RT-501",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-102",
+            "bRowId": "B-RT-501",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-103",
+            "bRowId": "B-RT-503",
+            "field": "address"
+          },
+          {
+            "aRowId": "A-RT-103",
+            "bRowId": "B-RT-503",
+            "field": "updated_at"
+          },
+          {
+            "aRowId": "A-RT-104",
+            "bRowId": "B-RT-504",
+            "field": "phone"
+          },
+          {
+            "aRowId": "A-RT-104",
+            "bRowId": "B-RT-504",
+            "field": "address"
+          },
+          {
+            "aRowId": "A-RT-104",
+            "bRowId": "B-RT-504",
+            "field": "updated_at"
+          }
+        ],
+        "retainedAlternatives": 0,
+        "unresolvedCollisions": 2
+      },
+      "scenarioId": "S10",
+      "scenarioName": "Reviewer throughput"
+    }
+  ]
+}

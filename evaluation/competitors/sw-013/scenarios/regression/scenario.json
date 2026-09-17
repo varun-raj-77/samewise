@@ -1,0 +1,1 @@
+{"scenarioId":"S08","scenarioName":"Matcher change/regression","thesis":"A mixed exact/fuzzy set is frozen so matcher versions can be compared without moving truth.","powerQueryExpectation":"YELLOW/GREEN for Samewise's existing versioned evaluation product; competitor regression-gate equivalence remains unverified.","survivorshipFields":[]}

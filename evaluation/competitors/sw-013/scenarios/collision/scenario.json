@@ -1,0 +1,1 @@
+{"scenarioId":"S06","scenarioName":"Competing/colliding matches","thesis":"Two A records plausibly and correctly refer to the same B entity.","powerQueryExpectation":"GREEN candidate for workflow visibility: Samewise surfaces the collision but does not solve global assignment.","survivorshipFields":[]}

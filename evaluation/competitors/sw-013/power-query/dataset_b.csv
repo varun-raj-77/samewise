@@ -1,0 +1,26 @@
+scenario_id,record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+S06,B-CL-401,,Pioneer Dental Clinic,10 Oak St,frontdesk@pioneerdental.example,5035550601,Portland,OR,97205,Lee Park,2026-06-03
+S06,B-CL-499,,Pioneer Dental Lab,44 Pine Street,lab@pioneerdental.example,5035550699,Portland,OR,97205,Robin West,2026-06-03
+S04,B-CO-601,,Harbor Health Partners,12 River Rd,,6175550499,Boston,MA,02110,Dana Cole,2026-04-01
+S04,B-CO-602,,Harbor Health Partner,14 River Rd,,6175550401,Boston,MA,02110,Dana Cole,2026-04-02
+S04,B-CO-603,,Harbor Medical Group,12 River Road,,6175550888,Boston,MA,02110,Alex Stone,2026-04-03
+S01,B-EX-901,CUST-1001,Northwind Traders,1 Harbor Way,ops@northwind.example,6175550101,Boston,MA,02110,Ana Reed,2026-01-05
+S01,B-EX-902,CUST-1002,Blue Yonder Air,8 Logan Road,hello@blueyonder.example,6175550102,Boston,MA,02128,Jo Li,2026-01-06
+S01,B-EX-999,CUST-1999,B Only Services,77 Other Road,bonly@example.test,6175550999,Quincy,MA,02169,Sam Fox,2026-01-07
+S07,B-IV-301,VEND-7001,Fabrikam Foods,900 New Orchard Ave,accounts@fabrikam.example,2065550799,Seattle,WA,98101,Morgan Kim,2026-07-01
+S05,B-NT-511,,Greenline Logistics,88 Depot Rd,,3125550588,Chicago,IL,60601,Casey Mills,2026-05-02
+S05,B-NT-512,,Green Line Logistics,900 Lake Road,ops@greenline.example,3125550599,Milwaukee,WI,53202,Casey Mills,2026-05-03
+S02,B-NO-801,,contoso llc,42 market st.,sales@contoso.example,+1 617-555-0201,boston,MA,02110,Jamie Ortiz,2026-02-01
+S02,B-NO-899,,Normalized Only B,6 Other Street,bonly-normal@example.test,6175550899,Medford,MA,02155,Taylor Lane,2026-02-02
+S09,B-PR-101,AUD-9001,Adventure Works Cycles,100 Cycle Way,audit@adventureworks.example,7205550901,Denver,CO,80202,Rowan James,2026-09-02
+S09,B-PR-199,,Provenance Only B,2 Trace Lane,bonly-provenance@example.test,7205550199,Denver,CO,80204,Drew Queen,2026-09-02
+S08,B-RG-201,REG-8001,Wide World Importers,1 Commerce Plaza,ops@wideworld.example,4155550801,San Francisco,CA,94105,Avery Cole,2026-08-02
+S08,B-RG-202,,Tailspin Toys Inc,500 Play St,hello@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-02
+S08,B-RG-203,,Tailspin Toy Co,700 Play St,sales@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-02
+S10,B-RT-501,,Summit Community Center,10 Hill Rd,hello@summitcenter.example,3035551001,Denver,CO,80202,Alex Green,2026-09-14
+S10,B-RT-502,,Summit Community Services,100 Hill Road,info@summitservices.example,3035551098,Denver,CO,80202,Alex Gray,2026-09-14
+S10,B-RT-503,,Lakeside Youth Services,5 Lake Ave,contact@lakesideyouth.example,3035551003,Denver,CO,80203,Blair Stone,2026-09-14
+S10,B-RT-504,,Lakeside Youth Service,55 Lake Ave,contact@lakesideyouth.example,3035551097,Aurora,CO,80012,Blair Stone,2026-09-14
+S10,B-RT-599,,Unrelated Arts Council,9 Art Street,arts@example.test,3035551599,Boulder,CO,80301,Robin White,2026-09-14
+S03,B-FZ-701,,Acme Inc,15 Main St,contact@acme.example,2125550301,New York,NY,10001,Riley Shaw,2026-03-01
+S03,B-FZ-702,,Acme Industrial,900 Factory Road,info@acmeindustrial.example,2125550777,Newark,NJ,07102,Morgan Bell,2026-03-01

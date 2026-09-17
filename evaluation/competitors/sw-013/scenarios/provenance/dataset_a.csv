@@ -1,0 +1,3 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+A-PR-901,AUD-9001,Adventure Works Cycles,100 Cycle Way,audit@adventureworks.example,7205550901,Denver,CO,80202,Rowan James,2026-09-01
+A-PR-999,,Provenance Only A,1 Trace Lane,aonly-provenance@example.test,7205550999,Denver,CO,80203,Drew King,2026-09-01

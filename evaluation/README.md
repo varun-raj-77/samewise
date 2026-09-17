@@ -15,6 +15,12 @@ fixture facts only. SW-005 reports are limited to candidate retention, pair
 reduction, blocker diagnostics, runtime, and measured Python allocation peak. They
 make no final scoring precision, recall, accuracy, or production claim.
 
+`competitors/sw-013` contains the adversarial product-thesis validation: ten small
+truth-isolated scenarios, executed Samewise results, official-source competitor
+matrices, and a documentary Power Query reproduction package. External products
+were not executed; their cells are explicitly documented capability or not
+verified, never fabricated comparative results.
+
 `reports/sw-005f` contains the adversarial weak-identifier ablation, strong/weak
 stratification, suppression audit, hard-negative coverage, v0.1/v0.2 comparison,
 and preserved miss inventory.

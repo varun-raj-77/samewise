@@ -1,0 +1,1 @@
+{"scenarioId":"S02","scenarioName":"Normalized multi-field join","thesis":"Case, whitespace, punctuation, and phone formatting differ, but deterministic normalization is sufficient.","powerQueryExpectation":"RED: Power Query transformations and a multi-column join are likely sufficient.","survivorshipFields":[]}

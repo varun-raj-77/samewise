@@ -1,0 +1,1 @@
+{"scenarioId":"S05","scenarioName":"Near-tie ambiguity","thesis":"One candidate has stronger name/address/location evidence; another has exact email but conflicting location.","powerQueryExpectation":"GREEN candidate: ranked alternatives plus field-level evidence support a safer human decision; Power Query was not executed.","survivorshipFields":[]}

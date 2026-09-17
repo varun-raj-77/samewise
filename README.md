@@ -2,6 +2,37 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
+## Why not Power Query?
+
+If an exact join, deterministic normalized join, or straightforward fuzzy-text
+merge solves the problem, Samewise adds little. Power Query supports multi-column
+joins, outer/anti joins, fuzzy merge, thresholds, multiple returned matches,
+similarity scores, transformation tables, fuzzy grouping, and repeatable applied
+steps. It should be the default for clean keys and many low-ambiguity jobs.
+
+Samewise becomes useful only when a high-risk reconciliation needs ranked
+alternatives, field-specific agreement and contradiction, explicit unresolved and
+collision state, a purpose-built human review flow, separate survivorship decisions,
+or deterministic evidence/provenance artifacts. This boundary is based on an
+executed Samewise scenario suite and current Power Query documentation; Power Query
+was not executed in SW-013. See
+[the adversarial validation](evaluation/competitors/sw-013/summary.md).
+
+## Why not a full MDM platform?
+
+Samewise is a narrow two-file reconciliation workbench, not a master-data system.
+It has no durable entity store, crosswalk service, connector estate, governance
+program, streaming operation, global assignment, or enterprise deployment layer.
+Reltio, Informatica, and similar platforms address broader operational master-data
+needs and should be preferred when those needs exist.
+
+DataMatch Enterprise overlaps Samewise much more directly and documents profiling,
+cleansing, composite matching, human review, survivorship, golden records, export,
+REST API, containerized deployment, entity graphs, and scheduling. Samewise has no
+proven broad advantage over it. The remaining hypothesis is a smaller review and
+audit experience for high-risk, one-time migrations and consolidations; that needs
+real-user testing before further product investment.
+
 SW-012 adds bounded result/review/conflict projections and on-demand full evidence
 on top of the frozen matcher, review, survivorship, evaluation, and export surfaces:
 

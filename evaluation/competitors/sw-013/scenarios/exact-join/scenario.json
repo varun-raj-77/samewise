@@ -1,0 +1,1 @@
+{"scenarioId":"S01","scenarioName":"Clean exact join","thesis":"A stable unique ID is present on both sides.","powerQueryExpectation":"RED: an exact join plus anti joins solves this directly; Samewise adds little.","survivorshipFields":[]}

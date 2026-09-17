@@ -1,0 +1,3 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+A-CL-601,,Pioneer Dental Clinic,10 Oak Street,frontdesk@pioneerdental.example,5035550601,Portland,OR,97205,Lee Park,2026-06-01
+A-CL-602,,Pioneer Dental,10 Oak St,,5035550601,Portland,OR,97205,Lee Park,2026-06-02

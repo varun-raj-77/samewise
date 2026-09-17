@@ -1,0 +1,3 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+A-NO-201,,"  Contoso, LLC ",42 Market Street,SALES@CONTOSO.EXAMPLE,(617) 555-0201," BOSTON ",ma,02110,Jamie Ortiz,2026-02-01
+A-NO-299,,Normalized Only A,5 Lone Street,aonly-normal@example.test,6175550299,Somerville,MA,02143,Kim Ray,2026-02-02

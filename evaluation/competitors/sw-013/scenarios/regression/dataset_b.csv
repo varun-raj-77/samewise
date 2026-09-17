@@ -1,0 +1,4 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+B-RG-201,REG-8001,Wide World Importers,1 Commerce Plaza,ops@wideworld.example,4155550801,San Francisco,CA,94105,Avery Cole,2026-08-02
+B-RG-202,,Tailspin Toys Inc,500 Play St,hello@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-02
+B-RG-203,,Tailspin Toy Co,700 Play St,sales@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-02

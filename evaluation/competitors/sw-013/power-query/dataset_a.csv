@@ -1,0 +1,21 @@
+scenario_id,record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+S06,A-CL-601,,Pioneer Dental Clinic,10 Oak Street,frontdesk@pioneerdental.example,5035550601,Portland,OR,97205,Lee Park,2026-06-01
+S06,A-CL-602,,Pioneer Dental,10 Oak St,,5035550601,Portland,OR,97205,Lee Park,2026-06-02
+S04,A-CO-401,,Harbor Health Partners,12 River Road,,6175550401,Boston,MA,02110,Dana Cole,2025-11-01
+S01,A-EX-101,CUST-1001,Northwind Traders,1 Harbor Way,ops@northwind.example,6175550101,Boston,MA,02110,Ana Reed,2026-01-05
+S01,A-EX-102,CUST-1002,Blue Yonder Air,8 Logan Road,hello@blueyonder.example,6175550102,Boston,MA,02128,Jo Li,2026-01-06
+S01,A-EX-199,CUST-1099,A Only Supply,90 Solo Lane,aonly@example.test,6175550199,Cambridge,MA,02139,Pat Wu,2026-01-07
+S07,A-IV-701,VEND-7001,Fabrikam Foods,70 Orchard Avenue,accounts@fabrikam.example,2065550701,Seattle,WA,98101,Jordan Kim,2025-07-01
+S05,A-NT-501,,Greenline Logistics,88 Depot Road,ops@greenline.example,3125550501,Chicago,IL,60601,Casey Mills,2026-05-01
+S02,A-NO-201,,"  Contoso, LLC ",42 Market Street,SALES@CONTOSO.EXAMPLE,(617) 555-0201, BOSTON ,ma,02110,Jamie Ortiz,2026-02-01
+S02,A-NO-299,,Normalized Only A,5 Lone Street,aonly-normal@example.test,6175550299,Somerville,MA,02143,Kim Ray,2026-02-02
+S09,A-PR-901,AUD-9001,Adventure Works Cycles,100 Cycle Way,audit@adventureworks.example,7205550901,Denver,CO,80202,Rowan James,2026-09-01
+S09,A-PR-999,,Provenance Only A,1 Trace Lane,aonly-provenance@example.test,7205550999,Denver,CO,80203,Drew King,2026-09-01
+S08,A-RG-801,REG-8001,Wide World Importers,1 Commerce Plaza,ops@wideworld.example,4155550801,San Francisco,CA,94105,Avery Cole,2026-08-01
+S08,A-RG-802,,Tailspin Toys,500 Play Street,hello@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-01
+S08,A-RG-803,,Tailspin Toy Company,700 Play Street,sales@tailspin.example,,San Francisco,CA,94107,Quinn Ray,2026-08-01
+S10,A-RT-101,,Summit Community Center,10 Hill Road,hello@summitcenter.example,3035551001,Denver,CO,80202,Alex Green,2026-09-10
+S10,A-RT-102,,Summit Community Centre,10 Hill Rd,,3035551001,Denver,CO,80202,Alex Green,2026-09-11
+S10,A-RT-103,,Lakeside Youth Services,5 Lake Avenue,contact@lakesideyouth.example,3035551003,Denver,CO,80203,Blair Stone,2026-09-12
+S10,A-RT-104,,Lakeside Youth Service,55 Lake Avenue,contact@lakesideyouth.example,3035551099,Aurora,CO,80012,Blair Stone,2026-09-13
+S03,A-FZ-301,,Acme Incorporated,15 Main Street,contact@acme.example,2125550301,New York,NY,10001,Riley Shaw,2026-03-01

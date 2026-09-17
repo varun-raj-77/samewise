@@ -1,0 +1,3 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+B-FZ-701,,Acme Inc,15 Main St,contact@acme.example,2125550301,New York,NY,10001,Riley Shaw,2026-03-01
+B-FZ-702,,Acme Industrial,900 Factory Road,info@acmeindustrial.example,2125550777,Newark,NJ,07102,Morgan Bell,2026-03-01

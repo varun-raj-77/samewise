@@ -1,0 +1,1 @@
+{"scenarioId":"S03","scenarioName":"Simple fuzzy text match","thesis":"A common corporate-suffix variation has little ambiguity.","powerQueryExpectation":"RED/YELLOW: Power Query fuzzy merge is likely adequate; Samewise adds value only if review or audit requirements matter.","survivorshipFields":[]}

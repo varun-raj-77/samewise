@@ -1,0 +1,11 @@
+scenario_id,scenario_name
+S06,Competing/colliding matches
+S04,Multi-field contradictory evidence
+S01,Clean exact join
+S07,Identity versus field conflict
+S05,Near-tie ambiguity
+S02,Normalized multi-field join
+S09,Audit and reproducibility
+S08,Matcher change/regression
+S10,Reviewer throughput
+S03,Simple fuzzy text match

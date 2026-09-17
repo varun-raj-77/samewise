@@ -1,0 +1,4 @@
+record_id,stable_id,name,address,email,phone,city,region,postal,contact_name,updated_at
+A-EX-101,CUST-1001,Northwind Traders,1 Harbor Way,ops@northwind.example,6175550101,Boston,MA,02110,Ana Reed,2026-01-05
+A-EX-102,CUST-1002,Blue Yonder Air,8 Logan Road,hello@blueyonder.example,6175550102,Boston,MA,02128,Jo Li,2026-01-06
+A-EX-199,CUST-1099,A Only Supply,90 Solo Lane,aonly@example.test,6175550199,Cambridge,MA,02139,Pat Wu,2026-01-07

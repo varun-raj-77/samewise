@@ -1,0 +1,1 @@
+{"scenarioId":"S04","scenarioName":"Multi-field contradictory evidence","thesis":"Name, address, and location agree while phone contradicts and another candidate owns the exact phone.","powerQueryExpectation":"GREEN candidate: one fuzzy similarity value does not represent field-specific contradiction; documentary comparison only.","survivorshipFields":["phone","updated_at"]}
