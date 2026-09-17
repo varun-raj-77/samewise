@@ -1,0 +1,54 @@
+{
+  "benchmarkVersion": "candidate-evaluation-v0.1.0",
+  "implementationRevision": "sw-011-normalization-cache-v1",
+  "fixture": "organizations-performance-50k-v1",
+  "seed": 11011,
+  "scope": "candidate generation and candidate-recall evaluation only",
+  "counts": {
+    "canonicalEntities": 50000,
+    "sourceARows": 43000,
+    "sourceBRows": 43000,
+    "theoreticalPairs": 1849000000,
+    "emittedCandidates": 366207,
+    "candidateReductionRatio": 5049.056954,
+    "truePairs": 35837,
+    "retainedTruePairs": 35837,
+    "missedTruePairs": 0,
+    "candidateRecall": 1.0
+  },
+  "normalRun": {
+    "generationRuntimeSeconds": 28.395842,
+    "memory": "not measured"
+  },
+  "memoryRun": {
+    "generationRuntimeSecondsUnderTracing": 122.137438,
+    "method": "python_tracemalloc",
+    "scope": "Peak traced Python allocations during candidate generation only; excludes CSV load, evaluation, native/runtime/process RSS.",
+    "peakTracedBytes": 1103961077
+  },
+  "suppression": {
+    "keysSuppressed": 1392,
+    "relationshipsSuppressed": 1109750711,
+    "byBlocker": [
+      {"blockerId": "exact_strong_v1", "relationshipsGenerated": 136784, "relationshipsSuppressed": 0},
+      {"blockerId": "name_token_v1", "relationshipsGenerated": 40327, "relationshipsSuppressed": 358462313},
+      {"blockerId": "name_character_v1", "relationshipsGenerated": 293422, "relationshipsSuppressed": 554719975},
+      {"blockerId": "location_name_v2", "relationshipsGenerated": 206158, "relationshipsSuppressed": 196568423},
+      {"blockerId": "address_name_v2", "relationshipsGenerated": 149791, "relationshipsSuppressed": 0}
+    ]
+  },
+  "fullScoring": {
+    "status": "not_attempted_after_candidate_phase",
+    "reason": "The candidate-only traced peak was 1.10 GB and produced 366207 candidates. Retaining eight-field evidence and serializing the result was not safe on the 7.89 GB host after the 10K full run had already peaked at 825.64 MB traced allocations."
+  },
+  "exportCheck": {
+    "scope": "Opt-in deterministic 50000-row source-only finalized RunView; independent of full matcher completion",
+    "reconciliationMilliseconds": 798.7262,
+    "trustedMilliseconds": 391.9739,
+    "snapshotWithCsvRegenerationAndHashingMilliseconds": 1196.249,
+    "reconciliationBytes": 18600540,
+    "trustedBytes": 18100380,
+    "manifestBytes": 3312,
+    "repeatedSnapshotEqual": true
+  }
+}

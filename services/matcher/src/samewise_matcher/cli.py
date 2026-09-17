@@ -38,6 +38,10 @@ from samewise_matcher.matcher_evaluation import (
     markdown_matcher_report,
     run_fixture_evaluation,
 )
+from samewise_matcher.performance_benchmark import benchmark_fixture
+from samewise_matcher.performance_benchmark import (
+    markdown_summary as markdown_performance_summary,
+)
 from samewise_matcher.weak_identifier_fixture import (
     WeakIdentifierFixtureConfig,
     generate_weak_identifier_fixture,
@@ -120,6 +124,11 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--mappings", required=True, type=Path)
     benchmark.add_argument("--config", type=Path)
     benchmark.add_argument("--output-dir", required=True, type=Path)
+    benchmark.add_argument(
+        "--no-tracemalloc",
+        action="store_true",
+        help="skip Python allocation tracing for a lower-overhead safety run",
+    )
     falsify = candidate_commands.add_parser(
         "falsify", help="run blocker ablations and adversarial evaluation"
     )
@@ -178,6 +187,28 @@ def build_parser() -> argparse.ArgumentParser:
             "false_unmatched",
             "hard_negatives",
         ),
+    )
+    performance = subcommands.add_parser(
+        "performance", help="measure stage-level matcher performance"
+    )
+    performance_commands = performance.add_subparsers(
+        dest="performance_command", required=True
+    )
+    performance_benchmark = performance_commands.add_parser(
+        "benchmark", help="benchmark one deterministic repository fixture"
+    )
+    performance_benchmark.add_argument("--root", type=Path, default=Path.cwd())
+    performance_benchmark.add_argument("--fixture", required=True)
+    performance_benchmark.add_argument("--mappings", required=True, type=Path)
+    performance_benchmark.add_argument(
+        "--candidate-config", required=True, type=Path
+    )
+    performance_benchmark.add_argument("--matcher-config", required=True, type=Path)
+    performance_benchmark.add_argument("--output-dir", required=True, type=Path)
+    performance_benchmark.add_argument(
+        "--no-tracemalloc",
+        action="store_true",
+        help="skip Python allocation tracing for a lower-overhead safety run",
     )
     return parser
 
@@ -385,7 +416,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         b_path = _fixture_artifact(root, manifest, "dataset_b")
         a_headers, a_rows = read_csv(a_path)
         b_headers, b_rows = read_csv(b_path)
-        tracemalloc.start()
+        if not args.no_tracemalloc:
+            tracemalloc.start()
         started = time.perf_counter()
         result = generate_candidates(
             a_headers,
@@ -396,8 +428,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             _load_candidate_config(args.config),
         )
         elapsed = time.perf_counter() - started
-        _, peak_memory = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
+        peak_memory = None
+        if not args.no_tracemalloc:
+            _, peak_memory = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
         report = evaluate_candidates(
             result,
             load_truth_pairs(_fixture_artifact(root, manifest, "identity_truth")),
@@ -528,6 +562,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             else errors
         )
         print(json.dumps(selected, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "performance" and args.performance_command == "benchmark":
+        report = benchmark_fixture(
+            args.root,
+            args.fixture,
+            _load_mappings(args.mappings),
+            _load_candidate_config(args.candidate_config),
+            _load_matcher_config(args.matcher_config),
+            trace_python_memory=not args.no_tracemalloc,
+        )
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        (args.output_dir / "benchmark.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (args.output_dir / "summary.md").write_text(
+            markdown_performance_summary(report), encoding="utf-8"
+        )
+        print(markdown_performance_summary(report), end="")
         return 0
 
     return 2

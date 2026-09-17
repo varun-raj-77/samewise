@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import math
+import time
 from collections import Counter
+from collections.abc import MutableMapping
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Literal
@@ -116,6 +118,9 @@ class ScoredPair(StrictModel):
     strongContradiction: bool
     evidence: list[FieldEvidence] = Field(min_length=1)
     blockingEvidence: list[BlockingEvidenceView] = Field(min_length=1)
+
+
+NormalizedRowCache = dict[str, tuple[str, ...]]
 
 
 def _bounded(value: float) -> float:
@@ -276,6 +281,26 @@ def compute_field_evidence(
     kind = _mapping_kind(mapping)
     normalized_a = _normalizer(kind)(a_value)
     normalized_b = _normalizer(kind)(b_value)
+    return _compute_field_evidence_normalized(
+        mapping,
+        a_value,
+        b_value,
+        normalized_a,
+        normalized_b,
+        kind,
+        config,
+    )
+
+
+def _compute_field_evidence_normalized(
+    mapping: ManualMapping,
+    a_value: str,
+    b_value: str,
+    normalized_a: str,
+    normalized_b: str,
+    kind: str,
+    config: MatcherConfig,
+) -> FieldEvidence:
     weight = getattr(config.weights, kind)
     conflict_multiplier = getattr(config.conflictMultipliers, kind)
     if not normalized_a and not normalized_b:
@@ -355,6 +380,17 @@ def score_candidate(
         )
         for mapping in identity_mappings
     ]
+    return _score_candidate_evidence(
+        a_row_id, b_row_id, evidence, blocking_evidence
+    )
+
+
+def _score_candidate_evidence(
+    a_row_id: str,
+    b_row_id: str,
+    evidence: list[FieldEvidence],
+    blocking_evidence: list[BlockingEvidenceView],
+) -> ScoredPair:
     # The denominator is fixed by confirmed identity mappings. Missing values add
     # no evidence and cannot inflate the score by shrinking the denominator.
     total_weight = round(sum(item.weight for item in evidence), 6)
@@ -384,6 +420,85 @@ def score_candidate(
         evidence=evidence,
         blockingEvidence=blocking_evidence,
     )
+
+
+def _normalized_row_cache(
+    rows_by_id: dict[str, dict[str, str]],
+    identity_mappings: list[ManualMapping],
+    side: Literal["A", "B"],
+) -> NormalizedRowCache:
+    prepared = [
+        (
+            mapping.aColumn if side == "A" else mapping.bColumn,
+            _normalizer(_mapping_kind(mapping)),
+        )
+        for mapping in identity_mappings
+    ]
+    return {
+        row_id: tuple(normalizer(row[column]) for column, normalizer in prepared)
+        for row_id, row in rows_by_id.items()
+    }
+
+
+def score_generated_candidates(
+    generated: list[GeneratedCandidate],
+    a_by_id: dict[str, dict[str, str]],
+    b_by_id: dict[str, dict[str, str]],
+    identity_mappings: list[ManualMapping],
+    config: MatcherConfig,
+    *,
+    performance_timings: MutableMapping[str, float] | None = None,
+) -> list[ScoredPair]:
+    """Score candidates with one normalized representation per row and mapping."""
+
+    cache_started = time.perf_counter()
+    a_cache = _normalized_row_cache(a_by_id, identity_mappings, "A")
+    b_cache = _normalized_row_cache(b_by_id, identity_mappings, "B")
+    if performance_timings is not None:
+        performance_timings["feature_normalization_cache_seconds"] = round(
+            time.perf_counter() - cache_started, 6
+        )
+
+    kinds = [_mapping_kind(mapping) for mapping in identity_mappings]
+    feature_seconds = 0.0
+    scoring_seconds = 0.0
+    scored: list[ScoredPair] = []
+    for candidate in generated:
+        a_row = a_by_id[candidate.aRowId]
+        b_row = b_by_id[candidate.bRowId]
+        feature_started = time.perf_counter()
+        evidence = [
+            _compute_field_evidence_normalized(
+                mapping,
+                a_row[mapping.aColumn],
+                b_row[mapping.bColumn],
+                a_cache[candidate.aRowId][index],
+                b_cache[candidate.bRowId][index],
+                kinds[index],
+                config,
+            )
+            for index, mapping in enumerate(identity_mappings)
+        ]
+        feature_seconds += time.perf_counter() - feature_started
+        scoring_started = time.perf_counter()
+        scored.append(
+            _score_candidate_evidence(
+                candidate.aRowId,
+                candidate.bRowId,
+                evidence,
+                [
+                    BlockingEvidenceView.model_validate(item.model_dump())
+                    for item in candidate.blockingEvidence
+                ],
+            )
+        )
+        scoring_seconds += time.perf_counter() - scoring_started
+    if performance_timings is not None:
+        performance_timings["feature_extraction_seconds"] = round(
+            feature_seconds, 6
+        )
+        performance_timings["scoring_seconds"] = round(scoring_seconds, 6)
+    return scored
 
 
 def _oracle_candidate(
@@ -439,23 +554,11 @@ def score_rows(
             for b_index, b_id in enumerate(b_by_id)
         ]
     by_a: dict[str, list[GeneratedCandidate]] = {row_id: [] for row_id in a_by_id}
-    scored: list[ScoredPair] = []
     for candidate in generated:
         by_a[candidate.aRowId].append(candidate)
-        scored.append(
-            score_candidate(
-                candidate.aRowId,
-                candidate.bRowId,
-                a_by_id[candidate.aRowId],
-                b_by_id[candidate.bRowId],
-                identity,
-                [
-                    BlockingEvidenceView.model_validate(item.model_dump())
-                    for item in candidate.blockingEvidence
-                ],
-                config,
-            )
-        )
+    scored = score_generated_candidates(
+        generated, a_by_id, b_by_id, identity, config
+    )
     return scored, by_a
 
 

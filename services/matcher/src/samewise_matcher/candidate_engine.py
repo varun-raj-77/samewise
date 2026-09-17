@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableMapping
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from samewise_matcher.blocking_normalization import (
     NORMALIZATION_VERSION,
     address_number,
-    email_domain,
     name_tokens,
     normalize_address,
     normalize_domain,
@@ -156,8 +156,7 @@ def _row_ids(rows: list[dict[str, str]], headers: list[str], side: str) -> list[
     ]
 
 
-def _meaningful_tokens(value: str, config: CandidateEngineConfig) -> set[str]:
-    stop = set(config.stopTokens)
+def _meaningful_tokens(value: str, stop: frozenset[str]) -> set[str]:
     return {
         token for token in name_tokens(value) if token not in stop and len(token) >= 3
     }
@@ -168,6 +167,9 @@ def record_blocking_keys(
     side: Literal["A", "B"],
     mappings: list[ManualMapping],
     config: CandidateEngineConfig,
+    *,
+    mapping_kinds: tuple[tuple[ManualMapping, str], ...] | None = None,
+    stop_tokens: frozenset[str] | None = None,
 ) -> dict[BlockerId, set[str]]:
     """Return visible-data-only keys. Empty values never emit a key."""
 
@@ -177,12 +179,17 @@ def record_blocking_keys(
     name_values: list[tuple[str, set[str]]] = []
     location_values: list[str] = []
     address_values: list[str] = []
-    for mapping in mappings:
+    prepared_mappings = mapping_kinds or tuple(
+        (mapping, _mapping_kind(mapping))
+        for mapping in mappings
+        if mapping.role == "identity"
+    )
+    stop = stop_tokens if stop_tokens is not None else frozenset(config.stopTokens)
+    for mapping, kind in prepared_mappings:
         if mapping.role != "identity":
             continue
         column = mapping.aColumn if side == "A" else mapping.bColumn
         raw = row.get(column, "")
-        kind = _mapping_kind(mapping)
         if kind == "phone":
             normalized = normalize_phone(raw)
             if normalized and "exact_strong_v1" in keys:
@@ -191,7 +198,7 @@ def record_blocking_keys(
             normalized = normalize_email(raw)
             if normalized and "exact_strong_v1" in keys:
                 keys["exact_strong_v1"].add(f"{mapping.mappingId}:email:{normalized}")
-            domain = email_domain(raw)
+            domain = normalized.rsplit("@", maxsplit=1)[1] if normalized else ""
             if domain and "exact_strong_v1" in keys:
                 keys["exact_strong_v1"].add(
                     f"{mapping.mappingId}:email-domain:{domain}"
@@ -202,7 +209,7 @@ def record_blocking_keys(
                 keys["exact_strong_v1"].add(f"{mapping.mappingId}:domain:{normalized}")
         elif kind == "name":
             normalized = normalize_name(raw)
-            tokens = _meaningful_tokens(raw, config)
+            tokens = _meaningful_tokens(raw, stop)
             if normalized:
                 name_values.append((normalized, tokens))
         elif kind == "postal":
@@ -219,10 +226,10 @@ def record_blocking_keys(
                 address_values.append(normalized)
 
     for name, tokens in name_values:
+        compact = re_sub_nonword(name)
         if "name_token_v1" in keys:
             keys["name_token_v1"].update(f"token:{token}" for token in tokens)
         if "name_character_v1" in keys:
-            compact = re_sub_nonword(name)
             if len(compact) >= config.namePrefixLength:
                 prefix = compact[: config.namePrefixLength]
                 keys["name_character_v1"].add(f"prefix:{prefix}")
@@ -239,10 +246,8 @@ def record_blocking_keys(
         for blocker in location_blockers:
             for location in location_values:
                 keys[blocker].update(f"{location}:token:{token}" for token in tokens)
-                if blocker == "location_name_v2":
-                    compact = re_sub_nonword(name)
-                    if compact:
-                        keys[blocker].add(f"{location}:compact-name:{compact}")
+                if blocker == "location_name_v2" and compact:
+                    keys[blocker].add(f"{location}:compact-name:{compact}")
         address_blockers = {
             blocker
             for blocker in ("address_name_v1", "address_name_v2")
@@ -255,10 +260,8 @@ def record_blocking_keys(
                     keys[blocker].update(
                         f"number:{number}:token:{token}" for token in tokens
                     )
-                    if blocker == "address_name_v2":
-                        compact = re_sub_nonword(name)
-                        if compact:
-                            keys[blocker].add(f"number:{number}:compact-name:{compact}")
+                    if blocker == "address_name_v2" and compact:
+                        keys[blocker].add(f"number:{number}:compact-name:{compact}")
     return keys
 
 
@@ -271,12 +274,21 @@ def _inverted_indices(
     side: Literal["A", "B"],
     mappings: list[ManualMapping],
     config: CandidateEngineConfig,
+    mapping_kinds: tuple[tuple[ManualMapping, str], ...],
+    stop_tokens: frozenset[str],
 ) -> dict[BlockerId, dict[str, list[int]]]:
     indices: dict[BlockerId, dict[str, list[int]]] = {
         blocker: defaultdict(list) for blocker in config.enabledBlockers
     }
     for index, row in enumerate(rows):
-        for blocker, keys in record_blocking_keys(row, side, mappings, config).items():
+        for blocker, keys in record_blocking_keys(
+            row,
+            side,
+            mappings,
+            config,
+            mapping_kinds=mapping_kinds,
+            stop_tokens=stop_tokens,
+        ).items():
             for key in sorted(keys):
                 indices[blocker][key].append(index)
     return indices
@@ -302,6 +314,8 @@ def generate_candidates(
     b_rows: list[dict[str, str]],
     mappings: list[ManualMapping],
     config: CandidateEngineConfig | None = None,
+    *,
+    performance_timings: MutableMapping[str, float] | None = None,
 ) -> CandidateGenerationResult:
     """Generate a union of indexed blocking passes without enumerating A x B."""
 
@@ -312,8 +326,25 @@ def generate_candidates(
     if len(set(a_ids)) != len(a_ids) or len(set(b_ids)) != len(b_ids):
         raise ValueError("Source row IDs must be unique within each dataset")
 
-    a_indices = _inverted_indices(a_rows, "A", mappings, config)
-    b_indices = _inverted_indices(b_rows, "B", mappings, config)
+    mapping_kinds = tuple(
+        (mapping, _mapping_kind(mapping))
+        for mapping in mappings
+        if mapping.role == "identity"
+    )
+    stop_tokens = frozenset(config.stopTokens)
+    index_started = time.perf_counter()
+    a_indices = _inverted_indices(
+        a_rows, "A", mappings, config, mapping_kinds, stop_tokens
+    )
+    b_indices = _inverted_indices(
+        b_rows, "B", mappings, config, mapping_kinds, stop_tokens
+    )
+    if performance_timings is not None:
+        performance_timings["normalization_index_construction_seconds"] = round(
+            time.perf_counter() - index_started, 6
+        )
+
+    generation_started = time.perf_counter()
     evidence: dict[tuple[int, int], set[tuple[BlockerId, str]]] = defaultdict(set)
     diagnostics: list[BlockerDiagnostics] = []
 
@@ -368,7 +399,7 @@ def generate_candidates(
     ]
     seen_a = {candidate.aRowId for candidate in candidates}
     seen_b = {candidate.bRowId for candidate in candidates}
-    return CandidateGenerationResult(
+    result = CandidateGenerationResult(
         engineVersion=config.engineVersion,
         normalizationVersion=config.normalizationVersion,
         config=config,
@@ -379,6 +410,11 @@ def generate_candidates(
         zeroCandidateBRowIds=sorted(set(b_ids) - seen_b),
         blockerDiagnostics=diagnostics,
     )
+    if performance_timings is not None:
+        performance_timings["candidate_generation_seconds"] = round(
+            time.perf_counter() - generation_started, 6
+        )
+    return result
 
 
 def candidate_pairs(result: CandidateGenerationResult) -> Iterable[tuple[str, str]]:

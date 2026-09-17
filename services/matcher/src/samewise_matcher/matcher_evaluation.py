@@ -18,7 +18,9 @@ from samewise_matcher.explainable_matcher import (
     DecisionRules,
     MatcherConfig,
     ScoredPair,
-    score_candidate,
+)
+from samewise_matcher.explainable_matcher import (
+    score_generated_candidates as score_visible_candidates,
 )
 from samewise_matcher.workflow_models import BlockingEvidenceView, ManualMapping
 
@@ -49,21 +51,9 @@ def score_generated_candidates(
     identity = [mapping for mapping in mappings if mapping.role == "identity"]
     a_by_id = _rows_by_id(a_headers, a_rows, "A")
     b_by_id = _rows_by_id(b_headers, b_rows, "B")
-    return [
-        score_candidate(
-            candidate.aRowId,
-            candidate.bRowId,
-            a_by_id[candidate.aRowId],
-            b_by_id[candidate.bRowId],
-            identity,
-            [
-                BlockingEvidenceView.model_validate(item.model_dump())
-                for item in candidate.blockingEvidence
-            ],
-            config,
-        )
-        for candidate in generation.candidates
-    ]
+    return score_visible_candidates(
+        generation.candidates, a_by_id, b_by_id, identity, config
+    )
 
 
 def _rank(scored: list[ScoredPair]) -> dict[str, list[ScoredPair]]:

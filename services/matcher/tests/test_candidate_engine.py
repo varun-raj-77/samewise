@@ -153,6 +153,28 @@ def test_oversized_common_bucket_is_suppressed_and_measured_not_truncated() -> N
     assert diagnostic.relationshipsSuppressed == 9
 
 
+def test_adversarial_null_duplicate_long_unicode_bucket_cannot_explode() -> None:
+    config = CandidateEngineConfig(
+        enabledBlockers=("name_token_v1", "exact_strong_v1"),
+        stopTokens=(),
+        maxBucketSizePerSide=20,
+        maxBucketPairCount=100,
+    )
+    mappings = [
+        mapping("organization-name", "name", "name"),
+        mapping("phone", "phone", "phone", "phone"),
+    ]
+    long_name = f"München {'Å' * 2_000} Common"
+    a = [{"id": f"A{i}", "name": long_name, "phone": ""} for i in range(25)]
+    b = [{"id": f"B{i}", "name": long_name, "phone": ""} for i in range(25)]
+    result = generate(a, b, mappings, config)
+    assert result.candidates == []
+    assert sum(
+        item.relationshipsSuppressed for item in result.blockerDiagnostics
+    ) == 1_875
+    assert sum(item.keysSuppressed for item in result.blockerDiagnostics) == 3
+
+
 def test_duplicates_and_one_to_many_possibilities_are_preserved() -> None:
     config = CandidateEngineConfig(enabledBlockers=("exact_strong_v1",))
     item = mapping("phone", "phone", "phone", "phone")
@@ -183,6 +205,27 @@ def test_generation_is_deterministic_truth_blind_and_does_not_mutate_rows() -> N
     assert (a, b) == before
     assert all(candidate.aRowId == "A1" for candidate in first.candidates)
     assert all(candidate.bRowId == "B1" for candidate in first.candidates)
+
+
+def test_stage_timing_does_not_change_candidate_membership_or_order() -> None:
+    item = mapping("organization-name", "name", "name")
+    a = [{"id": "A1", "name": "Acme Incorporated"}]
+    b = [{"id": "B1", "name": "ACME Inc"}]
+    expected = generate(a, b, [item])
+    timings: dict[str, float] = {}
+    measured = generate_candidates(
+        list(a[0]),
+        a,
+        list(b[0]),
+        b,
+        [item],
+        performance_timings=timings,
+    )
+    assert measured == expected
+    assert set(timings) == {
+        "normalization_index_construction_seconds",
+        "candidate_generation_seconds",
+    }
 
 
 def test_candidate_mode_scores_only_generated_pairs_and_matches_oracle(

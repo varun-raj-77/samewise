@@ -961,7 +961,7 @@ export interface RunExportSnapshot {
   manifest: { filename: string; content: string; value: RunManifest };
 }
 
-function buildExportSnapshot(view: RunView, mappingProposal?: SemanticMappingProposal): RunExportSnapshot {
+export function buildExportSnapshot(view: RunView, mappingProposal?: SemanticMappingProposal): RunExportSnapshot {
   if (!view.summary || !view.matcherProvenance || !view.datasets.A || !view.datasets.B) {
     throw new WorkflowError("run_not_matched", "Run the matcher before exporting.");
   }

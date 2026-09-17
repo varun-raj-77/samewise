@@ -1,0 +1,73 @@
+{
+  "benchmarkVersion": "performance-benchmark-v0.1.0",
+  "implementationRevision": "sw-011-normalization-cache-v1",
+  "fixture": "organizations-candidates-10k-v1",
+  "seed": 5002,
+  "environment": {
+    "os": "Windows 11 Home Single Language 10.0.26200 64-bit",
+    "cpu": "AMD Ryzen 5 5600H, 6 cores, 12 logical processors",
+    "physicalMemoryBytes": 7887228928,
+    "python": "CPython 3.13.15",
+    "node": "24.19.0",
+    "pnpm": "11.19.0"
+  },
+  "counts": {
+    "sourceARows": 8600,
+    "sourceBRows": 8600,
+    "theoreticalPairs": 73960000,
+    "emittedCandidates": 13801,
+    "candidateReductionRatio": 5359.031954,
+    "truePairs": 7164,
+    "retainedTruePairs": 7164,
+    "candidateRecall": 1.0,
+    "productCandidates": 7663,
+    "onlyA": 1244,
+    "onlyB": 2378,
+    "serializedResultBytes": 56892493,
+    "serializedResultSha256": "8115ff85dcda59d68797bcd84894454dade77007e2357329bf303de969a91ba8"
+  },
+  "normalRunTimingsSeconds": {
+    "fixtureInputLoad": 0.169376,
+    "profiling": 0.145973,
+    "normalizationAndIndexConstruction": 2.136776,
+    "candidateGeneration": 1.372737,
+    "featureNormalizationCache": 0.717731,
+    "featureExtraction": 11.249975,
+    "scoring": 1.861251,
+    "resultAssembly": 0.273165,
+    "apiSerialization": 0.651487,
+    "matcherWithSerialization": 18.37808,
+    "qualityEvaluation": 0.060069
+  },
+  "memoryRun": {
+    "method": "python_tracemalloc",
+    "scope": "Peak traced Python allocations from pre-load through serialization and truth evaluation; excludes native/runtime/process RSS.",
+    "peakTracedBytes": 825638427,
+    "matcherWithSerializationSecondsUnderTracing": 65.568826
+  },
+  "apiBoundary": {
+    "method": "PowerShell stopwatch around a fresh samewise_matcher.cli process including stdin/stdout transfer; Node schema validation not included",
+    "wallSeconds": 22.849003,
+    "stdoutUtf8Bytes": 56892493,
+    "internalMatcherWithSerializationSeconds": 18.37808,
+    "differenceSeconds": 4.470923
+  },
+  "suppression": {
+    "keysSuppressed": 490,
+    "relationshipsSuppressed": 44379691
+  },
+  "exportCheck": {
+    "scope": "Opt-in deterministic 10000-row source-only finalized RunView; snapshot time regenerates both CSVs and hashes them into the manifest",
+    "reconciliationMilliseconds": 228.326,
+    "trustedMilliseconds": 107.8482,
+    "snapshotWithCsvRegenerationAndHashingMilliseconds": 331.6719,
+    "reconciliationBytes": 3720540,
+    "trustedBytes": 3620380,
+    "manifestBytes": 3310,
+    "repeatedSnapshotEqual": true
+  },
+  "webCheck": {
+    "queueItems": 10000,
+    "mountedRowsUpperBoundExclusive": 30
+  }
+}

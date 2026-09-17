@@ -3,12 +3,14 @@ from pathlib import Path
 
 import pytest
 
+from samewise_matcher.candidate_engine import GeneratedCandidate
 from samewise_matcher.explainable_matcher import (
     MatcherConfig,
     build_match_result,
     compute_field_evidence,
     match_csvs_explainable,
     score_candidate,
+    score_generated_candidates,
 )
 from samewise_matcher.workflow_models import BlockingEvidenceView, ManualMapping
 
@@ -359,3 +361,33 @@ def test_output_is_deterministic_and_candidate_provenance_survives() -> None:
     )
     assert pair == again
     assert pair.blockingEvidence == BLOCKING
+
+
+def test_cached_row_normalization_preserves_uncached_score_evidence() -> None:
+    mappings = [mapping("organization-name"), mapping("email", normalizer="email")]
+    a_row = {"organization-name": "Acme, Inc.", "email": "INFO@EXAMPLE.COM"}
+    b_row = {"organization-name": "Acme Incorporated", "email": "info@example.com"}
+    expected = score_candidate(
+        "A1", "B1", a_row, b_row, mappings, BLOCKING, MatcherConfig()
+    )
+    candidate = GeneratedCandidate(
+        candidateId="candidate-0123456789abcdef0123",
+        aRowId="A1",
+        bRowId="B1",
+        blockingEvidence=[item.model_dump() for item in BLOCKING],
+    )
+    timings: dict[str, float] = {}
+    actual = score_generated_candidates(
+        [candidate],
+        {"A1": a_row},
+        {"B1": b_row},
+        mappings,
+        MatcherConfig(),
+        performance_timings=timings,
+    )
+    assert actual == [expected]
+    assert set(timings) == {
+        "feature_normalization_cache_seconds",
+        "feature_extraction_seconds",
+        "scoring_seconds",
+    }

@@ -104,6 +104,21 @@ def profile_csv(
     path: Path, dataset_id: str, side: str, original_filename: str, sha256: str
 ) -> DatasetProfile:
     headers, rows = read_csv(path)
+    return profile_rows(
+        headers, rows, dataset_id, side, original_filename, sha256
+    )
+
+
+def profile_rows(
+    headers: list[str],
+    rows: list[dict[str, str]],
+    dataset_id: str,
+    side: str,
+    original_filename: str,
+    sha256: str,
+) -> DatasetProfile:
+    """Profile already-loaded rows with the exact product profiling semantics."""
+
     count = len(rows)
     profiles: list[ColumnProfile] = []
     for header in headers:

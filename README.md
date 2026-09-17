@@ -113,6 +113,15 @@ surviving exact phone/email/domain. This is
 recall, precision, accuracy, or evidence that the scorer made the right decision.
 Synthetic domains are unusually strong, and runtime is hardware-dependent.
 
+SW-011 stage measurements on the documented 7.89 GB Windows development host
+reproduced the 10K candidate result and retained 7,164/7,164 known pairs. The
+optimized 10K matcher took 18.378 seconds through JSON serialization, whose complete
+result was 56.9 MB. A 50K canonical-entity fixture completed candidate generation in
+28.396 seconds with 366,207 candidates and 35,837/35,837 candidate recall; its
+candidate-only traced Python-allocation peak was 1.10 GB, so full scoring and 100K
+were not attempted on that host. These are fixture- and machine-specific results,
+not capacity claims. See [docs/sw-011-performance.md](docs/sw-011-performance.md).
+
 After candidate generation, only confirmed identity mappings enter the explicit
 feature pipeline. Name, phone, email, domain, address, city, region, postal, and
 generic text evidence have versioned Samewise-owned feature definitions. Each field
@@ -211,8 +220,9 @@ uv run --project services/matcher samewise-matcher candidates benchmark --root .
 - Refresh and route navigation recover `?run=<run-id>&screen=<stage>` only while
   that API process is still alive.
 - Local immutable artifacts; no object storage.
-- Synthetic candidate quality is not evidence of real-data recall; 100K-row
-  behavior remains unmeasured.
+- Synthetic candidate quality is not evidence of real-data recall. Full 50K scoring,
+  100K, and larger behavior remain unmeasured; candidate-only 50K evidence is
+  documented separately.
 - The baseline scorer still ranks candidates in process memory and is not the
   default product matcher; it remains runnable only for comparison.
 - Match scores are uncalibrated evidence scores.

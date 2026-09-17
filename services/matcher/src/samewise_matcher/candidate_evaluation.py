@@ -237,6 +237,10 @@ def markdown_summary(report: dict[str, Any]) -> str:
     reduction_text = (
         "infinite (zero candidates)" if reduction is None else f"{reduction:,.3f}x"
     )
+    peak_memory = metrics["peakPythonMemoryBytes"]
+    peak_memory_text = (
+        "not measured" if peak_memory is None else f"{peak_memory} bytes"
+    )
     lines = [
         "# Candidate benchmark report",
         "",
@@ -263,7 +267,7 @@ def markdown_summary(report: dict[str, Any]) -> str:
         f"- True pairs missed: {metrics['truePairsMissed']:,}",
         f"- Candidate recall: {recall_text}",
         f"- Generation runtime: {metrics['generationRuntimeSeconds']} seconds",
-        f"- Peak traced Python memory: {metrics['peakPythonMemoryBytes']} bytes",
+        f"- Peak traced Python memory: {peak_memory_text}",
         "",
         "## Misses",
         "",
