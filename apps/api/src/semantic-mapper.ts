@@ -13,6 +13,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { SEMANTIC_MAPPING_DEVELOPER_PROMPT } from "./semantic-mapping-prompt.js";
 
 export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
+export const DEFAULT_SEMANTIC_MAPPING_TIMEOUT_MS = 30_000;
 
 export interface SemanticMapperResult {
   provider: "openai";
@@ -78,7 +79,7 @@ class OpenAISemanticMapper implements SemanticMapper {
   private readonly client: OpenAI;
 
   constructor(apiKey: string, private readonly model: string) {
-    this.client = new OpenAI({ apiKey, timeout: 15_000, maxRetries: 0 });
+    this.client = new OpenAI({ apiKey, timeout: DEFAULT_SEMANTIC_MAPPING_TIMEOUT_MS, maxRetries: 0 });
   }
 
   async propose(input: SemanticMappingModelInput): Promise<SemanticMapperResult> {

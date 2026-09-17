@@ -17,6 +17,7 @@ import { buildApp } from "../src/app.js";
 import type { MatcherRunner } from "../src/matcher-process.js";
 import {
   createSemanticMapperFromEnvironment,
+  DEFAULT_SEMANTIC_MAPPING_TIMEOUT_MS,
   SemanticMapperError,
   type SemanticMapper,
   type SemanticMapperResult,
@@ -63,7 +64,11 @@ describe("SW-004 semantic mapping API", () => {
   let app: ReturnType<typeof buildApp>;
 
   beforeEach(async () => { dataRoot = await mkdtemp(join(tmpdir(), "samewise-semantic-")); });
-  afterEach(async () => { if (app) await app.close(); });
+  afterEach(async () => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    if (app) await app.close();
+  });
 
   async function setup(semanticMapper: SemanticMapper, matcher = matcherWithCapture()) {
     app = buildApp({ dataRoot, matcher, semanticMapper });
@@ -133,6 +138,39 @@ describe("SW-004 semantic mapping API", () => {
     const response = await suggest(runId);
     expect(response.statusCode).toBe(503);
     expect(response.json().error).toEqual({ code: "ai_missing_key", message: "AI suggestions unavailable. You can continue mapping columns manually." });
+  });
+
+  it("aborts after the bounded 30-second default and preserves the ai_timeout manual fallback", async () => {
+    let providerSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn((_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      providerSignal = init?.signal ?? undefined;
+      providerSignal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const runId = await setup(createSemanticMapperFromEnvironment({ OPENAI_API_KEY: "test-key" }));
+    const manual = { mappingId: "manual-name", label: "Organization", aColumn: "name", bColumn: "organization", role: "identity", normalizer: "text" };
+    await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings: [manual] } });
+
+    vi.useFakeTimers();
+    const responsePromise = suggest(runId);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(DEFAULT_SEMANTIC_MAPPING_TIMEOUT_MS).toBe(30_000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(providerSignal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_SEMANTIC_MAPPING_TIMEOUT_MS - 1);
+    expect(providerSignal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(providerSignal?.aborted).toBe(true);
+
+    const response = await responsePromise;
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: { code: "ai_timeout", message: "AI suggestions unavailable. You can continue mapping columns manually." } });
+    const current = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    expect(current.mappings).toEqual([manual]);
   });
 
   it("consumes accepted mappings, ignores rejected suggestions, and preserves original proposal when remapped", async () => {
