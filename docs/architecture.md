@@ -6,7 +6,7 @@ Samewise begins with three executable surfaces and one shared contract package. 
 
 ### `apps/web`
 
-The React/Vite application owns a seven-step upload-to-export workflow. It validates API run views and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps server state in `RunView` while selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its fixed-height queue window renders only the visible range plus overscan. A separate survivorship workspace owns conflict counts, manual actions, policy configuration, read-only preview, explicit bulk application, provenance, and trusted-export readiness; it exposes no identity controls.
+The React/Vite application owns a seven-step upload-to-export workflow. It validates compact API projections and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps a `RunSummary`, one bounded `ReviewQueuePage`, and the selected `CandidateEvidenceDetail`; selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its detail cache is capped at ten entries, and its fixed-height queue window renders only the visible range plus overscan. A separate survivorship workspace consumes bounded conflict pages and owns manual actions, policy configuration, read-only preview, explicit bulk application, provenance, and trusted-export readiness; it exposes no identity controls.
 
 Evaluation is a separate navigation area. It consumes validated immutable snapshots
 and paged error evidence through dedicated APIs; it does not import fixture truth or
@@ -15,7 +15,13 @@ separate source type with a visible nonrepresentative-sampling caveat.
 
 ### `apps/api`
 
-The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation, gated trusted, and provenance-manifest exports. `RunView.reviewQueue` is a deterministic per-A projection of retained candidates and decisions; the matcher response remains unchanged. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
+The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation, gated trusted, and provenance-manifest exports. The matcher response remains unchanged and authoritative in memory. HTTP list surfaces derive explicit `RunSummary`, `ResultsPage`, `ReviewQueuePage`, and `ConflictPage` projections; complete candidate evidence is returned only by run-owned candidate lookup. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
+
+List projections use offset paging with a 50-item default and 100-item server
+maximum. Results and conflicts have fixed stable-key ordering; Review applies its
+explicit filter/sort/search before paging and uses stable source-order tie breaks.
+Mutation responses are compact summaries. Export and human-evaluation evidence use
+the authoritative internal `RunView`, not whatever page a client loaded.
 
 Dedicated evaluation routes validate and cache checked-in catalog metadata and load
 error pages separately. They are not a truth service for ordinary uploaded runs.
@@ -130,8 +136,8 @@ The web app depends on the TypeScript contract package, not on API source. The A
 also depends on that package. The matcher has its own Pydantic representation and
 verifies applicable messages against the same language-neutral schema. The
 subprocess boundary remains deliberately synchronous; no Python HTTP service,
-queue, or worker has been introduced. The 10K benchmark measures the candidate
-engine only, not product result storage or browser rendering.
+queue, or worker has been introduced. SW-012's 10K Fastify benchmark measures the
+real product path and browser projections separately from authoritative retention.
 
 ## Why matching is separate from Node orchestration
 
@@ -139,7 +145,7 @@ Python has a mature ecosystem for data processing, statistical evaluation, and m
 
 ## SW-003 development persistence
 
-Run metadata, mappings, matcher results, decisions, conflicts, and resolutions are held in API process memory. Immutable upload bytes live in the ignored local artifact directory so Python can read them. IDs and boundary concepts are stable enough to move behind persistent repositories later, but no database abstraction or fake enterprise persistence is present. The persistence approach for large results remains deliberately undecided until measurements justify it.
+Run metadata, mappings, matcher results, decisions, conflicts, and resolutions are held in API process memory. Immutable upload bytes live in the ignored local artifact directory so Python can read them. Paging bounds HTTP transfer but does not reduce or persist authoritative matcher state: SW-012 observed a 202,253,512-byte Node heap-used increase across the 10K match request and makes no isolated retained-size claim. IDs and boundary concepts are stable enough to move behind persistent repositories later, but no database abstraction or fake enterprise persistence is present. The persistence approach for large results remains deliberately undecided until measurements justify it.
 
 SW-004 semantic proposals and their provider/model/prompt/schema/request/response provenance are also process-local. The stored validated proposal is the response used for review; Samewise does not claim that a future call can reproduce it. Advisory normalization hints are restricted to a contract allowlist and are never dynamically executed.
 

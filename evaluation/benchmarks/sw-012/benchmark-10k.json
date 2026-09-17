@@ -1,0 +1,101 @@
+{
+  "benchmarkVersion": "sw-012-bounded-projection-benchmark-v1",
+  "fixture": "organizations-candidates-10k-v1",
+  "measuredAt": "2026-09-17T02:35:08.966Z",
+  "environment": {
+    "os": "Windows 11 Home Single Language 10.0.26200 64-bit",
+    "cpu": "AMD Ryzen 5 5600H, 6 cores, 12 logical processors",
+    "physicalMemoryBytes": 7887228928,
+    "node": "24.19.0"
+  },
+  "source": {
+    "aRows": 8600,
+    "bRows": 8600,
+    "aBytes": 1817970,
+    "bBytes": 1739170
+  },
+  "baseline": {
+    "method": "Direct rerun of the unchanged Python MatcherResult boundary on the SW-011 10K fixture; this is the exact oversized result named by SW-011, not a reconstructed pre-change Fastify response.",
+    "matcherResultBytes": 56892493,
+    "matcherResultSha256": "8115ff85dcda59d68797bcd84894454dade77007e2357329bf303de969a91ba8",
+    "wallSeconds": 34.7586,
+    "candidates": 7663,
+    "aRowsWithCandidates": 7356,
+    "retainedAlternatives": 307,
+    "maxCandidatesPerA": 3,
+    "onlyA": 1244,
+    "onlyB": 2378,
+    "overlappingSerializedContributorsBytes": {
+      "candidateArray": 54786827,
+      "evidenceArrays": 40831625,
+      "repeatedCandidateRecordCopies": 5834812,
+      "uniqueCandidateRecordsIfDeduplicated": 5522381,
+      "blockingEvidence": 5612358,
+      "candidateMetadata": 2086566,
+      "onlyA": 493053,
+      "onlyB": 1012007,
+      "provenance": 1150
+    }
+  },
+  "timingsMilliseconds": {
+    "uploadA": 1391.6086,
+    "uploadB": 1240.156,
+    "mappings": 4.9692,
+    "matchThroughFastify": 24656.2059,
+    "firstResultsPage": 278.6082,
+    "firstReviewPage": 101.962,
+    "firstConflictPage": 58.2032,
+    "firstEvidenceDetail": 94.0797
+  },
+  "payloads": {
+    "matchSummaryBytes": 8386,
+    "runSummaryBytes": 8385,
+    "resultsPage50Bytes": 49263,
+    "reviewPage50Bytes": 88351,
+    "conflictPage50Bytes": 23545,
+    "candidateEvidenceDetailBytes": 7468,
+    "alternateCandidateEvidenceDetailBytes": 7865,
+    "sameDecisionSummaryBytes": 8598,
+    "differentDecisionSummaryBytes": 8599,
+    "evaluationEvidenceAfterOneDecisionBytes": 6435,
+    "reconciliationExportBytes": 9819677,
+    "manifestBytes": 6356,
+    "matchSummaryReductionPercentAgainstMatcherResult": 99.98526,
+    "largestFirstPageReductionPercentAgainstMatcherResult": 99.844705
+  },
+  "pages": {
+    "results": { "offset": 0, "limit": 50, "total": 8600, "returned": 50, "nextOffset": 50, "previousOffset": null },
+    "review": { "offset": 0, "limit": 50, "total": 1218, "returned": 50, "nextOffset": 50, "previousOffset": null },
+    "conflictsBeforeDecision": { "offset": 0, "limit": 50, "total": 10394, "returned": 50, "nextOffset": 50, "previousOffset": null },
+    "conflictsAfterSameDecision": { "offset": 0, "limit": 50, "total": 10396, "returned": 50, "nextOffset": 50, "previousOffset": null }
+  },
+  "memoryObservation": {
+    "method": "Node process.memoryUsage before and immediately after the Fastify match request; includes parsed authoritative state and response construction and is not an isolated retained-size measurement.",
+    "beforeMatch": { "rss": 127750144, "heapTotal": 61448192, "heapUsed": 39550296, "external": 14027231, "arrayBuffers": 9700373 },
+    "afterMatch": { "rss": 429010944, "heapTotal": 350892032, "heapUsed": 241803808, "external": 10255665, "arrayBuffers": 5933610 },
+    "heapUsedDeltaBytes": 202253512,
+    "rssDeltaBytes": 301260800,
+    "priorPythonPeakTracedBytes": 825638427,
+    "conclusion": "SW-012 bounds browser transfer but deliberately retains the unchanged authoritative MatcherResult in process. It does not claim a server-memory reduction."
+  },
+  "behaviorChecks": {
+    "summaryOmitsAuthoritativeArrays": true,
+    "rankSwitchPreservedState": true,
+    "sameDecisionRecorded": true,
+    "differentDecisionRecorded": true,
+    "humanEvaluationEvidencePreserved": true,
+    "fieldResolutionRoundTrip": true,
+    "exportRepeatedBytesEqual": true,
+    "exportSha256": "d5c6f235f66d676ff6b8d16d8c407e001d35b147f189e17988a6d91b82aaf065",
+    "manifestRepeatedBytesEqual": true,
+    "manifestReconciliationHashMatchesBytes": true,
+    "webMountedRowsUpperBoundExclusive": 30
+  },
+  "notMeasured": [
+    "A pre-change Fastify RunView payload byte count",
+    "isolated retained object size",
+    "whole-process Python RSS",
+    "concurrency or deployed-host behavior",
+    "50K or larger full matcher/projection runs"
+  ]
+}

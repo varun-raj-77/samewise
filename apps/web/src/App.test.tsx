@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MappingSuggestionResponse, RunView, SemanticMappingProposal } from "@samewise/contracts";
+import type { MappingSuggestionResponse, RunSummary, SemanticMappingProposal } from "@samewise/contracts";
 import { App } from "./App.js";
 
 const evidence = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name" as const, featurePipelineVersion: "feature-pipeline-v0.1.0" as const, features: [{ name: "token_similarity", value: 1 }], outcome: "similar" as const, evidenceClass: "partial_agreement" as const, weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." };
+const candidate = { candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review" as const, collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] };
+const candidateSummary = { candidateId: candidate.candidateId, bRowId: candidate.bRowId, rank: 1, matchScore: 0.72, band: "needs_review" as const, collision: false, strongContradiction: false, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement" as const, contribution: 0.72 }, strongestContradiction: null, humanDecision: null };
 const mapping = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", role: "identity" as const, normalizer: "text" as const };
 const comparison = { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", role: "comparison" as const, normalizer: "text" as const };
 
@@ -15,20 +17,30 @@ function profile(side: "A" | "B") {
   ] };
 }
 
-function runView(overrides: Partial<RunView> = {}): RunView {
+function runView(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
-    contractVersion: "1.0.0", runId: "run-1", stage: "results",
+    contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "results",
     datasets: { A: profile("A"), B: profile("B") }, mappings: [mapping, comparison],
     mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null,
     matcherVersion: "explainable-matcher-v0.2.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
     matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
-    candidates: [{ candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review", collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] }],
-    decisions: [], conflicts: [], survivorshipPolicy: null,
+    survivorshipPolicy: null,
     trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["1 identity review item(s) remain unresolved."] },
-    reviewQueue: [{ aRowId: "A1", candidateIds: ["candidate-1-1"], topCandidateId: "candidate-1-1", topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement", contribution: 0.72 }, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: 0 }],
     reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null,
-    onlyA: [], onlyB: [], ...overrides,
+    conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, ...overrides,
   };
+}
+
+function resultsPage() {
+  return { contractVersion: "1.0.0", runId: "run-1", items: [{ aRowId: "A1", aIdentity: { name: "Acme Corp" }, status: "needs_review", topCandidate: candidateSummary, topBIdentity: { organization: "Acme Corporation" }, alternativeCount: 0, collision: false, sourceOrder: 0 }], page: { offset: 0, limit: 50, total: 1, returned: 1, nextOffset: null, previousOffset: null }, ordering: "a_row_id_ascending" };
+}
+
+function reviewPage() {
+  return { contractVersion: "1.0.0", runId: "run-1", items: [{ aRowId: "A1", topCandidateId: candidate.candidateId, topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: candidateSummary.strongestPositive, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: 0, aIdentity: { name: "Acme Corp" }, topBIdentity: { organization: "Acme Corporation" }, candidates: [candidateSummary] }], page: { offset: 0, limit: 50, total: 1, returned: 1, nextOffset: null, previousOffset: null }, progress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, filter: "unresolved", sort: "ambiguity", query: "" };
+}
+
+function candidateDetail() {
+  return { contractVersion: "1.0.0", runId: "run-1", candidate, alternatives: [candidateSummary], reviewState: "needs_review", deferred: false, collisionARowIds: [], effectiveCollisionARowIds: [], humanDecision: null, conflicts: [], matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0" };
 }
 
 function proposal(overrides: Partial<SemanticMappingProposal["suggestions"][number]> = {}): SemanticMappingProposal {
@@ -59,7 +71,7 @@ describe("Samewise vertical slice", () => {
   });
 
   it("validates that both CSV files are selected", () => {
-    render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, summary: null, candidates: [] })} initialScreen="upload" />);
+    render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, summary: null })} initialScreen="upload" />);
     fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Choose one CSV file for Dataset A and one for Dataset B");
   });
@@ -142,43 +154,28 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByRole("button", { name: "+ Add manual mapping" })).toBeEnabled();
   });
 
-  it("shows real API-shaped result categories and inspectable evidence", () => {
+  it("loads bounded results and fetches inspectable evidence on demand", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const value = url.includes("/results") ? resultsPage() : url.includes("/review?") ? reviewPage() : candidateDetail();
+      return Promise.resolve(new Response(JSON.stringify(value), { status: 200, headers: { "Content-Type": "application/json" } }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
     render(<App initialRun={runView()} initialScreen="results" />);
     expect(screen.getByText("Matched").parentElement).toHaveTextContent("2");
     expect(screen.getByText(/Only B means no identity link is established/)).toBeInTheDocument();
     expect(screen.getByText("Needs review").parentElement).toHaveTextContent("1");
     expect(screen.getByText("Only A").parentElement).toHaveTextContent("3");
     expect(screen.getByText("Only B").parentElement).toHaveTextContent("4");
-    fireEvent.click(screen.getByRole("button", { name: /A1.*B1/ }));
-    expect(screen.getByRole("heading", { name: "Are A1 and B1 the same entity?" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /A1.*B1/ }));
+    expect(await screen.findByRole("heading", { name: "Are A1 and B1 the same entity?" })).toBeInTheDocument();
     expect(screen.getByText("Selection alone never records a decision.")).toBeInTheDocument();
     expect(screen.getAllByText("0.720").length).toBeGreaterThan(0);
     expect(screen.getByText("Strong agreement")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Feature detail and matcher explanation"));
     expect(screen.getByText("token similarity")).toBeInTheDocument();
-  });
-
-  it("keeps SAME ENTITY separate from explicit field resolution", async () => {
-    const conflictRun = runView({
-      stage: "resolution",
-      decisions: [{ decisionId: "d1", runId: "run-1", candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", systemProposal: "needs_review", humanDecision: "same_entity", matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.2.0", matchScore: 0.72, evidenceShown: [evidence], decidedAt: "2026-08-30T12:00:00.000Z" }],
-      conflicts: [{ conflictId: "c1", runId: "run-1", candidateId: "candidate-1-1", mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", aValue: "active", bValue: "inactive", identityDecisionId: "d1", identitySource: "human", status: "unresolved", resolution: null, resolutionHistory: [] }],
-      trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["1 comparison-field conflict(s) remain unresolved."] },
-    });
-    const resolvedRun = runView({ ...conflictRun, conflicts: [{ ...conflictRun.conflicts[0]!, status: "resolved", resolution: { resolutionId: "r1", strategy: "use_a", resolutionSource: "manual", chosenSource: "A", chosenValue: "active", keptValues: [], reasonCode: "use_a", reason: "A user explicitly selected Dataset A.", policyVersion: null, ruleId: null, inputSnapshot: { aValue: "active", bValue: "inactive", aTimestamp: null, bTimestamp: null }, resolvedAt: "2026-08-30T12:01:00.000Z" } }], trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } });
-    vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(conflictRun), { status: 200, headers: { "Content-Type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(resolvedRun), { status: 200, headers: { "Content-Type": "application/json" } })));
-    render(<App initialRun={runView()} initialScreen="results" />);
-    fireEvent.click(screen.getByRole("button", { name: /A1.*B1/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Same entity" }));
-    expect((await screen.findByText("1 field conflict")).parentElement).toHaveTextContent("Zero values were selected automatically.");
-    fireEvent.click(screen.getByRole("button", { name: "Resolve values separately" }));
-    expect(screen.getByRole("heading", { name: "Identity is settled. Values are not." })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use A" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Use A" }));
-    await waitFor(() => expect(screen.getByText(/manual · use a/i)).toBeInTheDocument());
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/results?"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/candidates/candidate-1-1"))).toBe(true);
   });
 
   it("shows a safe API error state", async () => {

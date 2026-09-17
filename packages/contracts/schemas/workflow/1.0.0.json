@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://samewise.dev/contracts/workflow/1.0.0.json",
   "title": "SamewiseWorkflowBoundary",
-  "description": "Canonical SW-003 profile, mapping, matcher evidence, identity decision, conflict, and resolution shapes. Runtime implementations enforce the referenced definitions.",
+  "description": "Canonical workflow shapes, including SW-012 bounded list projections and on-demand authoritative evidence details. Runtime implementations enforce the referenced definitions.",
   "type": "object",
   "x-contract-version": "1.0.0",
+  "x-projection-contract-version": "1.0.0",
   "$defs": {
     "datasetSide": { "enum": ["A", "B"] },
     "inferredType": { "enum": ["string", "integer", "number", "boolean", "date", "unknown"] },
@@ -248,11 +249,84 @@
         "onlyB": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } }
       }
     },
+    "pagination": {
+      "type": "object", "additionalProperties": false,
+      "required": ["offset", "limit", "total", "returned", "nextOffset", "previousOffset"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0 }, "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "total": { "type": "integer", "minimum": 0 }, "returned": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "nextOffset": { "type": ["integer", "null"], "minimum": 0 }, "previousOffset": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "identityDecisionSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidateId", "aRowId", "bRowId", "humanDecision", "decidedAt"],
+      "properties": { "candidateId": { "type": "string", "minLength": 1 }, "aRowId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 }, "humanDecision": { "$ref": "#/$defs/humanDecision" }, "decidedAt": { "type": "string", "format": "date-time" } }
+    },
+    "reviewHumanDecision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidateId", "bRowId", "humanDecision", "decidedAt"],
+      "properties": { "candidateId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 }, "humanDecision": { "$ref": "#/$defs/humanDecision" }, "decidedAt": { "type": "string", "format": "date-time" } }
+    },
+    "candidateSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidateId", "bRowId", "rank", "matchScore", "band", "collision", "strongContradiction", "strongestPositive", "strongestContradiction", "humanDecision"],
+      "properties": {
+        "candidateId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 }, "rank": { "type": "integer", "minimum": 1 }, "matchScore": { "type": "number", "minimum": 0, "maximum": 1 }, "band": { "$ref": "#/$defs/candidateBand" }, "collision": { "type": "boolean" }, "strongContradiction": { "type": "boolean" },
+        "strongestPositive": { "oneOf": [{ "$ref": "#/$defs/reviewEvidenceSummary" }, { "type": "null" }] }, "strongestContradiction": { "oneOf": [{ "$ref": "#/$defs/reviewEvidenceSummary" }, { "type": "null" }] }, "humanDecision": { "oneOf": [{ "$ref": "#/$defs/identityDecisionSummary" }, { "type": "null" }] }
+      }
+    },
+    "resultItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["aRowId", "aIdentity", "status", "topCandidate", "topBIdentity", "alternativeCount", "collision", "sourceOrder"],
+      "properties": {
+        "aRowId": { "type": "string", "minLength": 1 }, "aIdentity": { "type": "object", "additionalProperties": { "type": "string" } }, "status": { "enum": ["auto_match", "needs_review", "reviewed_same", "reviewed_different", "unmatched"] }, "topCandidate": { "oneOf": [{ "$ref": "#/$defs/candidateSummary" }, { "type": "null" }] }, "topBIdentity": { "oneOf": [{ "type": "object", "additionalProperties": { "type": "string" } }, { "type": "null" }] }, "alternativeCount": { "type": "integer", "minimum": 0 }, "collision": { "type": "boolean" }, "sourceOrder": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "resultsPage": {
+      "type": "object", "additionalProperties": false, "required": ["contractVersion", "runId", "items", "page", "ordering"],
+      "properties": { "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 }, "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/resultItem" } }, "page": { "$ref": "#/$defs/pagination" }, "ordering": { "const": "a_row_id_ascending" } }
+    },
+    "reviewQueueProjectionItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["aRowId", "topCandidateId", "topBRowId", "topMatchScore", "runnerUpMargin", "candidateCount", "strongestPositive", "strongestContradiction", "collision", "collisionARowIds", "strongContradiction", "state", "deferred", "humanDecision", "matcherVersion", "sourceOrder", "aIdentity", "topBIdentity", "candidates"],
+      "properties": {
+        "aRowId": { "type": "string", "minLength": 1 }, "topCandidateId": { "type": "string", "minLength": 1 }, "topBRowId": { "type": "string", "minLength": 1 }, "topMatchScore": { "type": "number", "minimum": 0, "maximum": 1 }, "runnerUpMargin": { "type": "number", "minimum": 0, "maximum": 1 }, "candidateCount": { "type": "integer", "minimum": 1 }, "strongestPositive": { "oneOf": [{ "$ref": "#/$defs/reviewEvidenceSummary" }, { "type": "null" }] }, "strongestContradiction": { "oneOf": [{ "$ref": "#/$defs/reviewEvidenceSummary" }, { "type": "null" }] }, "collision": { "type": "boolean" }, "collisionARowIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "strongContradiction": { "type": "boolean" }, "state": { "enum": ["needs_review", "deferred", "reviewed_same", "reviewed_different"] }, "deferred": { "type": "boolean" }, "humanDecision": { "oneOf": [{ "$ref": "#/$defs/reviewHumanDecision" }, { "type": "null" }] }, "matcherVersion": { "$ref": "#/$defs/matcherVersion" }, "sourceOrder": { "type": "integer", "minimum": 0 }, "aIdentity": { "type": "object", "additionalProperties": { "type": "string" } }, "topBIdentity": { "type": "object", "additionalProperties": { "type": "string" } }, "candidates": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "$ref": "#/$defs/candidateSummary" } }
+      }
+    },
+    "reviewQueuePage": {
+      "type": "object", "additionalProperties": false, "required": ["contractVersion", "runId", "items", "page", "progress", "filter", "sort", "query"],
+      "properties": { "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 }, "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/reviewQueueProjectionItem" } }, "page": { "$ref": "#/$defs/pagination" }, "progress": { "$ref": "#/$defs/reviewProgress" }, "filter": { "enum": ["unresolved", "all", "deferred", "collision", "contradiction", "multiple"] }, "sort": { "enum": ["ambiguity", "score_desc", "score_asc", "candidate_count", "source"] }, "query": { "type": "string" } }
+    },
+    "candidateEvidenceDetail": {
+      "type": "object", "additionalProperties": false, "required": ["contractVersion", "runId", "candidate", "alternatives", "reviewState", "deferred", "collisionARowIds", "effectiveCollisionARowIds", "humanDecision", "conflicts", "matcherVersion", "candidateEngineVersion"],
+      "properties": { "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 }, "candidate": { "$ref": "#/$defs/candidatePair" }, "alternatives": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "$ref": "#/$defs/candidateSummary" } }, "reviewState": { "enum": ["auto_match", "needs_review", "deferred", "reviewed_same", "reviewed_different"] }, "deferred": { "type": "boolean" }, "collisionARowIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "effectiveCollisionARowIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "humanDecision": { "oneOf": [{ "$ref": "#/$defs/identityDecision" }, { "type": "null" }] }, "conflicts": { "type": "array", "items": { "$ref": "#/$defs/fieldConflict" } }, "matcherVersion": { "$ref": "#/$defs/matcherVersion" }, "candidateEngineVersion": { "const": "candidate-engine-v0.2.0" } }
+    },
+    "conflictProjectionItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["conflictId", "runId", "candidateId", "mappingId", "label", "aColumn", "bColumn", "aValue", "bValue", "identityDecisionId", "identitySource", "status", "resolution", "resolutionHistory", "aRowId", "bRowId"],
+      "properties": { "conflictId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 }, "candidateId": { "type": "string", "minLength": 1 }, "mappingId": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "aColumn": { "type": "string", "minLength": 1 }, "bColumn": { "type": "string", "minLength": 1 }, "aValue": { "type": "string" }, "bValue": { "type": "string" }, "identityDecisionId": { "type": ["string", "null"] }, "identitySource": { "enum": ["human", "system_matcher"] }, "status": { "enum": ["unresolved", "resolved"] }, "resolution": { "oneOf": [{ "$ref": "#/$defs/fieldResolution" }, { "type": "null" }] }, "resolutionHistory": { "type": "array", "items": { "$ref": "#/$defs/fieldResolution" } }, "aRowId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 } }
+    },
+    "conflictPage": {
+      "type": "object", "additionalProperties": false, "required": ["contractVersion", "runId", "items", "page", "ordering"],
+      "properties": { "contractVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 }, "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/conflictProjectionItem" } }, "page": { "$ref": "#/$defs/pagination" }, "ordering": { "const": "conflict_id_ascending" } }
+    },
+    "conflictSummary": {
+      "type": "object", "additionalProperties": false, "required": ["total", "resolved", "unresolved"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "resolved": { "type": "integer", "minimum": 0 }, "unresolved": { "type": "integer", "minimum": 0 } }
+    },
+    "runSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "projectionVersion", "runId", "stage", "datasets", "mappings", "mappingVersion", "semanticMappingProvenance", "matcherVersion", "matcherProvenance", "summary", "survivorshipPolicy", "trustedExportReadiness", "reviewProgress", "reviewUndo", "conflictSummary"],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" }, "projectionVersion": { "const": "1.0.0" }, "runId": { "type": "string", "minLength": 1 }, "stage": { "enum": ["upload", "profile", "mapping", "results", "review", "resolution", "export"] }, "datasets": { "type": "object", "additionalProperties": false, "properties": { "A": { "$ref": "#/$defs/datasetProfile" }, "B": { "$ref": "#/$defs/datasetProfile" } } }, "mappings": { "type": "array", "items": { "$ref": "#/$defs/manualMapping" } }, "mappingVersion": { "const": "confirmed-mappings-v1" }, "semanticMappingProvenance": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["provider", "model", "promptVersion", "schemaVersion", "requestVersion", "responseId"], "properties": { "provider": { "const": "openai" }, "model": { "type": "string", "minLength": 1 }, "promptVersion": { "type": "string", "minLength": 1 }, "schemaVersion": { "type": "string", "minLength": 1 }, "requestVersion": { "type": "string", "minLength": 1 }, "responseId": { "type": "string", "minLength": 1 } } }, { "type": "null" }] }, "matcherVersion": { "oneOf": [{ "$ref": "#/$defs/matcherVersion" }, { "type": "null" }] }, "matcherProvenance": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["matcherVersion", "candidateEngineVersion", "blockingNormalizationVersion", "featurePipelineVersion", "matcherConfigVersion", "matcherConfig"], "properties": { "matcherVersion": { "$ref": "#/$defs/matcherVersion" }, "candidateEngineVersion": { "const": "candidate-engine-v0.2.0" }, "blockingNormalizationVersion": { "const": "blocking-normalization-v0.1.0" }, "featurePipelineVersion": { "const": "feature-pipeline-v0.1.0" }, "matcherConfigVersion": { "const": "matcher-config-v0.2.0" }, "matcherConfig": { "type": "object" } } }, { "type": "null" }] }, "summary": { "oneOf": [{ "$ref": "#/$defs/resultSummary" }, { "type": "null" }] }, "survivorshipPolicy": { "oneOf": [{ "$ref": "../survivorship/1.0.0.json#/$defs/policy" }, { "type": "null" }] }, "trustedExportReadiness": { "$ref": "../survivorship/1.0.0.json#/$defs/trustedExportReadiness" }, "reviewProgress": { "$ref": "#/$defs/reviewProgress" }, "reviewUndo": { "oneOf": [{ "$ref": "#/$defs/reviewUndo" }, { "type": "null" }] }, "conflictSummary": { "$ref": "#/$defs/conflictSummary" }
+      }
+    },
     "ruleApplicationResponse": {
       "type": "object", "additionalProperties": false,
       "required": ["run", "policyVersion", "ruleId", "appliedCount", "unresolvedCount", "skippedCount"],
       "properties": {
-        "run": { "$ref": "#/$defs/runView" }, "policyVersion": { "type": "string", "minLength": 1 }, "ruleId": { "type": "string", "minLength": 1 },
+        "run": { "$ref": "#/$defs/runSummary" }, "policyVersion": { "type": "string", "minLength": 1 }, "ruleId": { "type": "string", "minLength": 1 },
         "appliedCount": { "type": "integer", "minimum": 0 }, "unresolvedCount": { "type": "integer", "minimum": 0 }, "skippedCount": { "type": "integer", "minimum": 0 }
       }
     },
@@ -280,6 +354,11 @@
     { "$ref": "#/$defs/datasetProfile" },
     { "$ref": "#/$defs/matcherResult" },
     { "$ref": "#/$defs/runView" },
+    { "$ref": "#/$defs/runSummary" },
+    { "$ref": "#/$defs/resultsPage" },
+    { "$ref": "#/$defs/reviewQueuePage" },
+    { "$ref": "#/$defs/candidateEvidenceDetail" },
+    { "$ref": "#/$defs/conflictPage" },
     { "$ref": "#/$defs/ruleApplicationResponse" },
     { "$ref": "#/$defs/profileRequest" },
     { "$ref": "#/$defs/matchRequest" }

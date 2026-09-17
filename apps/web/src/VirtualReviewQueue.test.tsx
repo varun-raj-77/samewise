@@ -1,17 +1,21 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ReviewQueueItem } from "@samewise/contracts";
+import type { ReviewQueueProjectionItem } from "@samewise/contracts";
 import { VirtualReviewQueue } from "./VirtualReviewQueue.js";
 
-function item(index: number): ReviewQueueItem {
+function item(index: number): ReviewQueueProjectionItem {
+  const candidateId = `candidate-${index}`;
+  const bRowId = `B${index.toString().padStart(5, "0")}`;
   return {
     aRowId: `A${index.toString().padStart(5, "0")}`,
-    candidateIds: [`candidate-${index}`], topCandidateId: `candidate-${index}`, topBRowId: `B${index.toString().padStart(5, "0")}`,
+    topCandidateId: candidateId, topBRowId: bRowId,
     topMatchScore: 0.5, runnerUpMargin: 0.02, candidateCount: 1,
     strongestPositive: null, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false,
     state: "needs_review", deferred: false, humanDecision: null,
     matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: index,
+    aIdentity: { name: `A ${index}` }, topBIdentity: { name: `B ${index}` },
+    candidates: [{ candidateId, bRowId, rank: 1, matchScore: 0.5, band: "needs_review", collision: false, strongContradiction: false, strongestPositive: null, strongestContradiction: null, humanDecision: null }],
   };
 }
 

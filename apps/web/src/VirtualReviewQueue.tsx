@@ -1,13 +1,13 @@
-import type { ReviewQueueItem } from "@samewise/contracts";
+import type { ReviewQueueProjectionItem } from "@samewise/contracts";
 import { useEffect, useRef, useState } from "react";
 
 const ROW_HEIGHT = 94;
 const OVERSCAN = 5;
 
 interface VirtualReviewQueueProps {
-  items: ReviewQueueItem[];
+  items: ReviewQueueProjectionItem[];
   selectedARowId: string | null;
-  onSelect: (item: ReviewQueueItem) => void;
+  onSelect: (item: ReviewQueueProjectionItem) => void;
 }
 
 export function VirtualReviewQueue({ items, selectedARowId, onSelect }: VirtualReviewQueueProps) {

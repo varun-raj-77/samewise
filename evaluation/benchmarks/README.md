@@ -26,3 +26,9 @@ Use `--no-tracemalloc` for normal wall time. Runs with tracing report Python
 allocation peaks only, not process RSS, and should not be compared directly with
 normal wall time. Compact checked-in evidence lives in `sw-011/`; generated source
 data and full candidate/result artifacts stay under ignored `.samewise-data` paths.
+
+SW-012 adds a real Fastify-path projection benchmark using the same generated 10K
+fixture. Run `pnpm benchmark:sw012`; compact checked-in measurements live in
+`sw-012/`. The command verifies bounded non-empty pages, on-demand candidate detail,
+decision/undo/resolution behavior, evaluation evidence, and deterministic export
+and manifest hashes without committing the full payload.

@@ -54,6 +54,14 @@ survivorship state used to produce them. Re-export from unchanged authoritative
 state is deterministic. Ordinary product manifests state that no Evaluation
 snapshot is attached; they never import hidden synthetic truth.
 
+SW-012 keeps that authoritative evidence intact while removing the giant eager
+browser dependency. Results, Review, and conflicts load deterministic 50-item
+pages; selecting a candidate retrieves its complete retained source records,
+features, blocker provenance, scores, rank, collision context, and decision state.
+On the real 10K path, the largest initial page was 88,351 bytes rather than the
+56,892,493-byte matcher result. This improves constrained demo delivery but does
+not make process-local state durable or reduce the retained evidence object.
+
 ## Evaluation foundation
 
 Ground truth is created before matcher development so future changes can be compared against known identity relationships, including source-only entities, hard negatives, and duplicate source rows. The product-visible CSVs never contain canonical identifiers, corruption labels, or partner hints. Canonical entities, source-to-canonical mappings, schema mapping truth, and provenance are evaluation-only artifacts.

@@ -2,14 +2,21 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  CandidateEvidenceDetailSchema,
+  ConflictPageSchema,
   ManualMappingSchema,
   MappingSuggestionDecisionSchema,
   MappingSuggestionResponseSchema,
   HumanReviewEvidenceSchema,
   ResolutionPreviewSchema,
+  ResultsPageSchema,
+  ReviewFilterSchema,
+  ReviewQueuePageSchema,
+  ReviewSortSchema,
   RunManifestSchema,
   RuleApplicationResponseSchema,
   RunViewSchema,
+  RunSummarySchema,
   SurvivorshipPolicyInputSchema,
   createHealthResponse,
 } from "@samewise/contracts";
@@ -18,7 +25,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
-import { MAX_CSV_BYTES, WorkflowError, WorkflowStore } from "./workflow-store.js";
+import { DEFAULT_PAGE_LIMIT, MAX_CSV_BYTES, MAX_PAGE_LIMIT, WorkflowError, WorkflowStore } from "./workflow-store.js";
 
 interface BuildAppOptions {
   dataRoot?: string;
@@ -37,6 +44,21 @@ function objectBody(value: unknown): Record<string, unknown> {
 
 function routeParams(value: unknown): Record<string, string> {
   return value as Record<string, string>;
+}
+
+function pageQuery(value: unknown): { offset: number; limit: number } {
+  const query = value as { offset?: string; limit?: string };
+  const parse = (raw: string | undefined, fallback: number, minimum: number) => {
+    if (raw === undefined) return fallback;
+    if (!/^\d+$/.test(raw)) throw new WorkflowError("invalid_pagination", "Pagination values must be non-negative integers.");
+    const parsed = Number(raw);
+    if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new WorkflowError("invalid_pagination", "Pagination values are outside the supported range.");
+    return parsed;
+  };
+  return {
+    offset: parse(query.offset, 0, 0),
+    limit: Math.min(MAX_PAGE_LIMIT, parse(query.limit, DEFAULT_PAGE_LIMIT, 1)),
+  };
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -86,7 +108,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.post("/api/runs", async (_request, reply) => {
-    const view = RunViewSchema.parse(store.createRun());
+    const view = RunSummarySchema.parse(store.createRun());
     app.log.info({ runId: view.runId, stage: view.stage }, "run created");
     reply.code(201);
     return view;
@@ -95,13 +117,44 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.get("/api/runs/:runId", async (request) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    return RunViewSchema.parse(store.get(runId));
+    return RunSummarySchema.parse(store.get(runId));
+  });
+
+  app.get("/api/runs/:runId/results", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const { offset, limit } = pageQuery(request.query);
+    return ResultsPageSchema.parse(store.resultsPage(runId, offset, limit));
+  });
+
+  app.get("/api/runs/:runId/review", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const { offset, limit } = pageQuery(request.query);
+    const query = request.query as { filter?: string; sort?: string; q?: string };
+    if ((query.q?.length ?? 0) > 200) throw new WorkflowError("invalid_request", "Review search is limited to 200 characters.");
+    const filter = ReviewFilterSchema.parse(query.filter ?? "unresolved");
+    const sort = ReviewSortSchema.parse(query.sort ?? "ambiguity");
+    return ReviewQueuePageSchema.parse(store.reviewPage(runId, offset, limit, filter, sort, query.q ?? ""));
+  });
+
+  app.get("/api/runs/:runId/candidates/:candidateId", async (request) => {
+    const { runId, candidateId } = routeParams(request.params);
+    if (!runId || !candidateId) throw new WorkflowError("invalid_request", "Run ID and candidate ID are required.");
+    return CandidateEvidenceDetailSchema.parse(store.candidateDetail(runId, candidateId));
+  });
+
+  app.get("/api/runs/:runId/conflicts", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const { offset, limit } = pageQuery(request.query);
+    return ConflictPageSchema.parse(store.conflictPage(runId, offset, limit));
   });
 
   app.get("/api/runs/:runId/evaluation-evidence", async (request) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    return HumanReviewEvidenceSchema.parse(humanReviewEvidence(RunViewSchema.parse(store.get(runId))));
+    return HumanReviewEvidenceSchema.parse(humanReviewEvidence(RunViewSchema.parse(store.evaluationView(runId))));
   });
 
   app.post("/api/runs/:runId/datasets/:side", async (request, reply) => {
@@ -114,7 +167,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const dataset = view.datasets[side];
     app.log.info({ runId, stage: "profile", datasetId: dataset?.datasetId, side, rowCount: dataset?.rowCount }, "dataset profiled");
     reply.code(201);
-    return RunViewSchema.parse(view);
+    return RunSummarySchema.parse(view);
   });
 
   app.put("/api/runs/:runId/mappings", async (request) => {
@@ -122,7 +175,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const body = objectBody(request.body);
     if (!runId || !Array.isArray(body.mappings) || body.mappings.length === 0) throw new WorkflowError("invalid_request", "At least one mapping is required.");
     const mappings = body.mappings.map((mapping) => ManualMappingSchema.parse(mapping));
-    const view = RunViewSchema.parse(store.setMappings(runId, mappings));
+    const view = RunSummarySchema.parse(store.setMappings(runId, mappings));
     app.log.info({ runId, stage: "mapping", mappingCount: mappings.length }, "mappings saved");
     return view;
   });
@@ -154,7 +207,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.post("/api/runs/:runId/match", async (request) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const view = RunViewSchema.parse(await store.match(runId));
+    const view = RunSummarySchema.parse(await store.match(runId));
     app.log.info({ runId, stage: "results", matcherVersion: view.matcherVersion, ...view.summary }, "match completed");
     return view;
   });
@@ -163,7 +216,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const { runId, candidateId } = routeParams(request.params);
     const decision = objectBody(request.body).decision;
     if (!runId || !candidateId || (decision !== "same_entity" && decision !== "different_entity")) throw new WorkflowError("invalid_request", "A valid identity decision is required.");
-    const view = RunViewSchema.parse(store.decide(runId, candidateId, decision));
+    const view = RunSummarySchema.parse(store.decide(runId, candidateId, decision));
     app.log.info({ runId, stage: "review", candidateId, decision, matcherVersion: view.matcherVersion }, "identity decision recorded");
     return view;
   });
@@ -174,7 +227,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!runId || !aRowId || typeof deferred !== "boolean") {
       throw new WorkflowError("invalid_request", "A review item and deferred state are required.");
     }
-    const view = RunViewSchema.parse(store.setDeferred(runId, aRowId, deferred));
+    const view = RunSummarySchema.parse(store.setDeferred(runId, aRowId, deferred));
     app.log.info({ runId, stage: "review", aRowId, deferred }, "review item defer state changed");
     return view;
   });
@@ -182,7 +235,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.post("/api/runs/:runId/review-undo", async (request) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const view = RunViewSchema.parse(store.undo(runId));
+    const view = RunSummarySchema.parse(store.undo(runId));
     app.log.info({ runId, stage: "review", undoneCandidateId: view.reviewUndo?.candidateId ?? null }, "review decision undone");
     return view;
   });
@@ -192,7 +245,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const action = objectBody(request.body).action;
     const replace = objectBody(request.body).replace;
     if (!runId || !conflictId || (action !== "use_a" && action !== "use_b" && action !== "keep_both") || (replace !== undefined && typeof replace !== "boolean")) throw new WorkflowError("invalid_request", "A valid field-resolution action is required.");
-    const view = RunViewSchema.parse(store.resolveConflict(runId, conflictId, action, replace === true));
+    const view = RunSummarySchema.parse(store.resolveConflict(runId, conflictId, action, replace === true));
     app.log.info({ runId, stage: "resolution", conflictId, action }, "field resolution recorded");
     return view;
   });
@@ -200,7 +253,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.delete("/api/runs/:runId/conflicts/:conflictId/resolution", async (request) => {
     const { runId, conflictId } = routeParams(request.params);
     if (!runId || !conflictId) throw new WorkflowError("invalid_request", "Run ID and conflict ID are required.");
-    const view = RunViewSchema.parse(store.clearResolution(runId, conflictId));
+    const view = RunSummarySchema.parse(store.clearResolution(runId, conflictId));
     app.log.info({ runId, stage: "resolution", conflictId }, "field resolution cleared");
     return view;
   });
@@ -209,7 +262,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
     const policy = SurvivorshipPolicyInputSchema.parse(request.body);
-    const view = RunViewSchema.parse(store.setSurvivorshipPolicy(runId, policy));
+    const view = RunSummarySchema.parse(store.setSurvivorshipPolicy(runId, policy));
     app.log.info({ runId, stage: "resolution", policyVersion: view.survivorshipPolicy?.policyVersion }, "survivorship policy configured without applying it");
     return view;
   });
@@ -227,7 +280,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!runId || typeof ruleId !== "string" || !ruleId) throw new WorkflowError("invalid_request", "A configured survivorship rule is required.");
     const result = store.applySurvivorshipRule(runId, ruleId);
     app.log.info({ runId, stage: "resolution", ruleId, policyVersion: result.policyVersion, appliedCount: result.appliedCount }, "survivorship rule explicitly applied");
-    return RuleApplicationResponseSchema.parse({ ...result, run: RunViewSchema.parse(result.run) });
+    return RuleApplicationResponseSchema.parse({ ...result, run: RunSummarySchema.parse(result.run) });
   });
 
   app.get("/api/runs/:runId/export", async (request, reply) => {

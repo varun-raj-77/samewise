@@ -1,17 +1,19 @@
 import {
+  ConflictPageSchema,
   ResolutionPreviewSchema,
-  RunViewSchema,
+  RunSummarySchema,
+  type ConflictPage,
   type FieldPolicyInput,
   type ResolutionPreview,
   type RuleStrategy,
-  type RunView,
+  type RunSummary,
 } from "@samewise/contracts";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Props {
-  run: RunView;
+  run: RunSummary;
   busy: boolean;
-  onRun: (run: RunView) => void;
+  onRun: (run: RunSummary) => void;
   onBusy: (busy: boolean) => void;
   onError: (message: string | null) => void;
   onBack: () => void;
@@ -33,13 +35,25 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
   const [timestampMappingId, setTimestampMappingId] = useState(existingRule?.timestampMappingId ?? dateMappings[0]?.mappingId ?? "");
   const [preview, setPreview] = useState<ResolutionPreview | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [conflictPage, setConflictPage] = useState<ConflictPage | null>(null);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [conflictRequestVersion, setConflictRequestVersion] = useState(0);
 
-  const counts = useMemo(() => ({
-    resolved: run.conflicts.filter((conflict) => conflict.resolution).length,
-    unresolved: run.conflicts.filter((conflict) => !conflict.resolution).length,
-  }), [run.conflicts]);
+  useEffect(() => {
+    let active = true;
+    setConflictError(null);
+    void fetch(`/api/runs/${encodeURIComponent(run.runId)}/conflicts?offset=${offset}&limit=50`)
+      .then(async (response) => {
+        if (!response.ok) throw await apiError(response);
+        return ConflictPageSchema.parse(await response.json());
+      })
+      .then((loaded) => { if (active) setConflictPage(loaded); })
+      .catch((error) => { if (active) setConflictError(error instanceof Error ? error.message : "Field conflicts could not be loaded."); });
+    return () => { active = false; };
+  }, [run.runId, run.conflictSummary, offset, conflictRequestVersion]);
 
-  async function runRequest(work: () => Promise<RunView>, message: string) {
+  async function runRequest(work: () => Promise<RunSummary>, message: string) {
     onBusy(true); onError(null);
     try {
       const updated = await work();
@@ -55,7 +69,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, replace }),
       });
       if (!response.ok) throw await apiError(response);
-      return RunViewSchema.parse(await response.json());
+      return RunSummarySchema.parse(await response.json());
     }, `${action.replaceAll("_", " ")} resolution recorded.`);
   }
 
@@ -63,7 +77,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
     await runRequest(async () => {
       const response = await fetch(`/api/runs/${run.runId}/conflicts/${conflictId}/resolution`, { method: "DELETE" });
       if (!response.ok) throw await apiError(response);
-      return RunViewSchema.parse(await response.json());
+      return RunSummarySchema.parse(await response.json());
     }, "Field resolution cleared. The conflict is unresolved again.");
   }
 
@@ -91,7 +105,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fieldPolicies: policies }),
       });
       if (!response.ok) throw await apiError(response);
-      return RunViewSchema.parse(await response.json());
+      return RunSummarySchema.parse(await response.json());
     }, "Policy configured. No values were changed; preview it before applying.");
     setPreview(null);
   }
@@ -122,7 +136,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
       });
       if (!response.ok) throw await apiError(response);
       const payload = await response.json() as { run: unknown; appliedCount: number; unresolvedCount: number; skippedCount: number };
-      onRun(RunViewSchema.parse(payload.run));
+      onRun(RunSummarySchema.parse(payload.run));
       setAnnouncement(`Rule applied to ${payload.appliedCount} conflict(s); ${payload.unresolvedCount} could not resolve and ${payload.skippedCount} were preserved.`);
       setPreview(null);
     } catch (error) {
@@ -137,8 +151,8 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
     <p className="lede">Inspect source provenance, resolve deliberately, or preview a deterministic field rule before applying it. Identity evidence never chooses a value.</p>
     <p className="sr-announcement" aria-live="polite">{announcement}</p>
     <div className="survivorship-summary" aria-label="Conflict status">
-      <div><small>Unresolved</small><strong>{counts.unresolved}</strong></div>
-      <div><small>Resolved</small><strong>{counts.resolved}</strong></div>
+      <div><small>Unresolved</small><strong>{run.conflictSummary.unresolved}</strong></div>
+      <div><small>Resolved</small><strong>{run.conflictSummary.resolved}</strong></div>
       <div><small>Confirmed links</small><strong>{run.trustedExportReadiness.eligibleConfirmedCount}</strong></div>
     </div>
 
@@ -157,16 +171,18 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
     </section>
 
     <div className="conflicts">
-      {run.conflicts.length ? run.conflicts.map((conflict) => {
-        const candidate = run.candidates.find((item) => item.candidateId === conflict.candidateId);
+      {conflictError && <div className="warning" role="alert"><span>{conflictError}</span><button type="button" onClick={() => setConflictRequestVersion((value) => value + 1)}>Retry</button></div>}
+      {!conflictError && !conflictPage && <p role="status">Loading field conflicts…</p>}
+      {conflictPage?.items.length ? conflictPage.items.map((conflict) => {
         const resolution = conflict.resolution;
         return <article className={`conflict-card ${resolution ? "is-resolved" : "is-unresolved"}`} key={conflict.conflictId}>
-          <header><div><small>{candidate?.aRowId} ↔ {candidate?.bRowId} · {conflict.aColumn} ↔ {conflict.bColumn}</small><h2>{conflict.label}</h2></div><span className="resolution-badge">{resolution ? `${resolution.resolutionSource.replace("_", " ")} · ${resolution.strategy.replaceAll("_", " ")}` : "Unresolved"}</span></header>
+          <header><div><small>{conflict.aRowId} ↔ {conflict.bRowId} · {conflict.aColumn} ↔ {conflict.bColumn}</small><h2>{conflict.label}</h2></div><span className="resolution-badge">{resolution ? `${resolution.resolutionSource.replace("_", " ")} · ${resolution.strategy.replaceAll("_", " ")}` : "Unresolved"}</span></header>
           <div className="conflict-values"><div><small>Dataset A · raw value</small><strong>{conflict.aValue || "Empty"}</strong><button aria-pressed={resolution?.strategy === "use_a"} disabled={busy} onClick={() => void manual(conflict.conflictId, "use_a", Boolean(resolution))}>Use A</button></div><div><small>Dataset B · raw value</small><strong>{conflict.bValue || "Empty"}</strong><button aria-pressed={resolution?.strategy === "use_b"} disabled={busy} onClick={() => void manual(conflict.conflictId, "use_b", Boolean(resolution))}>Use B</button></div></div>
           <div className="conflict-footer"><button className="secondary" aria-pressed={resolution?.strategy === "keep_both"} disabled={busy} onClick={() => void manual(conflict.conflictId, "keep_both", Boolean(resolution))}>Keep both</button>{resolution && <button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button>}</div>
           {resolution && <div className="provenance"><strong>Why this value won</strong><p>{resolution.reason}</p><small>{resolution.chosenSource ? `Selected Dataset ${resolution.chosenSource}` : "Both source values retained in dedicated A/B output columns"} · {resolution.policyVersion ?? "manual action"} · {new Date(resolution.resolvedAt).toLocaleString()}</small>{conflict.resolutionHistory.length > 0 && <small>{conflict.resolutionHistory.length} prior resolution{conflict.resolutionHistory.length === 1 ? "" : "s"} retained.</small>}</div>}
         </article>;
-      }) : <p className="empty">No field conflicts are available. Confirm a same-entity review candidate first.</p>}
+      }) : conflictPage && <p className="empty">No field conflicts are available. Confirm a same-entity review candidate first.</p>}
+      {conflictPage && <div className="actions" aria-label="Conflict pagination"><button type="button" className="secondary" disabled={conflictPage.page.previousOffset === null} onClick={() => setOffset(conflictPage.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={conflictPage.page.nextOffset === null} onClick={() => setOffset(conflictPage.page.nextOffset ?? offset)}>Next</button></div>}
     </div>
     <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button><button className="primary" onClick={onContinue}>Continue to exports</button></div>
   </section>;

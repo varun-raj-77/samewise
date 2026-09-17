@@ -13,7 +13,11 @@ import {
   SURVIVORSHIP_POLICY_SCHEMA_VERSION,
   TRUSTED_EXPORT_VERSION,
   WORKFLOW_CONTRACT_VERSION,
+  WORKFLOW_PROJECTION_CONTRACT_VERSION,
+  type CandidateEvidenceDetail,
   type CandidatePair,
+  type CandidateSummary,
+  type ConflictPage,
   type DatasetProfile,
   type DatasetSide,
   type FieldConflict,
@@ -22,10 +26,18 @@ import {
   type MatcherResult,
   type MappingSuggestionDecision,
   type MappingSuggestionResponse,
+  type Pagination,
+  type ResultItem,
+  type ResultsPage,
+  type ReviewFilter,
+  type ReviewQueuePage,
+  type ReviewQueueProjectionItem,
   type ReviewQueueItem,
+  type ReviewSort,
   type ResolutionPreview,
   type RunManifest,
   type RunView,
+  type RunSummary,
   type SemanticMappingProposal,
   type SurvivorshipPolicy,
   type SurvivorshipPolicyInput,
@@ -48,6 +60,8 @@ import {
 } from "./survivorship.js";
 
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
+export const DEFAULT_PAGE_LIMIT = 50;
+export const MAX_PAGE_LIMIT = 100;
 
 interface DatasetArtifact {
   profile: DatasetProfile;
@@ -92,6 +106,18 @@ function safeOriginalFilename(value: string): string {
   return name.slice(0, 200);
 }
 
+function pagination(total: number, offset: number, limit: number): Pagination {
+  const returned = Math.max(0, Math.min(limit, total - offset));
+  return {
+    offset,
+    limit,
+    total,
+    returned,
+    nextOffset: offset + returned < total ? offset + returned : null,
+    previousOffset: offset > 0 ? Math.max(0, offset - limit) : null,
+  };
+}
+
 function comparisonConflicts(run: RunState, candidate: CandidatePair, decisionId: string | null, identitySource: "human" | "system_matcher"): FieldConflict[] {
   return run.mappings
     .filter((mapping) => mapping.role === "comparison")
@@ -123,7 +149,7 @@ export class WorkflowStore {
     private readonly semanticMapper: SemanticMapper,
   ) {}
 
-  createRun(): RunView {
+  createRun(): RunSummary {
     const run: RunState = {
       runId: `run-${randomUUID()}`,
       stage: "upload",
@@ -136,7 +162,7 @@ export class WorkflowStore {
       previewedRuleIds: new Set(),
     };
     this.runs.set(run.runId, run);
-    return this.view(run);
+    return this.summaryView(run);
   }
 
   private requireRun(runId: string): RunState {
@@ -145,7 +171,7 @@ export class WorkflowStore {
     return run;
   }
 
-  async upload(runId: string, side: DatasetSide, filenameHeader: string | undefined, bytes: Buffer): Promise<RunView> {
+  async upload(runId: string, side: DatasetSide, filenameHeader: string | undefined, bytes: Buffer): Promise<RunSummary> {
     const run = this.requireRun(runId);
     if (run.datasets[side]) throw new WorkflowError("source_immutable", `Dataset ${side} is already saved and cannot be replaced.`, 409);
     if (!filenameHeader) throw new WorkflowError("filename_required", "The original CSV filename is required.");
@@ -169,10 +195,10 @@ export class WorkflowStore {
     }
     run.datasets[side] = { profile, path };
     run.stage = run.datasets.A && run.datasets.B ? "profile" : "upload";
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  setMappings(runId: string, mappings: ManualMapping[]): RunView {
+  setMappings(runId: string, mappings: ManualMapping[]): RunSummary {
     const run = this.requireRun(runId);
     const a = run.datasets.A?.profile;
     const b = run.datasets.B?.profile;
@@ -204,7 +230,7 @@ export class WorkflowStore {
     run.deferredARowIds.clear();
     run.undoStack.length = 0;
     run.stage = "mapping";
-    return this.view(run);
+    return this.summaryView(run);
   }
 
   async generateMappingSuggestions(runId: string): Promise<MappingSuggestionResponse> {
@@ -319,7 +345,7 @@ export class WorkflowStore {
     };
   }
 
-  async match(runId: string): Promise<RunView> {
+  async match(runId: string): Promise<RunSummary> {
     const run = this.requireRun(runId);
     if (!run.datasets.A || !run.datasets.B || !run.mappings.some((mapping) => mapping.role === "identity")) {
       throw new WorkflowError("run_not_ready", "Both datasets and an identity mapping are required.");
@@ -338,10 +364,10 @@ export class WorkflowStore {
       for (const conflict of comparisonConflicts(run, candidate, null, "system_matcher")) run.conflicts.set(conflict.conflictId, conflict);
     }
     run.stage = "results";
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  decide(runId: string, candidateId: string, humanDecision: "same_entity" | "different_entity"): RunView {
+  decide(runId: string, candidateId: string, humanDecision: "same_entity" | "different_entity"): RunSummary {
     const run = this.requireRun(runId);
     if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before recording identity decisions.", 409);
     const candidate = run.result.candidates.find((item) => item.candidateId === candidateId);
@@ -389,10 +415,10 @@ export class WorkflowStore {
     run.undoStack.push({ candidateId, decisionId: decision.decisionId, createdConflictIds, wasDeferred });
     if (run.undoStack.length > 20) run.undoStack.shift();
     run.previewedRuleIds.clear();
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  setDeferred(runId: string, aRowId: string, deferred: boolean): RunView {
+  setDeferred(runId: string, aRowId: string, deferred: boolean): RunSummary {
     const run = this.requireRun(runId);
     const candidates = run.result?.candidates.filter((candidate) => candidate.aRowId === aRowId) ?? [];
     if (!candidates.length) throw new WorkflowError("review_item_not_found", "Review item was not found.", 404);
@@ -403,10 +429,10 @@ export class WorkflowStore {
     else run.deferredARowIds.delete(aRowId);
     run.stage = "review";
     run.previewedRuleIds.clear();
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  undo(runId: string): RunView {
+  undo(runId: string): RunSummary {
     const run = this.requireRun(runId);
     const entry = run.undoStack.at(-1);
     if (!entry) throw new WorkflowError("nothing_to_undo", "There is no recent review decision to undo.", 409);
@@ -428,10 +454,10 @@ export class WorkflowStore {
     run.undoStack.pop();
     run.stage = "review";
     run.previewedRuleIds.clear();
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  resolveConflict(runId: string, conflictId: string, action: "use_a" | "use_b" | "keep_both", replace = false): RunView {
+  resolveConflict(runId: string, conflictId: string, action: "use_a" | "use_b" | "keep_both", replace = false): RunSummary {
     const run = this.requireRun(runId);
     const conflict = run.conflicts.get(conflictId);
     if (!conflict) throw new WorkflowError("conflict_not_found", "Field conflict was not found.", 404);
@@ -444,10 +470,10 @@ export class WorkflowStore {
     conflict.status = "resolved";
     run.stage = "resolution";
     run.previewedRuleIds.clear();
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  clearResolution(runId: string, conflictId: string): RunView {
+  clearResolution(runId: string, conflictId: string): RunSummary {
     const run = this.requireRun(runId);
     const conflict = run.conflicts.get(conflictId);
     if (!conflict) throw new WorkflowError("conflict_not_found", "Field conflict was not found.", 404);
@@ -457,10 +483,10 @@ export class WorkflowStore {
     conflict.status = "unresolved";
     run.stage = "resolution";
     run.previewedRuleIds.clear();
-    return this.view(run);
+    return this.summaryView(run);
   }
 
-  setSurvivorshipPolicy(runId: string, input: SurvivorshipPolicyInput): RunView {
+  setSurvivorshipPolicy(runId: string, input: SurvivorshipPolicyInput): RunSummary {
     const run = this.requireRun(runId);
     if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before configuring survivorship.");
     try {
@@ -472,7 +498,7 @@ export class WorkflowStore {
       throw error;
     }
     run.stage = "resolution";
-    return this.view(run);
+    return this.summaryView(run);
   }
 
   previewSurvivorshipRule(runId: string, ruleId: string): ResolutionPreview {
@@ -505,7 +531,7 @@ export class WorkflowStore {
     return preview;
   }
 
-  applySurvivorshipRule(runId: string, ruleId: string): { run: RunView; policyVersion: string; ruleId: string; appliedCount: number; unresolvedCount: number; skippedCount: number } {
+  applySurvivorshipRule(runId: string, ruleId: string): { run: RunSummary; policyVersion: string; ruleId: string; appliedCount: number; unresolvedCount: number; skippedCount: number } {
     const run = this.requireRun(runId);
     const policy = run.survivorshipPolicy;
     const rule = policy?.fieldPolicies.find((item) => item.ruleId === ruleId);
@@ -523,7 +549,7 @@ export class WorkflowStore {
     run.stage = "resolution";
     run.previewedRuleIds.clear();
     return {
-      run: this.view(run),
+      run: this.summaryView(run),
       policyVersion: policy.policyVersion,
       ruleId,
       appliedCount: mutations.length,
@@ -532,7 +558,170 @@ export class WorkflowStore {
     };
   }
 
-  get(runId: string): RunView { return this.view(this.requireRun(runId)); }
+  get(runId: string): RunSummary { return this.summaryView(this.requireRun(runId)); }
+
+  evaluationView(runId: string): RunView { return this.view(this.requireRun(runId)); }
+
+  resultsPage(runId: string, offset: number, limit: number): ResultsPage {
+    const run = this.requireRun(runId);
+    const result = run.result;
+    if (!result) return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      items: [],
+      page: pagination(0, offset, limit),
+      ordering: "a_row_id_ascending",
+    };
+    const groups = new Map<string, CandidatePair[]>();
+    for (const candidate of result.candidates) {
+      const group = groups.get(candidate.aRowId) ?? [];
+      group.push(candidate);
+      groups.set(candidate.aRowId, group);
+    }
+    const queueByA = new Map(this.reviewQueue(run, result.candidates).map((item) => [item.aRowId, item]));
+    const items: Omit<ResultItem, "sourceOrder">[] = [...groups.entries()].map(([aRowId, unsorted]) => {
+      const options = [...unsorted].sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+      const queueItem = queueByA.get(aRowId);
+      const top = queueItem
+        ? options.find((candidate) => candidate.candidateId === queueItem.topCandidateId) ?? options[0]!
+        : options[0]!;
+      const status = queueItem?.state === "reviewed_same"
+        ? "reviewed_same" as const
+        : queueItem?.state === "reviewed_different"
+          ? "reviewed_different" as const
+          : queueItem
+            ? "needs_review" as const
+            : "auto_match" as const;
+      return {
+        aRowId,
+        aIdentity: this.identityRecord(run, top, "A"),
+        status,
+        topCandidate: this.candidateSummary(run, top),
+        topBIdentity: this.identityRecord(run, top, "B"),
+        alternativeCount: Math.max(0, options.length - 1),
+        collision: top.collision || (queueItem?.collision ?? false),
+      };
+    });
+    for (const row of result.onlyA) {
+      items.push({
+        aRowId: row.rowId,
+        aIdentity: Object.fromEntries(run.mappings.filter((mapping) => mapping.role === "identity").map((mapping) => [mapping.aColumn, row.record[mapping.aColumn] ?? ""])),
+        status: "unmatched",
+        topCandidate: null,
+        topBIdentity: null,
+        alternativeCount: 0,
+        collision: false,
+      });
+    }
+    items.sort((left, right) => left.aRowId.localeCompare(right.aRowId));
+    const projected = items.map((item, sourceOrder) => ({ ...item, sourceOrder }));
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      items: projected.slice(offset, offset + limit),
+      page: pagination(projected.length, offset, limit),
+      ordering: "a_row_id_ascending",
+    };
+  }
+
+  reviewPage(
+    runId: string,
+    offset: number,
+    limit: number,
+    filter: ReviewFilter,
+    sort: ReviewSort,
+    query: string,
+  ): ReviewQueuePage {
+    const run = this.requireRun(runId);
+    const candidates = run.result?.candidates ?? [];
+    const candidateById = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const all = this.reviewQueue(run, candidates);
+    const filtered = all.filter((item) => {
+      if (filter === "unresolved" && item.state !== "needs_review") return false;
+      if (filter === "deferred" && item.state !== "deferred") return false;
+      if (filter === "collision" && !item.collision) return false;
+      if (filter === "contradiction" && !item.strongContradiction && !item.strongestContradiction) return false;
+      if (filter === "multiple" && item.candidateCount <= 1) return false;
+      if (!normalizedQuery) return true;
+      const top = candidateById.get(item.topCandidateId);
+      const name = top?.evidence.find((evidence) => evidence.fieldKind === "name");
+      return [item.aRowId, item.topBRowId, name?.aValue, name?.bValue]
+        .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery));
+    });
+    filtered.sort((left, right) => {
+      if (sort === "ambiguity") return left.runnerUpMargin - right.runnerUpMargin || right.topMatchScore - left.topMatchScore || left.sourceOrder - right.sourceOrder;
+      if (sort === "score_desc") return right.topMatchScore - left.topMatchScore || left.sourceOrder - right.sourceOrder;
+      if (sort === "score_asc") return left.topMatchScore - right.topMatchScore || left.sourceOrder - right.sourceOrder;
+      if (sort === "candidate_count") return right.candidateCount - left.candidateCount || left.sourceOrder - right.sourceOrder;
+      return left.sourceOrder - right.sourceOrder;
+    });
+    const projected = filtered.slice(offset, offset + limit).map((item) => this.reviewProjection(run, item, candidateById));
+    const reviewed = all.filter((item) => item.state === "reviewed_same" || item.state === "reviewed_different").length;
+    const deferred = all.filter((item) => item.state === "deferred").length;
+    const remaining = all.filter((item) => item.state === "needs_review").length;
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      items: projected,
+      page: pagination(filtered.length, offset, limit),
+      progress: { total: all.length, reviewed, remaining, deferred },
+      filter,
+      sort,
+      query,
+    };
+  }
+
+  candidateDetail(runId: string, candidateId: string): CandidateEvidenceDetail {
+    const run = this.requireRun(runId);
+    const candidates = run.result?.candidates ?? [];
+    const candidate = candidates.find((item) => item.candidateId === candidateId);
+    if (!candidate) throw new WorkflowError("candidate_not_found", "Candidate was not found in this run.", 404);
+    const queueItem = this.reviewQueue(run, candidates).find((item) => item.aRowId === candidate.aRowId);
+    const collisionARowIds = [...new Set(candidates
+      .filter((item) => item.bRowId === candidate.bRowId && item.aRowId !== candidate.aRowId)
+      .map((item) => item.aRowId))].sort();
+    const effectiveCollisionARowIds = [...new Set(this.effectiveLinks(run)
+      .filter((item) => item.bRowId === candidate.bRowId && item.aRowId !== candidate.aRowId)
+      .map((item) => item.aRowId))].sort();
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      candidate,
+      alternatives: candidates
+        .filter((item) => item.aRowId === candidate.aRowId)
+        .sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId))
+        .map((item) => this.candidateSummary(run, item)),
+      reviewState: queueItem?.state ?? "auto_match",
+      deferred: queueItem?.deferred ?? false,
+      collisionARowIds,
+      effectiveCollisionARowIds,
+      humanDecision: run.decisions.get(candidateId) ?? null,
+      conflicts: [...run.conflicts.values()].filter((conflict) => conflict.candidateId === candidateId),
+      matcherVersion: run.result!.matcherVersion,
+      candidateEngineVersion: run.result!.candidateEngineVersion,
+    };
+  }
+
+  conflictPage(runId: string, offset: number, limit: number): ConflictPage {
+    const run = this.requireRun(runId);
+    const candidateById = new Map((run.result?.candidates ?? []).map((candidate) => [candidate.candidateId, candidate]));
+    const effectiveCandidateIds = new Set(this.effectiveLinks(run).map((candidate) => candidate.candidateId));
+    const items = [...run.conflicts.values()]
+      .filter((conflict) => effectiveCandidateIds.has(conflict.candidateId))
+      .sort((left, right) => left.conflictId.localeCompare(right.conflictId))
+      .map((conflict) => {
+        const candidate = candidateById.get(conflict.candidateId)!;
+        return { ...conflict, aRowId: candidate.aRowId, bRowId: candidate.bRowId };
+      });
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      items: items.slice(offset, offset + limit),
+      page: pagination(items.length, offset, limit),
+      ordering: "conflict_id_ascending",
+    };
+  }
 
   exportSnapshot(runId: string): RunExportSnapshot {
     const run = this.requireRun(runId);
@@ -551,6 +740,114 @@ export class WorkflowStore {
       ...candidates.filter((candidate) => humanSameByA.get(candidate.aRowId)?.candidateId === candidate.candidateId),
       ...candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameByA.has(candidate.aRowId) && !rejectedCandidates.has(candidate.candidateId)),
     ];
+  }
+
+  private identityRecord(run: RunState, candidate: CandidatePair, side: DatasetSide): Record<string, string> {
+    return Object.fromEntries(run.mappings
+      .filter((mapping) => mapping.role === "identity")
+      .map((mapping) => {
+        const column = side === "A" ? mapping.aColumn : mapping.bColumn;
+        const record = side === "A" ? candidate.aRecord : candidate.bRecord;
+        return [column, record[column] ?? ""];
+      }));
+  }
+
+  private candidateSummary(run: RunState, candidate: CandidatePair): CandidateSummary {
+    const strongestPositive = [...candidate.evidence]
+      .filter((evidence) => evidence.positiveContribution > 0)
+      .sort((left, right) => right.positiveContribution - left.positiveContribution)[0] ?? null;
+    const strongestContradiction = [...candidate.evidence]
+      .filter((evidence) => evidence.conflictContribution > 0)
+      .sort((left, right) => right.conflictContribution - left.conflictContribution)[0] ?? null;
+    const decision = run.decisions.get(candidate.candidateId);
+    return {
+      candidateId: candidate.candidateId,
+      bRowId: candidate.bRowId,
+      rank: candidate.rank,
+      matchScore: candidate.matchScore,
+      band: candidate.band,
+      collision: candidate.collision,
+      strongContradiction: candidate.strongContradiction,
+      strongestPositive: strongestPositive ? {
+        mappingId: strongestPositive.mappingId,
+        label: strongestPositive.label,
+        evidenceClass: strongestPositive.evidenceClass,
+        contribution: strongestPositive.contribution,
+      } : null,
+      strongestContradiction: strongestContradiction ? {
+        mappingId: strongestContradiction.mappingId,
+        label: strongestContradiction.label,
+        evidenceClass: strongestContradiction.evidenceClass,
+        contribution: strongestContradiction.contribution,
+      } : null,
+      humanDecision: decision ? {
+        candidateId: decision.candidateId,
+        aRowId: decision.aRowId,
+        bRowId: decision.bRowId,
+        humanDecision: decision.humanDecision,
+        decidedAt: decision.decidedAt,
+      } : null,
+    };
+  }
+
+  private reviewProjection(
+    run: RunState,
+    item: ReviewQueueItem,
+    candidateById: Map<string, CandidatePair>,
+  ): ReviewQueueProjectionItem {
+    const candidates = item.candidateIds
+      .map((candidateId) => candidateById.get(candidateId))
+      .filter((candidate): candidate is CandidatePair => Boolean(candidate))
+      .sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+    const top = candidateById.get(item.topCandidateId)!;
+    return {
+      aRowId: item.aRowId,
+      topCandidateId: item.topCandidateId,
+      topBRowId: item.topBRowId,
+      topMatchScore: item.topMatchScore,
+      runnerUpMargin: item.runnerUpMargin,
+      candidateCount: item.candidateCount,
+      strongestPositive: item.strongestPositive,
+      strongestContradiction: item.strongestContradiction,
+      collision: item.collision,
+      collisionARowIds: item.collisionARowIds,
+      strongContradiction: item.strongContradiction,
+      state: item.state,
+      deferred: item.deferred,
+      humanDecision: item.humanDecision,
+      matcherVersion: item.matcherVersion,
+      sourceOrder: item.sourceOrder,
+      aIdentity: this.identityRecord(run, top, "A"),
+      topBIdentity: this.identityRecord(run, top, "B"),
+      candidates: candidates.map((candidate) => this.candidateSummary(run, candidate)),
+    };
+  }
+
+  private summaryView(run: RunState): RunSummary {
+    const view = this.view(run);
+    const resolved = view.conflicts.filter((conflict) => conflict.resolution !== null).length;
+    return {
+      contractVersion: view.contractVersion,
+      projectionVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId: view.runId,
+      stage: view.stage,
+      datasets: view.datasets,
+      mappings: view.mappings,
+      mappingVersion: view.mappingVersion,
+      semanticMappingProvenance: view.semanticMappingProvenance,
+      matcherVersion: view.matcherVersion,
+      matcherProvenance: view.matcherProvenance,
+      summary: view.summary,
+      survivorshipPolicy: view.survivorshipPolicy,
+      trustedExportReadiness: view.trustedExportReadiness,
+      reviewProgress: view.reviewProgress,
+      reviewUndo: view.reviewUndo,
+      conflictSummary: {
+        total: view.conflicts.length,
+        resolved,
+        unresolved: view.conflicts.length - resolved,
+      },
+    };
   }
 
   private view(run: RunState): RunView {

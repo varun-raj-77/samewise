@@ -6,6 +6,7 @@ import {
 } from "./survivorship.js";
 
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
+export const WORKFLOW_PROJECTION_CONTRACT_VERSION = "1.0.0" as const;
 export const MATCHER_VERSION = "explainable-matcher-v0.2.0" as const;
 export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.2.0" as const;
 export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
@@ -192,6 +193,88 @@ export const ReviewQueueItemSchema = z.object({
 }).strict();
 export type ReviewQueueItem = z.infer<typeof ReviewQueueItemSchema>;
 
+export const PaginationSchema = z.object({
+  offset: z.number().int().nonnegative(),
+  limit: z.number().int().positive().max(100),
+  total: z.number().int().nonnegative(),
+  returned: z.number().int().nonnegative().max(100),
+  nextOffset: z.number().int().nonnegative().nullable(),
+  previousOffset: z.number().int().nonnegative().nullable(),
+}).strict();
+export type Pagination = z.infer<typeof PaginationSchema>;
+
+export const IdentityDecisionSummarySchema = IdentityDecisionSchema.pick({
+  candidateId: true,
+  aRowId: true,
+  bRowId: true,
+  humanDecision: true,
+  decidedAt: true,
+});
+export type IdentityDecisionSummary = z.infer<typeof IdentityDecisionSummarySchema>;
+
+export const CandidateSummarySchema = z.object({
+  candidateId: z.string().min(1),
+  bRowId: z.string().min(1),
+  rank: z.number().int().positive(),
+  matchScore: z.number().min(0).max(1),
+  band: z.enum(["auto_match", "needs_review"]),
+  collision: z.boolean(),
+  strongContradiction: z.boolean(),
+  strongestPositive: ReviewEvidenceSummarySchema.nullable(),
+  strongestContradiction: ReviewEvidenceSummarySchema.nullable(),
+  humanDecision: IdentityDecisionSummarySchema.nullable(),
+}).strict();
+export type CandidateSummary = z.infer<typeof CandidateSummarySchema>;
+
+export const ResultItemSchema = z.object({
+  aRowId: z.string().min(1),
+  aIdentity: z.record(z.string(), z.string()),
+  status: z.enum(["auto_match", "needs_review", "reviewed_same", "reviewed_different", "unmatched"]),
+  topCandidate: CandidateSummarySchema.nullable(),
+  topBIdentity: z.record(z.string(), z.string()).nullable(),
+  alternativeCount: z.number().int().nonnegative(),
+  collision: z.boolean(),
+  sourceOrder: z.number().int().nonnegative(),
+}).strict();
+export type ResultItem = z.infer<typeof ResultItemSchema>;
+
+export const ResultsPageSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  items: z.array(ResultItemSchema).max(100),
+  page: PaginationSchema,
+  ordering: z.literal("a_row_id_ascending"),
+}).strict();
+export type ResultsPage = z.infer<typeof ResultsPageSchema>;
+
+export const ReviewFilterSchema = z.enum(["unresolved", "all", "deferred", "collision", "contradiction", "multiple"]);
+export const ReviewSortSchema = z.enum(["ambiguity", "score_desc", "score_asc", "candidate_count", "source"]);
+export type ReviewFilter = z.infer<typeof ReviewFilterSchema>;
+export type ReviewSort = z.infer<typeof ReviewSortSchema>;
+
+export const ReviewQueueProjectionItemSchema = ReviewQueueItemSchema.omit({ candidateIds: true }).extend({
+  aIdentity: z.record(z.string(), z.string()),
+  topBIdentity: z.record(z.string(), z.string()),
+  candidates: z.array(CandidateSummarySchema).min(1).max(3),
+}).strict();
+export type ReviewQueueProjectionItem = z.infer<typeof ReviewQueueProjectionItemSchema>;
+
+export const CandidateEvidenceDetailSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  candidate: CandidatePairSchema,
+  alternatives: z.array(CandidateSummarySchema).min(1).max(3),
+  reviewState: z.enum(["auto_match", "needs_review", "deferred", "reviewed_same", "reviewed_different"]),
+  deferred: z.boolean(),
+  collisionARowIds: z.array(z.string().min(1)),
+  effectiveCollisionARowIds: z.array(z.string().min(1)),
+  humanDecision: IdentityDecisionSchema.nullable(),
+  conflicts: z.array(FieldConflictSchema),
+  matcherVersion: z.literal(MATCHER_VERSION),
+  candidateEngineVersion: z.literal(CANDIDATE_ENGINE_VERSION),
+}).strict();
+export type CandidateEvidenceDetail = z.infer<typeof CandidateEvidenceDetailSchema>;
+
 export const ReviewProgressSchema = z.object({
   total: z.number().int().nonnegative(),
   reviewed: z.number().int().nonnegative(),
@@ -199,6 +282,18 @@ export const ReviewProgressSchema = z.object({
   deferred: z.number().int().nonnegative(),
 }).strict();
 export type ReviewProgress = z.infer<typeof ReviewProgressSchema>;
+
+export const ReviewQueuePageSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  items: z.array(ReviewQueueProjectionItemSchema).max(100),
+  page: PaginationSchema,
+  progress: ReviewProgressSchema,
+  filter: ReviewFilterSchema,
+  sort: ReviewSortSchema,
+  query: z.string(),
+}).strict();
+export type ReviewQueuePage = z.infer<typeof ReviewQueuePageSchema>;
 
 export const ReviewUndoSchema = z.object({
   decisionId: z.string().min(1),
@@ -249,8 +344,42 @@ export const RunViewSchema = z.object({
 }).strict();
 export type RunView = z.infer<typeof RunViewSchema>;
 
+export const ConflictSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  resolved: z.number().int().nonnegative(),
+  unresolved: z.number().int().nonnegative(),
+}).strict();
+
+export const ConflictProjectionItemSchema = FieldConflictSchema.extend({
+  aRowId: z.string().min(1),
+  bRowId: z.string().min(1),
+}).strict();
+export type ConflictProjectionItem = z.infer<typeof ConflictProjectionItemSchema>;
+
+export const ConflictPageSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  items: z.array(ConflictProjectionItemSchema).max(100),
+  page: PaginationSchema,
+  ordering: z.literal("conflict_id_ascending"),
+}).strict();
+export type ConflictPage = z.infer<typeof ConflictPageSchema>;
+
+export const RunSummarySchema = RunViewSchema.omit({
+  candidates: true,
+  decisions: true,
+  conflicts: true,
+  reviewQueue: true,
+  onlyA: true,
+  onlyB: true,
+}).extend({
+  projectionVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  conflictSummary: ConflictSummarySchema,
+}).strict();
+export type RunSummary = z.infer<typeof RunSummarySchema>;
+
 export const RuleApplicationResponseSchema = z.object({
-  run: RunViewSchema,
+  run: RunSummarySchema,
   policyVersion: z.string().min(1),
   ruleId: z.string().min(1),
   appliedCount: z.number().int().nonnegative(),

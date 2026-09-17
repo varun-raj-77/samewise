@@ -15,6 +15,7 @@
     "test": "pnpm -r --if-present test",
     "python:lint": "node scripts/run-python-check.mjs lint",
     "python:test": "node scripts/run-python-check.mjs test",
+    "benchmark:sw012": "pnpm --filter @samewise/api exec tsx ../../scripts/measure-sw012-payload.ts",
     "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
     "acceptance:sw004": "node apps/web/e2e/sw004-closeout.mjs",
     "acceptance:sw006": "node apps/web/e2e/sw006-closeout.mjs",

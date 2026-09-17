@@ -2,9 +2,8 @@
 
 Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
 
-SW-010 completes the export and provenance surface on top of the frozen SW-006
-matcher, SW-007 review workspace, SW-008 survivorship flow, and SW-009 evaluation
-product:
+SW-012 adds bounded result/review/conflict projections and on-demand full evidence
+on top of the frozen matcher, review, survivorship, evaluation, and export surfaces:
 
 1. Upload immutable Dataset A and Dataset B CSV files.
 2. Inspect Python-generated profiles and limited representative samples.
@@ -69,7 +68,11 @@ Uploaded bytes are written once beneath the ignored `.samewise-data/<run-id>/` d
 | --- | --- | --- |
 | `POST` | `/api/runs` | Create a process-local run |
 | `POST` | `/api/runs/:runId/datasets/:side` | Upload raw CSV bytes for side `A` or `B` |
-| `GET` | `/api/runs/:runId` | Read current run state |
+| `GET` | `/api/runs/:runId` | Read compact current run summary |
+| `GET` | `/api/runs/:runId/results` | Read a bounded deterministic Results page |
+| `GET` | `/api/runs/:runId/review` | Read a filtered/sorted bounded Review page |
+| `GET` | `/api/runs/:runId/candidates/:candidateId` | Read complete run-owned candidate evidence on demand |
+| `GET` | `/api/runs/:runId/conflicts` | Read a bounded deterministic conflict page |
 | `PUT` | `/api/runs/:runId/mappings` | Save validated manual mappings |
 | `POST` | `/api/runs/:runId/mapping-suggestions` | Generate a validated metadata-only proposal from server-owned profiles |
 | `PATCH` | `/api/runs/:runId/mapping-suggestions/:suggestionId` | Accept, reject, or remap one proposal without overwriting its origin |
@@ -121,6 +124,14 @@ result was 56.9 MB. A 50K canonical-entity fixture completed candidate generatio
 candidate-only traced Python-allocation peak was 1.10 GB, so full scoring and 100K
 were not attempted on that host. These are fixture- and machine-specific results,
 not capacity claims. See [docs/sw-011-performance.md](docs/sw-011-performance.md).
+
+SW-012 reran that exact 56,892,493-byte matcher-result baseline and moved browser
+delivery to versioned bounded projections. On the same 10K fixture, the match
+summary was 8,386 bytes, a realistic 50-case Review page was 88,351 bytes, and a
+complete selected-candidate explanation was 7,468 bytes. Evidence remains retained
+authoritatively and is not recomputed. This is a wire-payload improvement, not a
+server-memory or durability claim. See
+[docs/sw-012-bounded-evidence.md](docs/sw-012-bounded-evidence.md).
 
 After candidate generation, only confirmed identity mappings enter the explicit
 feature pipeline. Name, phone, email, domain, address, city, region, postal, and
@@ -217,6 +228,8 @@ uv run --project services/matcher samewise-matcher candidates benchmark --root .
 
 - CSV only; no XLSX.
 - Process-local product state; no durable run or decision persistence.
+- Authoritative matcher evidence remains in process memory even though browser
+  projections are bounded; SW-012 does not claim lower retained-state memory.
 - Refresh and route navigation recover `?run=<run-id>&screen=<stage>` only while
   that API process is still alive.
 - Local immutable artifacts; no object storage.

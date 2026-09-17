@@ -50,5 +50,54 @@
         }
       }
     ]
+  },
+  "runSummaries": {
+    "valid": [
+      {
+        "name": "compact pre-match run summary",
+        "value": {
+          "contractVersion": "1.0.0",
+          "projectionVersion": "1.0.0",
+          "runId": "run-example",
+          "stage": "mapping",
+          "datasets": {},
+          "mappings": [],
+          "mappingVersion": "confirmed-mappings-v1",
+          "semanticMappingProvenance": null,
+          "matcherVersion": null,
+          "matcherProvenance": null,
+          "summary": null,
+          "survivorshipPolicy": null,
+          "trustedExportReadiness": { "ready": false, "unresolvedIdentityCount": 0, "unresolvedConflictCount": 0, "eligibleConfirmedCount": 0, "onlyACount": 0, "onlyBCount": 0, "blockers": ["The matcher has not completed."] },
+          "reviewProgress": { "total": 0, "reviewed": 0, "remaining": 0, "deferred": 0 },
+          "reviewUndo": null,
+          "conflictSummary": { "total": 0, "resolved": 0, "unresolved": 0 }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "summary cannot carry the authoritative candidate array",
+        "value": {
+          "contractVersion": "1.0.0",
+          "projectionVersion": "1.0.0",
+          "runId": "run-example",
+          "stage": "mapping",
+          "datasets": {},
+          "mappings": [],
+          "mappingVersion": "confirmed-mappings-v1",
+          "semanticMappingProvenance": null,
+          "matcherVersion": null,
+          "matcherProvenance": null,
+          "summary": null,
+          "survivorshipPolicy": null,
+          "trustedExportReadiness": { "ready": false, "unresolvedIdentityCount": 0, "unresolvedConflictCount": 0, "eligibleConfirmedCount": 0, "onlyACount": 0, "onlyBCount": 0, "blockers": ["The matcher has not completed."] },
+          "reviewProgress": { "total": 0, "reviewed": 0, "remaining": 0, "deferred": 0 },
+          "reviewUndo": null,
+          "conflictSummary": { "total": 0, "resolved": 0, "unresolved": 0 },
+          "candidates": []
+        }
+      }
+    ]
   }
 }

@@ -7,7 +7,7 @@ import {
   MATCHER_VERSION,
   MappingSuggestionResponseSchema,
   RunManifestSchema,
-  RunViewSchema,
+  RunSummarySchema,
   type MatcherResult,
   type SemanticMappingModelOutput,
 } from "@samewise/contracts";
@@ -67,7 +67,7 @@ describe("SW-004 semantic mapping API", () => {
 
   async function setup(semanticMapper: SemanticMapper, matcher = matcherWithCapture()) {
     app = buildApp({ dataRoot, matcher, semanticMapper });
-    const created = RunViewSchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
+    const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
     for (const [side, bytes] of [["A", aBytes], ["B", bBytes]] as const) {
       const response = await app.inject({ method: "POST", url: `/api/runs/${created.runId}/datasets/${side}`, headers: { "content-type": "text/csv", "x-file-name": `${side}.csv` }, payload: bytes });
       expect(response.statusCode).toBe(201);
@@ -122,7 +122,7 @@ describe("SW-004 semantic mapping API", () => {
     const paths = (await readdir(join(dataRoot, runId))).map((name) => join(dataRoot, runId, name));
     const before = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect((await suggest(runId)).statusCode).toBe(503);
-    const current = RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    const current = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
     expect(current.mappings).toEqual([manual]);
     const after = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect(after).toEqual(before);
@@ -177,7 +177,7 @@ describe("SW-004 semantic mapping API", () => {
     const proposal = MappingSuggestionResponseSchema.parse((await suggest(runId)).json()).proposal;
     await app.inject({ method: "PATCH", url: `/api/runs/${runId}/mapping-suggestions/${proposal.suggestions[0]!.suggestionId}`, payload: { decision: "accept" } });
     expect((await suggest(runId)).statusCode).toBe(503);
-    const current = RunViewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    const current = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
     expect(current.mappings).toHaveLength(1);
   });
 });
