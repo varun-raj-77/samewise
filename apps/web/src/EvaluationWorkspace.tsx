@@ -154,7 +154,9 @@ export function EvaluationWorkspace({ runId, initialCatalog, initialHumanEvidenc
   const selectedError = errorPage?.items.find((error) => error.id === selectedErrorId) ?? errorPage?.items[0] ?? null;
 
   return <section className="evaluation-workspace" aria-labelledby="evaluation-title">
-    <header className="evaluation-heading"><h1 id="evaluation-title">Evaluation</h1><p>Quality, regressions, and failure evidence for this matcher snapshot.</p></header>
+    <header className="evaluation-heading"><h1 id="evaluation-title">Matcher evaluation</h1><p>Quality, regressions, and failure evidence for this matcher snapshot.</p></header>
+
+    <section className="synthetic-benchmark-banner" role="note" aria-labelledby="synthetic-benchmark-title"><div><small>Evaluation boundary</small><h2 id="synthetic-benchmark-title">Synthetic benchmark — not your current reconciliation</h2></div><p>These precision, recall, and review-rate metrics come from Samewise's frozen synthetic holdout dataset with known ground truth. They are not calculated from the files in your current reconciliation.</p></section>
 
     <section className="evaluation-context" aria-labelledby="evaluated-title">
       <div><h2 id="evaluated-title">{current.fixture.name}</h2><span>{displayLabel(current.source.type)}</span><span>{current.provenance.matcherVersion.replace("explainable-matcher-", "matcher ")}</span></div>

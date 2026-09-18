@@ -37,4 +37,13 @@ describe("bounded results workspace", () => {
     expect(await screen.findByRole("button", { name: /A51.*B51/ })).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("offset=50&limit=50"))).toBe(true);
   });
+
+  it("hands unresolved identity work to Review using authoritative progress", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(page(0, "A1")), { status: 200, headers: { "Content-Type": "application/json" } })));
+    const onOpenReview = vi.fn();
+    render(<ResultsWorkspace run={{ ...run, reviewProgress: { total: 3, reviewed: 1, remaining: 1, deferred: 1 } }} onReview={vi.fn()} onResolution={vi.fn()} onOpenReview={onOpenReview} onExport={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "2 identity decisions need review" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review uncertain matches" }));
+    expect(onOpenReview).toHaveBeenCalledOnce();
+  });
 });

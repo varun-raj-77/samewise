@@ -16,6 +16,7 @@ interface Props {
   onRun: (run: RunSummary) => void;
   onBusy: (busy: boolean) => void;
   onError: (message: string | null) => void;
+  onReview: () => void;
   onBack: () => void;
   onContinue: () => void;
 }
@@ -25,8 +26,10 @@ async function apiError(response: Response): Promise<Error> {
   return new Error(payload?.error?.message ?? "Samewise could not complete that request.");
 }
 
-export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBack, onContinue }: Props) {
+export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onReview, onBack, onContinue }: Props) {
   const comparisonMappings = run.mappings.filter((mapping) => mapping.role === "comparison");
+  const unresolvedIdentity = run.reviewProgress.remaining + run.reviewProgress.deferred;
+  const shouldLoadConflicts = unresolvedIdentity === 0 && comparisonMappings.length > 0 && run.conflictSummary.total > 0;
   const [semanticField, setSemanticField] = useState(comparisonMappings[0]?.mappingId ?? "");
   const existingRule = run.survivorshipPolicy?.fieldPolicies.find((rule) => rule.semanticField === semanticField);
   const [strategy, setStrategy] = useState<RuleStrategy>(existingRule?.strategy ?? "prefer_non_null");
@@ -41,6 +44,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
   const [conflictRequestVersion, setConflictRequestVersion] = useState(0);
 
   useEffect(() => {
+    if (!shouldLoadConflicts) { setConflictPage(null); setConflictError(null); return; }
     let active = true;
     setConflictError(null);
     void fetch(`/api/runs/${encodeURIComponent(run.runId)}/conflicts?offset=${offset}&limit=50`)
@@ -51,7 +55,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
       .then((loaded) => { if (active) setConflictPage(loaded); })
       .catch((error) => { if (active) setConflictError(error instanceof Error ? error.message : "Field conflicts could not be loaded."); });
     return () => { active = false; };
-  }, [run.runId, run.conflictSummary, offset, conflictRequestVersion]);
+  }, [run.runId, run.conflictSummary, offset, conflictRequestVersion, shouldLoadConflicts]);
 
   async function runRequest(work: () => Promise<RunSummary>, message: string) {
     onBusy(true); onError(null);
@@ -145,6 +149,27 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
     } finally { onBusy(false); }
   }
 
+  if (unresolvedIdentity > 0) return <EmptyResolutionState
+    title="Identity review isn't finished"
+    description={`${unresolvedIdentity} candidate${unresolvedIdentity === 1 ? "" : "s"} still need${unresolvedIdentity === 1 ? "s" : ""} a SAME or DIFFERENT decision before field conflicts can be resolved.`}
+    action="Go to Review identity"
+    onAction={onReview}
+    onBack={onBack}
+  />;
+
+  if (comparisonMappings.length === 0) return <EmptyResolutionState
+    title="No comparison fields were configured"
+    description="Identity is confirmed, but no post-identity comparison mappings were accepted, so there are no conflicting values to resolve. Start a new reconciliation to configure comparison fields without rewriting this completed run."
+    onBack={onBack}
+  />;
+
+  if (run.conflictSummary.total === 0) return <EmptyResolutionState
+    title="No conflicting values need resolution"
+    description="Identity is confirmed and comparison fields are configured. Samewise found no differing values across those fields for confirmed identities."
+    onBack={onBack}
+    onContinue={onContinue}
+  />;
+
   return <section aria-labelledby="resolution-title" className="survivorship-workspace">
     <p className="eyebrow">Step 6 · Survivorship</p>
     <h1 id="resolution-title">Identity is settled. Values are not.</h1>
@@ -181,9 +206,18 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onBac
           <div className="conflict-footer"><button className="secondary" aria-pressed={resolution?.strategy === "keep_both"} disabled={busy} onClick={() => void manual(conflict.conflictId, "keep_both", Boolean(resolution))}>Keep both</button>{resolution && <button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button>}</div>
           {resolution && <div className="provenance"><strong>Why this value won</strong><p>{resolution.reason}</p><small>{resolution.chosenSource ? `Selected Dataset ${resolution.chosenSource}` : "Both source values retained in dedicated A/B output columns"} · {resolution.policyVersion ?? "manual action"} · {new Date(resolution.resolvedAt).toLocaleString()}</small>{conflict.resolutionHistory.length > 0 && <small>{conflict.resolutionHistory.length} prior resolution{conflict.resolutionHistory.length === 1 ? "" : "s"} retained.</small>}</div>}
         </article>;
-      }) : conflictPage && <p className="empty">No field conflicts are available. Confirm a same-entity review candidate first.</p>}
+      }) : conflictPage && <p className="empty">No field conflicts are available on this page.</p>}
       {conflictPage && <div className="actions" aria-label="Conflict pagination"><button type="button" className="secondary" disabled={conflictPage.page.previousOffset === null} onClick={() => setOffset(conflictPage.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={conflictPage.page.nextOffset === null} onClick={() => setOffset(conflictPage.page.nextOffset ?? offset)}>Next</button></div>}
     </div>
     <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button><button className="primary" onClick={onContinue}>Continue to exports</button></div>
+  </section>;
+}
+
+function EmptyResolutionState({ title, description, action, onAction, onBack, onContinue }: { title: string; description: string; action?: string; onAction?: () => void; onBack: () => void; onContinue?: () => void }) {
+  return <section aria-labelledby="resolution-title" className="survivorship-workspace">
+    <p className="eyebrow">Step 6 · Survivorship</p>
+    <h1 id="resolution-title">Resolve field conflicts.</h1>
+    <section className="resolution-empty-state" aria-labelledby="resolution-state-title"><span aria-hidden="true">—</span><div><h2 id="resolution-state-title">{title}</h2><p>{description}</p></div></section>
+    <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button>{action && onAction && <button className="primary" onClick={onAction}>{action}</button>}{onContinue && <button className="primary" onClick={onContinue}>Continue to exports</button>}</div>
   </section>;
 }

@@ -22,6 +22,13 @@
 .proposal-note,
 .unmapped-note { margin: 0; padding: 13px 20px; color: var(--text-muted); font-size: 12px; }
 .mapping-notice { margin: 15px 20px; padding: 13px; border: 1px solid rgba(245,158,11,.35); border-radius: 7px; background: rgba(245,158,11,.08); color: var(--semantic-warning); }
+.mapping-guidance { margin: -8px 0 22px; padding: 14px 16px; border-left: 3px solid var(--accent-primary); border-radius: 8px; background: var(--accent-soft); }
+.mapping-guidance > strong { display: block; }
+.mapping-guidance > p { margin: 5px 0 13px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.mapping-guidance dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.mapping-guidance dl > div { padding: 10px 12px; border: 1px solid rgba(59,130,246,.18); border-radius: 7px; background: rgba(15,23,42,.3); }
+.mapping-guidance dt { color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.mapping-guidance dd { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
 .suggestion-list { display: grid; gap: 10px; padding: 0 20px 20px; }
 .suggestion-card { padding: 16px; border: 1px solid var(--border-subtle); border-left: 3px solid var(--semantic-warning); border-radius: 9px; background: var(--surface-2); }
 .suggestion-card.accepted,
@@ -48,6 +55,7 @@
 
 @media (max-width: 900px) {
   .suggestion-review { grid-template-columns: 1fr; }
+  .mapping-guidance dl { grid-template-columns: 1fr; }
   .ai-mapping-panel > header,
   .manual-heading { align-items: flex-start; gap: 14px; flex-direction: column; }
   .manual-heading p { text-align: left; }

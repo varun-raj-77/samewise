@@ -47,7 +47,7 @@ function renderWorkspace(catalogOverride = catalog) {
 describe("SW-009 evaluation workspace", () => {
   it("opens on Overview with the four primary metrics and compact quality evidence", () => {
     renderWorkspace();
-    expect(screen.getByRole("heading", { name: "Evaluation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Matcher evaluation" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("organizations-matcher-holdout-1200-v1")).toBeInTheDocument();
     expect(screen.getByText("All quality gates pass")).toBeInTheDocument();
@@ -59,6 +59,13 @@ describe("SW-009 evaluation workspace", () => {
     expect(screen.queryByRole("heading", { name: "Version comparison" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Threshold analysis" })).not.toBeInTheDocument();
     expect(screen.queryByText(/overall accuracy/i)).not.toBeInTheDocument();
+  });
+
+  it("makes the frozen synthetic benchmark boundary explicit", () => {
+    renderWorkspace();
+    const banner = screen.getByRole("note", { name: "Synthetic benchmark — not your current reconciliation" });
+    expect(banner).toHaveTextContent("frozen synthetic holdout dataset with known ground truth");
+    expect(banner).toHaveTextContent("not calculated from the files in your current reconciliation");
   });
 
   it("keeps benchmark metadata, secondary metrics, and gate rows in accessible disclosures", () => {

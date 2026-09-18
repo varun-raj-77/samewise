@@ -25,6 +25,7 @@ export function ResultsWorkspace({ run, onReview, onResolution, onOpenReview, on
   const [page, setPage] = useState<ResultsPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
+  const unresolvedReviewCount = run.reviewProgress.remaining + run.reviewProgress.deferred;
 
   useEffect(() => {
     let active = true;
@@ -40,6 +41,7 @@ export function ResultsWorkspace({ run, onReview, onResolution, onOpenReview, on
     <p className="eyebrow">Step 4 · Explainable matcher</p>
     <h1 id="results-title">Evidence first, uncertainty visible.</h1>
     <p className="lede">Match scores are deterministic evidence scores, not probabilities. Auto-matches remain system proposals; review and human confirmation stay distinct. Only B means no identity link is established, even when the row appears as an alternative.</p>
+    {unresolvedReviewCount > 0 && <aside className="review-handoff" aria-labelledby="review-handoff-title"><div><small>Identity review required</small><h2 id="review-handoff-title">{unresolvedReviewCount} identity decision{unresolvedReviewCount === 1 ? "" : "s"} need{unresolvedReviewCount === 1 ? "s" : ""} review</h2><p>Resolve uncertain identities before trusted output can be prepared.</p></div><button className="primary" onClick={onOpenReview}>Review uncertain matches</button></aside>}
     <div className="summary-grid"><Metric label="Matched" value={run.summary?.matched ?? 0} /><Metric label="Needs review" value={run.summary?.needsReview ?? 0} accent /><Metric label="Only A" value={run.summary?.onlyA ?? 0} /><Metric label="Only B" value={run.summary?.onlyB ?? 0} /></div>
     <div className="result-list">
       <div className="review-queue-heading"><h2>Bounded results</h2><span>{page ? `${page.page.offset + 1}–${page.page.offset + page.page.returned} / ${page.page.total}` : "Loading…"}</span></div>

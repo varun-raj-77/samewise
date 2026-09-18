@@ -1,6 +1,10 @@
 .evaluation-workspace { display: grid; gap: 18px; max-width: 1180px; }
 .evaluation-heading h1 { font-size: 32px; }
 .evaluation-heading p { margin: 7px 0 0; color: var(--text-secondary); font-size: 15px; }
+.synthetic-benchmark-banner { display: grid; grid-template-columns: minmax(280px, .9fr) 1.25fr; gap: 24px; align-items: center; padding: 16px 18px; border: 1px solid rgba(59,130,246,.24); border-left: 3px solid var(--accent-primary); border-radius: 9px; background: var(--accent-soft); }
+.synthetic-benchmark-banner small { color: var(--accent-primary); font-weight: 700; }
+.synthetic-benchmark-banner h2 { margin: 4px 0 0; font-size: 18px; }
+.synthetic-benchmark-banner p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 
 .evaluation-context { padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface-1); }
 .evaluation-context > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -137,6 +141,7 @@
 }
 
 @media (max-width: 700px) {
+  .synthetic-benchmark-banner { grid-template-columns: 1fr; gap: 8px; }
   .evaluation-tabs { gap: 14px; overflow-x: auto; }
   .evaluation-pipeline { grid-template-columns: 1fr; }
   .evaluation-pipeline li:not(:last-child)::after { content: "↓"; top: auto; right: 50%; bottom: -7px; }

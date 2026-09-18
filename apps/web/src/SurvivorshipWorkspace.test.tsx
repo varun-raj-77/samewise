@@ -14,12 +14,36 @@ const page = (item: ConflictProjectionItem = conflict) => ({ contractVersion: "1
 
 function Harness({ initial = run() }: { initial?: RunSummary }) {
   const [value, setValue] = useState(initial);
-  return <SurvivorshipWorkspace run={value} busy={false} onRun={setValue} onBusy={() => undefined} onError={() => undefined} onBack={() => undefined} onContinue={() => undefined} />;
+  return <SurvivorshipWorkspace run={value} busy={false} onRun={setValue} onBusy={() => undefined} onError={() => undefined} onReview={() => undefined} onBack={() => undefined} onContinue={() => undefined} />;
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("bounded survivorship workspace", () => {
+  it("distinguishes unresolved identity and links back to identity review", () => {
+    const onReview = vi.fn();
+    const unresolved = run({ reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["identity"] }, conflictSummary: { total: 0, resolved: 0, unresolved: 0 } });
+    render(<SurvivorshipWorkspace run={unresolved} busy={false} onRun={vi.fn()} onBusy={vi.fn()} onError={vi.fn()} onReview={onReview} onBack={vi.fn()} onContinue={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Identity review isn't finished" })).toBeInTheDocument();
+    expect(screen.getByText(/1 candidate still needs a SAME or DIFFERENT decision/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Review identity" }));
+    expect(onReview).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes a run with no comparison mappings", () => {
+    render(<Harness initial={run({ mappings: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", role: "identity", normalizer: "text" }], conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} />);
+    expect(screen.getByRole("heading", { name: "No comparison fields were configured" })).toBeInTheDocument();
+    expect(screen.getByText(/Start a new reconciliation to configure comparison fields/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Map fields/ })).not.toBeInTheDocument();
+  });
+
+  it("distinguishes configured comparison fields whose values do not conflict", () => {
+    render(<Harness initial={run({ conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} />);
+    expect(screen.getByRole("heading", { name: "No conflicting values need resolution" })).toBeInTheDocument();
+    expect(screen.getByText(/found no differing values/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue to exports" })).toBeEnabled();
+  });
+
   it("loads a bounded conflict page and keeps manual resolution separate from identity", async () => {
     const resolution = { resolutionId: "r1", strategy: "use_b" as const, resolutionSource: "manual" as const, chosenSource: "B" as const, chosenValue: "+1 216", keptValues: [], reasonCode: "use_b", reason: "A user explicitly selected Dataset B.", policyVersion: null, ruleId: null, inputSnapshot: { aValue: "", bValue: "+1 216", aTimestamp: null, bTimestamp: null }, resolvedAt: "2026-01-01T01:00:00Z" };
     let resolved = false;

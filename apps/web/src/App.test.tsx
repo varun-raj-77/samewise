@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MappingSuggestionResponse, RunSummary, SemanticMappingProposal } from "@samewise/contracts";
@@ -59,11 +59,11 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
-  it("navigates between reconciliation and the dedicated Evaluation product", async () => {
+  it("navigates between reconciliation and the dedicated Matcher evaluation product", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App initialRun={runView()} initialScreen="results" />);
-    fireEvent.click(screen.getByRole("button", { name: "Evaluation" }));
-    expect(screen.getByRole("button", { name: "Evaluation" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Matcher evaluation" }));
+    expect(screen.getByRole("button", { name: "Matcher evaluation" })).toHaveAttribute("aria-current", "page");
     expect(document.querySelector(".workspace.evaluation-layout")).toBeInTheDocument();
     expect(await screen.findByText("offline")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reconciliation" }));
@@ -74,6 +74,56 @@ describe("Samewise vertical slice", () => {
     render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, summary: null })} initialScreen="upload" />);
     fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Choose one CSV file for Dataset A and one for Dataset B");
+  });
+
+  it("offers New reconciliation from an active run without changing the current run", () => {
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toHaveTextContent("Your current run will remain unchanged.");
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+  });
+
+  it("cancels the New reconciliation confirmation", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("confirms New reconciliation, creates a fresh run, and routes to Upload", async () => {
+    const fresh = runView({ runId: "run-2", stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["The matcher has not completed."] }, reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(fresh), { status: 201, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+    expect(await screen.findByRole("heading", { name: "Upload datasets" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/runs", { method: "POST" });
+    await waitFor(() => expect(window.location.search).not.toContain("run-1"));
+  });
+
+  it("removes Dataset A before upload", () => {
+    render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null })} initialScreen="upload" />);
+    const input = screen.getByLabelText("Dataset A CSV");
+    fireEvent.change(input, { target: { files: [new File(["id\n1"], "first-a.csv", { type: "text/csv" })] } });
+    expect(screen.getByText("first-a.csv")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Dataset A CSV" }));
+    expect(screen.queryByText("first-a.csv")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Dataset A CSV" })).not.toBeInTheDocument();
+  });
+
+  it("replaces Dataset B before upload", () => {
+    render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null })} initialScreen="upload" />);
+    const input = screen.getByLabelText("Dataset B CSV");
+    fireEvent.change(input, { target: { files: [new File(["id\n1"], "old-b.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Replace Dataset B CSV" }));
+    fireEvent.change(input, { target: { files: [new File(["id\n2"], "new-b.csv", { type: "text/csv" })] } });
+    expect(screen.queryByText("old-b.csv")).not.toBeInTheDocument();
+    expect(screen.getByText("new-b.csv")).toBeInTheDocument();
   });
 
   it("renders Python-shaped dataset profiles and limited samples", () => {
@@ -88,6 +138,14 @@ describe("Samewise vertical slice", () => {
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
     fireEvent.click(screen.getByRole("button", { name: "Save confirmed mappings & run matcher" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Add at least one identity-evidence mapping");
+  });
+
+  it("explains pending suggestions and the two mapping roles", () => {
+    render(<App initialRun={runView()} initialScreen="mapping" />);
+    expect(screen.getByText("Pending suggestions are not used.")).toBeInTheDocument();
+    expect(screen.getByText(/Rejected and pending suggestions do not affect matching or field resolution/)).toBeInTheDocument();
+    expect(screen.getByText("Used to determine whether records represent the same entity.")).toBeInTheDocument();
+    expect(screen.getByText(/Compared only after identity is confirmed/)).toBeInTheDocument();
   });
 
   it("shows AI suggestion loading, evidence, advisory confidence, and no auto-confirmation", async () => {
@@ -197,6 +255,7 @@ describe("Samewise vertical slice", () => {
 
   it("keeps the reconciliation report available while trusted merged output is blocked", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
+    expect(screen.getByRole("heading", { name: "Identity review isn't finished" })).toBeInTheDocument();
     expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Blocked");
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
@@ -211,16 +270,25 @@ describe("Samewise vertical slice", () => {
   });
 
   it("enables trusted output only after the server readiness gate passes", () => {
-    render(<App initialRun={runView({ trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
+    render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
+    expect(screen.getByRole("heading", { name: "Trusted-ready" })).toBeInTheDocument();
     expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Ready");
     expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeEnabled();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("keeps trusted output blocked with an exact unresolved field-conflict reason", () => {
-    render(<App initialRun={runView({ trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 3, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["3 comparison-field conflict(s) remain unresolved."] } })} initialScreen="export" />);
+    render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 3, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["3 comparison-field conflict(s) remain unresolved."] } })} initialScreen="export" />);
+    expect(screen.getByRole("heading", { name: "Field conflicts still need resolution" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("3 comparison-field conflict(s) remain unresolved.");
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
+  });
+
+  it("marks trusted output as identity-only when no comparison mappings were configured", () => {
+    render(<App initialRun={runView({ mappings: [mapping], reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
+    expect(screen.getByRole("heading", { name: "Identity resolved · no comparison fields configured" })).toBeInTheDocument();
+    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Ready · identity only");
+    expect(screen.getByText(/contains no reconciled comparison fields/)).toBeInTheDocument();
   });
 });
