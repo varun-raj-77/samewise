@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { ManualMappingSchema } from "./workflow.js";
 
-export const SEMANTIC_MAPPING_CONTRACT_VERSION = "1.0.0" as const;
-export const SEMANTIC_MAPPING_PROMPT_VERSION = "semantic-mapping-prompt-v1" as const;
-export const SEMANTIC_MAPPING_REQUEST_VERSION = "metadata-first-v1" as const;
+export const SEMANTIC_MAPPING_CONTRACT_VERSION = "2.0.0" as const;
+export const SEMANTIC_MAPPING_PROMPT_VERSION = "semantic-mapping-prompt-v2" as const;
+export const SEMANTIC_MAPPING_REQUEST_VERSION = "metadata-first-v2" as const;
 
 export const SemanticRelationSchema = z.enum([
   "equivalent",
@@ -41,7 +41,9 @@ export const SemanticMappingModelSuggestionSchema = z.object({
   leftColumn: z.string().min(1),
   rightColumn: z.string().min(1),
   relation: SemanticRelationSchema,
-  role: z.enum(["identity", "comparison"]),
+  useForMatching: z.boolean(),
+  includeInMerge: z.boolean(),
+  sourceSpecific: z.boolean(),
   confidence: z.number().finite().min(0).max(1),
   reason: z.string().min(1).max(300),
   normalizationHints: z.array(NormalizationHintSchema).max(5),

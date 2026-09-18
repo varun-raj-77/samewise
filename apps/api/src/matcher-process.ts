@@ -64,11 +64,16 @@ export function createMatcherRunner(): MatcherRunner {
       return DatasetProfileSchema.parse(await runPython({ operation: "profile", ...input }));
     },
     async match(input) {
+      const matcherMappings = input.mappings
+        .filter((mapping) => mapping.useForMatching)
+        .map(({ mappingId, label, aColumn, bColumn, normalizer }) => ({
+          mappingId, label, aColumn, bColumn, normalizer, role: "identity" as const,
+        }));
       return MatcherResultSchema.parse(await runPython({
         operation: "match",
         aPath: input.aPath,
         bPath: input.bPath,
-        mappings: input.mappings,
+        mappings: matcherMappings,
         candidateMode: "candidate_engine",
         matcherVersion: MATCHER_VERSION,
       }));

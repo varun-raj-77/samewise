@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ManualMappingSchema } from "./workflow.js";
+import { LegacyManualMappingSchema, ManualMappingSchema } from "./workflow.js";
 import { FieldPolicySchema } from "./survivorship.js";
 
 export const RECONCILIATION_EXPORT_VERSION = "reconciliation-export-v3.0.0" as const;
@@ -48,7 +48,7 @@ export const RunManifestSchema = z.object({
   }).strict(),
   semanticMapping: z.object({
     mappingVersion: z.string().min(1),
-    confirmedMappings: z.array(ManualMappingSchema),
+    confirmedMappings: z.array(z.union([ManualMappingSchema, LegacyManualMappingSchema])),
     ai: z.object({
       provider: z.string().min(1), model: z.string().min(1), promptVersion: z.string().min(1),
       structuredOutputSchemaVersion: z.string().min(1), requestVersion: z.string().min(1), responseId: z.string().min(1),

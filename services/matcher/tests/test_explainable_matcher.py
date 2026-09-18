@@ -242,6 +242,56 @@ def test_strong_multi_field_agreement_beats_weak_and_hard_negative() -> None:
     assert hard_score.strongContradiction
 
 
+def test_same_name_different_phone_never_auto_matches(tmp_path: Path) -> None:
+    a_path, b_path = tmp_path / "a.csv", tmp_path / "b.csv"
+    _write(a_path, "id,name,phone\nA1,Varun,2165551111\n")
+    _write(b_path, "id,name,phone\nB1,Varun,4405559999\n")
+    result = match_csvs_explainable(
+        a_path,
+        b_path,
+        [mapping("name"), mapping("phone", normalizer="phone")],
+        candidate_mode="all_pairs",
+    )
+    assert len(result.candidates) == 1
+    candidate = result.candidates[0]
+    assert candidate.band == "needs_review"
+    assert candidate.strongContradiction
+    phone = next(item for item in candidate.evidence if item.mappingId == "phone")
+    assert phone.evidenceClass == "conflict"
+
+
+def test_multi_field_agreement_keeps_phone_contradiction_visible(
+    tmp_path: Path,
+) -> None:
+    a_path, b_path = tmp_path / "a.csv", tmp_path / "b.csv"
+    _write(
+        a_path,
+        "id,name,phone,email,address\n"
+        "A1,Varun,2165551111,varun@example.com,123 Main St\n",
+    )
+    _write(
+        b_path,
+        "id,name,phone,email,address\n"
+        "B1,Varun,4405559999,varun@example.com,123 Main Street\n",
+    )
+    result = match_csvs_explainable(
+        a_path,
+        b_path,
+        [
+            mapping("name"),
+            mapping("phone", normalizer="phone"),
+            mapping("email", normalizer="email"),
+            mapping("address"),
+        ],
+        candidate_mode="all_pairs",
+    )
+    candidate = result.candidates[0]
+    assert candidate.band == "needs_review"
+    assert candidate.strongContradiction
+    phone = next(item for item in candidate.evidence if item.mappingId == "phone")
+    assert phone.conflictContribution > 0
+
+
 def _write(path: Path, value: str) -> None:
     path.write_text(value, encoding="utf-8")
 

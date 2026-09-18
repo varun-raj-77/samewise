@@ -4,6 +4,7 @@ import { basename, extname, resolve } from "node:path";
 
 import {
   EXPORT_SNAPSHOT_VERSION,
+  CONFIRMED_MAPPINGS_VERSION,
   MATCHER_VERSION,
   RECONCILIATION_EXPORT_VERSION,
   RUN_MANIFEST_VERSION,
@@ -120,7 +121,7 @@ function pagination(total: number, offset: number, limit: number): Pagination {
 
 function comparisonConflicts(run: RunState, candidate: CandidatePair, decisionId: string | null, identitySource: "human" | "system_matcher"): FieldConflict[] {
   return run.mappings
-    .filter((mapping) => mapping.role === "comparison")
+    .filter((mapping) => mapping.includeInMerge)
     .filter((mapping) => candidate.aRecord[mapping.aColumn] !== candidate.bRecord[mapping.bColumn])
     .map((mapping) => ({
       conflictId: `conflict-${candidate.candidateId}-${mapping.mappingId}`,
@@ -203,8 +204,8 @@ export class WorkflowStore {
     const a = run.datasets.A?.profile;
     const b = run.datasets.B?.profile;
     if (!a || !b) throw new WorkflowError("datasets_required", "Upload both datasets before mapping columns.");
-    if (!mappings.some((mapping) => mapping.role === "identity")) {
-      throw new WorkflowError("identity_mapping_required", "Add at least one identity-evidence mapping.");
+    if (!mappings.some((mapping) => mapping.useForMatching)) {
+      throw new WorkflowError("matching_mapping_required", "Choose at least one field Samewise can use to look for the same record.");
     }
     const aColumns = new Set(a.columns.map((column) => column.name));
     const bColumns = new Set(b.columns.map((column) => column.name));
@@ -320,8 +321,9 @@ export class WorkflowStore {
       label: suggestion.leftColumn.replaceAll("_", " "),
       aColumn: suggestion.leftColumn,
       bColumn: suggestion.rightColumn,
-      role: suggestion.role,
       normalizer,
+      useForMatching: suggestion.useForMatching,
+      includeInMerge: suggestion.includeInMerge,
     };
   }
 
@@ -347,13 +349,13 @@ export class WorkflowStore {
 
   async match(runId: string): Promise<RunSummary> {
     const run = this.requireRun(runId);
-    if (!run.datasets.A || !run.datasets.B || !run.mappings.some((mapping) => mapping.role === "identity")) {
-      throw new WorkflowError("run_not_ready", "Both datasets and an identity mapping are required.");
+    if (!run.datasets.A || !run.datasets.B || !run.mappings.some((mapping) => mapping.useForMatching)) {
+      throw new WorkflowError("run_not_ready", "Both datasets and at least one matching field are required.");
     }
     run.result = await this.matcher.match({
       aPath: run.datasets.A.path,
       bPath: run.datasets.B.path,
-      mappings: run.mappings,
+      mappings: run.mappings.filter((mapping) => mapping.useForMatching),
     });
     run.decisions.clear();
     run.conflicts.clear();
@@ -605,7 +607,7 @@ export class WorkflowStore {
     for (const row of result.onlyA) {
       items.push({
         aRowId: row.rowId,
-        aIdentity: Object.fromEntries(run.mappings.filter((mapping) => mapping.role === "identity").map((mapping) => [mapping.aColumn, row.record[mapping.aColumn] ?? ""])),
+        aIdentity: Object.fromEntries(run.mappings.filter((mapping) => mapping.useForMatching).map((mapping) => [mapping.aColumn, row.record[mapping.aColumn] ?? ""])),
         status: "unmatched",
         topCandidate: null,
         topBIdentity: null,
@@ -744,7 +746,7 @@ export class WorkflowStore {
 
   private identityRecord(run: RunState, candidate: CandidatePair, side: DatasetSide): Record<string, string> {
     return Object.fromEntries(run.mappings
-      .filter((mapping) => mapping.role === "identity")
+      .filter((mapping) => mapping.useForMatching)
       .map((mapping) => {
         const column = side === "A" ? mapping.aColumn : mapping.bColumn;
         const record = side === "A" ? candidate.aRecord : candidate.bRecord;
@@ -826,6 +828,25 @@ export class WorkflowStore {
   private summaryView(run: RunState): RunSummary {
     const view = this.view(run);
     const resolved = view.conflicts.filter((conflict) => conflict.resolution !== null).length;
+    const manualDecisions = view.conflicts.filter((conflict) =>
+      conflict.resolution !== null && conflict.resolution.policyVersion === null,
+    ).length;
+    const preservedBoth = view.conflicts.filter((conflict) =>
+      conflict.resolution?.strategy === "keep_both",
+    ).length;
+    const fields = view.mappings.filter((mapping) => mapping.includeInMerge).slice(0, 200).map((mapping) => {
+      const conflicts = view.conflicts.filter((conflict) => conflict.mappingId === mapping.mappingId);
+      const fieldResolved = conflicts.filter((conflict) => conflict.resolution !== null).length;
+      const policy = view.survivorshipPolicy?.fieldPolicies.find((item) => item.semanticField === mapping.mappingId);
+      return {
+        mappingId: mapping.mappingId,
+        label: mapping.label,
+        total: conflicts.length,
+        resolved: fieldResolved,
+        unresolved: conflicts.length - fieldResolved,
+        currentPolicy: policy?.strategy ?? null,
+      };
+    });
     return {
       contractVersion: view.contractVersion,
       projectionVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
@@ -846,6 +867,9 @@ export class WorkflowStore {
         total: view.conflicts.length,
         resolved,
         unresolved: view.conflicts.length - resolved,
+        manualDecisions,
+        preservedBoth,
+        fields,
       },
     };
   }
@@ -916,7 +940,7 @@ export class WorkflowStore {
         ...(run.datasets.B ? { B: run.datasets.B.profile } : {}),
       },
       mappings: run.mappings,
-      mappingVersion: "confirmed-mappings-v1",
+      mappingVersion: CONFIRMED_MAPPINGS_VERSION,
       semanticMappingProvenance: run.mappingProposal?.provenance ?? null,
       matcherVersion: result?.matcherVersion ?? null,
       matcherProvenance: result ? {
@@ -1090,7 +1114,7 @@ function appendIdentityNotApplicable(row: string[], comparisonCount: number, sta
 
 export function exportRun(view: RunView): string {
   if (!view.summary || !view.matcherVersion) throw new WorkflowError("run_not_matched", "Run the matcher before exporting.");
-  const comparisonMappings = view.mappings.filter((mapping) => mapping.role === "comparison");
+  const comparisonMappings = view.mappings.filter((mapping) => mapping.includeInMerge);
   const headers = [
     "a_row_id", "b_row_id", "identity_status", "identity_decision_source", "identity_decision_id", "identity_decided_at", "review_state",
     "candidate_id", "match_score", "collision", "matcher_version", "candidate_engine_version", "mapping_version", "source_a_sha256", "source_b_sha256",
@@ -1176,7 +1200,7 @@ export function exportTrustedRun(view: RunView): string {
   if (!view.trustedExportReadiness.ready) {
     throw new WorkflowError("trusted_export_not_ready", `Trusted merged output is blocked: ${view.trustedExportReadiness.blockers.join(" ")}`, 409);
   }
-  const comparisonMappings = view.mappings.filter((mapping) => mapping.role === "comparison");
+  const comparisonMappings = view.mappings.filter((mapping) => mapping.includeInMerge);
   const headers = [
     "entity_provenance", "a_row_id", "b_row_id", "identity_source", "identity_decision_id", "mapping_version", "source_a_sha256", "source_b_sha256",
     "candidate_engine_version", "matcher_version", "survivorship_policy_version", "export_version",

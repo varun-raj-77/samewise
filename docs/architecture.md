@@ -6,7 +6,22 @@ Samewise begins with three executable surfaces and one shared contract package. 
 
 ### `apps/web`
 
-The React/Vite application owns a seven-step upload-to-export workflow. It validates compact API projections and semantic-mapping responses at runtime and depends on the shared contract package rather than API implementation details. Mapping suggestions have visible pending, accepted, rejected, or edited state; only confirmed mappings reach matching. Identity review and field resolution remain separate screens and actions. The review workspace keeps a `RunSummary`, one bounded `ReviewQueuePage`, and the selected `CandidateEvidenceDetail`; selection, candidate switching, filters, focus, and panel expansion stay in local React state. Its detail cache is capped at ten entries, and its fixed-height queue window renders only the visible range plus overscan. A separate survivorship workspace consumes bounded conflict pages and owns manual actions, policy configuration, read-only preview, explicit bulk application, provenance, and trusted-export readiness; it exposes no identity controls.
+The React/Vite application presents five user jobs: Upload files, Match setup,
+Review matches, Merge values, and Export. File profile and complete result browsing
+are subordinate views; matcher evaluation is under Advanced → Matching quality.
+The browser validates compact API projections and semantic-mapping responses at
+runtime and depends on the shared contract package rather than API implementation
+details. Mapping suggestions have visible pending, accepted, rejected, or edited
+state; only human-confirmed mappings reach matching. Identity review and field
+resolution remain separate screens and actions. The review workspace keeps a
+`RunSummary`, one bounded `ReviewQueuePage`, and the selected
+`CandidateEvidenceDetail`; selection, candidate switching, filters, focus, and
+panel expansion stay in local React state. Its detail cache is capped at ten
+entries, and its fixed-height queue window renders only the visible range plus
+overscan. A separate merge-values workspace consumes bounded conflict pages and
+the per-field aggregates in `RunSummary`; it owns manual actions, policy
+configuration, read-only preview, explicit bulk application, provenance, and
+export readiness, and exposes no identity controls.
 
 Evaluation is a separate navigation area. It consumes validated immutable snapshots
 and paged error evidence through dedicated APIs; it does not import fixture truth or
@@ -27,7 +42,16 @@ Dedicated evaluation routes validate and cache checked-in catalog metadata and l
 error pages separately. They are not a truth service for ordinary uploaded runs.
 The API can create and match normal runs when evaluation artifacts are unavailable.
 
-Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v1` input from its authoritative profiles using only column name, inferred type, null rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs, canonical entities, schema truth, identity truth, and corruption provenance. The API uses a versioned developer prompt and strict structured output, then independently validates referenced columns, enums, confidence, allowlisted hints, duplicates, and mapping/unmapped consistency. Provider failures do not mutate proposals or confirmed mappings.
+Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v2`
+input from its authoritative profiles using only column name, inferred type, null
+rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs,
+canonical entities, schema truth, identity truth, and corruption provenance. The
+API uses a versioned developer prompt and strict structured output for column
+correspondence, independent matching/merge recommendations, and source-specific
+metadata advice, then independently validates referenced columns, enums,
+confidence, allowlisted hints, duplicates, and mapping/unmapped consistency.
+Provider failures do not mutate proposals or confirmed mappings, and the manual
+v2 setup remains usable.
 
 Uploaded source bytes are saved once under generated names in ignored `.samewise-data/<run-id>/` directories and fingerprinted with SHA-256. Original filenames are metadata only and never become filesystem paths. Source bytes are not rewritten by mapping, matching, review, resolution, or export. This is local development artifact handling, not an object-storage design.
 
@@ -58,8 +82,10 @@ command and deterministic fixture tooling. It does not run an HTTP server.
 
 Node invokes `samewise-matcher process` as a short-lived subprocess and sends one versioned JSON request over stdin. Python validates the request with Pydantic and emits one validated JSON profile or matcher result over stdout. Filesystem paths cross only this internal Node/Python boundary and are not returned to the browser.
 
-The candidate engine receives visible records, confirmed `ManualMapping` values,
-and versioned candidate config only. It does not receive OpenAI provenance, pending
+The candidate engine receives visible records and only confirmed v2 mappings whose
+`useForMatching` flag is true. The Node subprocess boundary adapts those mappings
+to the matcher's unchanged v1 identity-mapping request. It also receives versioned
+candidate config, but not OpenAI provenance, pending
 or rejected suggestions, reasons, confidence, normalization hints, canonical IDs,
 identity truth, corruption provenance, schema truth, or hard-negative labels. It
 never asks a model whether rows are the same entity.
@@ -78,7 +104,7 @@ within location and address-number context. The change was selected from repeate
 miss patterns, not individual truth IDs; bucket limits are unchanged. Version 0.1
 configuration and reports remain available for direct comparison.
 
-The scorer consumes the same visible rows plus confirmed identity mappings. It emits
+The scorer consumes the same visible rows plus the adapted matching mappings. It emits
 field-kind-specific normalized features, explicit agreement/conflict/missing classes,
 weights, positive and conflict contributions, and deterministic explanation codes.
 Its denominator is the total configured identity weight, so missing values cannot
@@ -114,7 +140,11 @@ repository's versioning rule requires synchronized representations rather than a
 new schema path for every internal iteration. SW-006 updated the canonical schema,
 Zod, Pydantic, examples/fixtures, and tests together. The current `workflow/1.0.0`
 path is therefore intentionally retained until an external compatibility policy is
-adopted; it must not be described as a stable public API.
+adopted; it must not be described as a stable public API. New product runs emit
+`confirmed-mappings-v2`, in which correspondence, `useForMatching`, and
+`includeInMerge` are independent. Historical v1 role-based mappings remain valid
+in historical examples/manifests and are normalized through an explicit adapter
+when a current reader needs the new representation.
 
 ## Dependency and process boundaries
 
@@ -125,7 +155,7 @@ Browser (apps/web) --validated HTTP--> Node API (apps/api)
 
 Browser --request suggestions--> Fastify --metadata-only structured request--> OpenAI
 Browser <--validated proposal---- Fastify <--strict structured output----------+
-Human accept/remap --> confirmed ManualMapping --> Python matcher
+Human accept/remap --> confirmed mapping v2 --matching subset/v1 adapter--> Python matcher
 
 Node orchestration --validated JSON/stdin subprocess--> Python matcher
                                                         |
@@ -155,7 +185,15 @@ Schema-mapping evaluation compares proposed column pairs with hidden SW-002 sche
 
 ## Identity and resolution state
 
-`IdentityDecision` captures the candidate, system proposal, human decision, matcher version, evidence shown, and timestamp. A same-entity decision may create `FieldConflict` records for comparison mappings; it cannot create a `FieldResolution`. Resolution is a later manual action or explicit application of a previewed closed-enum rule. It records source, raw snapshots, reason, rule/policy version, relevant configured timestamps, and time. Prior current resolutions move into compact history on explicit replace/clear.
+`IdentityDecision` captures the candidate, system proposal, human decision, matcher
+version, evidence shown, and timestamp. A same-entity decision may create
+`FieldConflict` records for mappings whose `includeInMerge` flag is true; that flag
+is independent of `useForMatching`. Identity cannot create a `FieldResolution`.
+Resolution is a later manual action or explicit application of a previewed
+closed-enum rule. It records source, raw snapshots, reason, rule/policy version,
+relevant configured timestamps, and time. Prior current resolutions move into
+compact history on explicit replace/clear. A mapped timestamp remains eligible as
+a recency helper even when it is excluded from merged output.
 
 Policy validation and evaluation stay in Node because the matcher does not consume
 survivorship state. Saving policy is non-mutating; preview calculates every outcome

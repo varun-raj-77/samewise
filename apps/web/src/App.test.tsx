@@ -7,8 +7,8 @@ import { App } from "./App.js";
 const evidence = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name" as const, featurePipelineVersion: "feature-pipeline-v0.1.0" as const, features: [{ name: "token_similarity", value: 1 }], outcome: "similar" as const, evidenceClass: "partial_agreement" as const, weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." };
 const candidate = { candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review" as const, collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] };
 const candidateSummary = { candidateId: candidate.candidateId, bRowId: candidate.bRowId, rank: 1, matchScore: 0.72, band: "needs_review" as const, collision: false, strongContradiction: false, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement" as const, contribution: 0.72 }, strongestContradiction: null, humanDecision: null };
-const mapping = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", role: "identity" as const, normalizer: "text" as const };
-const comparison = { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", role: "comparison" as const, normalizer: "text" as const };
+const mapping = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: false, normalizer: "text" as const };
+const comparison = { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", useForMatching: false, includeInMerge: true, normalizer: "text" as const };
 
 function profile(side: "A" | "B") {
   return { contractVersion: "1.0.0" as const, datasetId: `dataset-${side}`, side, originalFilename: `${side.toLowerCase()}.csv`, sha256: side === "A" ? "a".repeat(64) : "b".repeat(64), rowCount: 1, columns: [
@@ -21,7 +21,7 @@ function runView(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "results",
     datasets: { A: profile("A"), B: profile("B") }, mappings: [mapping, comparison],
-    mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null,
+    mappingVersion: "confirmed-mappings-v2", semanticMappingProvenance: null,
     matcherVersion: "explainable-matcher-v0.2.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
     matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
     survivorshipPolicy: null,
@@ -45,29 +45,30 @@ function candidateDetail() {
 
 function proposal(overrides: Partial<SemanticMappingProposal["suggestions"][number]> = {}): SemanticMappingProposal {
   return {
-    contractVersion: "1.0.0", proposalId: "proposal-1", runId: "run-1",
-    provenance: { provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v1", schemaVersion: "1.0.0", requestVersion: "metadata-first-v1", responseId: "response-1" },
-    suggestions: [{ suggestionId: "suggestion-1", leftColumn: "name", rightColumn: "organization", relation: "equivalent", role: "identity", confidence: 0.94, reason: "Both columns appear to contain organization names.", normalizationHints: ["casefold"], status: "pending", finalMapping: null, ...overrides }],
+    contractVersion: "2.0.0", proposalId: "proposal-1", runId: "run-1",
+    provenance: { provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v2", schemaVersion: "2.0.0", requestVersion: "metadata-first-v2", responseId: "response-1" },
+    suggestions: [{ suggestionId: "suggestion-1", leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, confidence: 0.94, reason: "Both columns appear to contain organization names.", normalizationHints: ["casefold"], status: "pending", finalMapping: null, ...overrides }],
     unmappedLeft: ["status"], unmappedRight: ["status"], createdAt: "2026-08-31T12:00:00.000Z",
   };
 }
 
 function suggestionResponse(value = proposal(), confirmedMappings: MappingSuggestionResponse["confirmedMappings"] = []): MappingSuggestionResponse {
-  return { contractVersion: "1.0.0", proposal: value, confirmedMappings };
+  return { contractVersion: "2.0.0", proposal: value, confirmedMappings };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
-  it("navigates between reconciliation and the dedicated Matcher evaluation product", async () => {
+  it("navigates between reconciliation and the dedicated Matching quality product", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App initialRun={runView()} initialScreen="results" />);
-    fireEvent.click(screen.getByRole("button", { name: "Matcher evaluation" }));
-    expect(screen.getByRole("button", { name: "Matcher evaluation" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByText("Advanced"));
+    fireEvent.click(screen.getByRole("button", { name: "Matching quality" }));
+    expect(screen.getByRole("button", { name: "Matching quality" })).toHaveAttribute("aria-current", "page");
     expect(document.querySelector(".workspace.evaluation-layout")).toBeInTheDocument();
     expect(await screen.findByText("offline")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reconciliation" }));
-    expect(screen.getByRole("heading", { name: "Evidence first, uncertainty visible." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Matching complete." })).toBeInTheDocument();
   });
 
   it("validates that both CSV files are selected", () => {
@@ -106,6 +107,18 @@ describe("Samewise vertical slice", () => {
     await waitFor(() => expect(window.location.search).not.toContain("run-1"));
   });
 
+  it("remounts file inputs for a fresh run so the same files can be selected again", async () => {
+    const current = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fresh = { ...current, runId: "run-2" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(fresh), { status: 201, headers: { "Content-Type": "application/json" } })));
+    render(<App initialRun={current} initialScreen="upload" />);
+    const originalInput = screen.getByLabelText("Dataset A CSV");
+    fireEvent.change(originalInput, { target: { files: [new File(["id\n1"], "same-a.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    await waitFor(() => expect(screen.getByLabelText("Dataset A CSV")).not.toBe(originalInput));
+    expect(screen.queryByText("same-a.csv")).not.toBeInTheDocument();
+  });
+
   it("removes Dataset A before upload", () => {
     render(<App initialRun={runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null })} initialScreen="upload" />);
     const input = screen.getByLabelText("Dataset A CSV");
@@ -128,36 +141,35 @@ describe("Samewise vertical slice", () => {
 
   it("renders Python-shaped dataset profiles and limited samples", () => {
     render(<App initialRun={runView()} initialScreen="profile" />);
-    expect(screen.getByRole("heading", { name: "Know what arrived." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
     expect(screen.getByText("a.csv")).toBeInTheDocument();
     expect(screen.getAllByText("Acme")).toHaveLength(2);
     expect(screen.getAllByText(/1 rows · SHA-256/)).toHaveLength(2);
   });
 
-  it("requires an identity mapping on the manual mapping screen", () => {
+  it("blocks matching until at least one matching field is selected", () => {
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Save confirmed mappings & run matcher" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Add at least one identity-evidence mapping");
+    expect(screen.getByRole("button", { name: "Confirm setup & run matching" })).toBeDisabled();
+    expect(screen.getByText("Choose at least one field Samewise can use to look for the same record.")).toBeInTheDocument();
   });
 
-  it("explains pending suggestions and the two mapping roles", () => {
+  it("presents matching and merge participation as independent choices", () => {
     render(<App initialRun={runView()} initialScreen="mapping" />);
-    expect(screen.getByText("Pending suggestions are not used.")).toBeInTheDocument();
-    expect(screen.getByText(/Rejected and pending suggestions do not affect matching or field resolution/)).toBeInTheDocument();
-    expect(screen.getByText("Used to determine whether records represent the same entity.")).toBeInTheDocument();
-    expect(screen.getByText(/Compared only after identity is confirmed/)).toBeInTheDocument();
+    expect(screen.getByText(/A field can do both/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Use to match")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Keep in result")).toHaveLength(2);
   });
 
   it("shows AI suggestion loading, evidence, advisory confidence, and no auto-confirmation", async () => {
     let resolveFetch!: (response: Response) => void;
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { resolveFetch = resolve; })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Request AI suggestions" }));
-    expect(screen.getByText("Loading AI suggestions…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    expect(screen.getByText("Reviewing schema metadata…")).toBeInTheDocument();
     resolveFetch(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } }));
     expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
-    expect(screen.getByText("Model confidence · 94% (advisory)")).toBeInTheDocument();
-    expect(screen.getByText("pending")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Samewise found 1 corresponding fields." })).toBeInTheDocument();
+    expect(screen.getByText(/Recommendations stay inactive until you confirm them/)).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Organization name")).not.toBeInTheDocument();
   });
 
@@ -168,46 +180,41 @@ describe("Samewise vertical slice", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [acceptedMapping])), { status: 200, headers: { "Content-Type": "application/json" } })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Request AI suggestions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
-    expect(await screen.findByText("accepted")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Recommended setup added");
     expect(screen.getByLabelText("Mapping label")).toHaveValue("name");
   });
 
-  it("rejects a suggestion without adding a mapping", async () => {
-    const rejectedProposal = proposal({ status: "rejected" });
-    vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(rejectedProposal)), { status: 200, headers: { "Content-Type": "application/json" } })));
+  it("keeps manual setup available without accepting a recommendation", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Request AI suggestions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
-    expect(await screen.findByText("rejected")).toBeInTheDocument();
-    expect(screen.getByText("Add mappings the assistant missed, change any confirmed role, or continue entirely without AI.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    await screen.findByRole("button", { name: "Use recommended setup" });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add manual mapping" }));
+    expect(screen.getByLabelText("Mapping label")).toBeInTheDocument();
   });
 
-  it("remaps to another B column and role while showing the original proposed pair", async () => {
-    const editedMapping = { mappingId: "edited", label: "name", aColumn: "name", bColumn: "status", role: "comparison" as const, normalizer: "text" as const };
-    const editedProposal = proposal({ status: "edited", finalMapping: editedMapping });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(editedProposal, [editedMapping])), { status: 200, headers: { "Content-Type": "application/json" } }));
+  it("allows a confirmed recommendation to be remapped and used in both phases", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name", includeInMerge: true };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201, headers: { "Content-Type": "application/json" } })).mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [acceptedMapping])), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Request AI suggestions" }));
-    fireEvent.change(await screen.findByLabelText("Remap name Dataset B column"), { target: { value: "status" } });
-    fireEvent.change(screen.getByLabelText("Confirmed role for name"), { target: { value: "comparison" } });
-    fireEvent.click(screen.getByRole("button", { name: "Remap" }));
-    expect(await screen.findByText("Confirmed: name ↔ status · comparison")).toBeInTheDocument();
-    expect(screen.getByText("equivalent").closest("article")).toHaveTextContent("name↔organization");
-    const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
-    expect(JSON.parse(request.body as string)).toMatchObject({ decision: "remap", finalMapping: { aColumn: "name", bColumn: "status", role: "comparison" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Recommended setup added");
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    fireEvent.change(screen.getByLabelText("Dataset B column"), { target: { value: "status" } });
+    expect(screen.getByLabelText("Use to match")).toBeChecked();
+    expect(screen.getByLabelText("Keep in result")).toBeChecked();
+    expect(screen.getByLabelText("Dataset B column")).toHaveValue("status");
   });
 
   it("keeps manual mapping available when AI is unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "ai_missing_key", message: "AI suggestions unavailable. You can continue mapping columns manually." } }), { status: 503, headers: { "Content-Type": "application/json" } })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
-    fireEvent.click(screen.getByRole("button", { name: "Request AI suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
     expect(await screen.findByRole("status")).toHaveTextContent("continue mapping columns manually");
     expect(screen.getByRole("button", { name: "+ Add manual mapping" })).toBeEnabled();
   });
@@ -220,17 +227,15 @@ describe("Samewise vertical slice", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App initialRun={runView()} initialScreen="results" />);
-    expect(screen.getByText("Matched").parentElement).toHaveTextContent("2");
-    expect(screen.getByText(/Only B means no identity link is established/)).toBeInTheDocument();
-    expect(screen.getByText("Needs review").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("Only A").parentElement).toHaveTextContent("3");
-    expect(screen.getByText("Only B").parentElement).toHaveTextContent("4");
+    expect(screen.getByText("Matched automatically").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Need your review").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("No match found in Dataset B").parentElement).toHaveTextContent("3");
+    expect(screen.getByText("No match found in Dataset A").parentElement).toHaveTextContent("4");
     fireEvent.click(await screen.findByRole("button", { name: /A1.*B1/ }));
-    expect(await screen.findByRole("heading", { name: "Are A1 and B1 the same entity?" })).toBeInTheDocument();
-    expect(screen.getByText("Selection alone never records a decision.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText("Show technical evidence")[0]!);
     expect(screen.getAllByText("0.720").length).toBeGreaterThan(0);
-    expect(screen.getByText("Strong agreement")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Feature detail and matcher explanation"));
+    fireEvent.click(screen.getAllByText("Show technical evidence")[1]!);
     expect(screen.getByText("token similarity")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/results?"))).toBe(true);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/candidates/candidate-1-1"))).toBe(true);
@@ -247,7 +252,7 @@ describe("Samewise vertical slice", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(runView({ stage: "review" })), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Resolve identity uncertainty." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Could these be the same entity?" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1");
     expect(window.location.search).toContain("run=run-1");
     expect(window.location.search).toContain("screen=review");
@@ -256,9 +261,10 @@ describe("Samewise vertical slice", () => {
   it("keeps the reconciliation report available while trusted merged output is blocked", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
     expect(screen.getByRole("heading", { name: "Identity review isn't finished" })).toBeInTheDocument();
-    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Blocked");
+    expect(screen.getByText("Reconciled data").parentElement).toHaveTextContent("Blocked");
+    fireEvent.click(screen.getByText("Audit & technical files"));
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Download provenance manifest" })).toBeEnabled();
     expect(screen.getByText("reconciliation-export-v3.0.0")).toBeInTheDocument();
     expect(screen.getByText("trusted-merged-export-v2.0.0")).toBeInTheDocument();
@@ -270,10 +276,12 @@ describe("Samewise vertical slice", () => {
   });
 
   it("enables trusted output only after the server readiness gate passes", () => {
-    render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
-    expect(screen.getByRole("heading", { name: "Trusted-ready" })).toBeInTheDocument();
-    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Ready");
-    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeEnabled();
+    render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, conflictSummary: { total: 2, resolved: 2, unresolved: 0, manualDecisions: 1, preservedBoth: 1 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
+    expect(screen.getByRole("heading", { name: "Ready to export" })).toBeInTheDocument();
+    expect(screen.getByText("Reconciled data").parentElement).toHaveTextContent("Ready");
+    expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeEnabled();
+    expect(screen.getByText(/1 matched entity · 2 differences handled · 1 manual decision · 0 unfinished decisions/)).toBeInTheDocument();
+    expect(screen.getByText("Some fields intentionally preserve both source values.")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
@@ -281,14 +289,15 @@ describe("Samewise vertical slice", () => {
     render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 3, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["3 comparison-field conflict(s) remain unresolved."] } })} initialScreen="export" />);
     expect(screen.getByRole("heading", { name: "Field conflicts still need resolution" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("3 comparison-field conflict(s) remain unresolved.");
+    fireEvent.click(screen.getByText("Audit & technical files"));
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Download trusted merged output" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeDisabled();
   });
 
-  it("marks trusted output as identity-only when no comparison mappings were configured", () => {
+  it("marks reconciled output as identity-only when no merge mappings were configured", () => {
     render(<App initialRun={runView({ mappings: [mapping], reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="export" />);
-    expect(screen.getByRole("heading", { name: "Identity resolved · no comparison fields configured" })).toBeInTheDocument();
-    expect(screen.getByText("Trusted merged output").parentElement).toHaveTextContent("Ready · identity only");
-    expect(screen.getByText(/contains no reconciled comparison fields/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Identity resolved · no merge fields configured" })).toBeInTheDocument();
+    expect(screen.getByText("Reconciled data").parentElement).toHaveTextContent("Ready · identity only");
+    expect(screen.getByText(/contains no merged business fields/)).toBeInTheDocument();
   });
 });

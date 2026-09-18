@@ -41,10 +41,11 @@ function largeReadyView(rowCount: number): RunView {
       label: "Status",
       aColumn: "status",
       bColumn: "status",
-      role: "comparison",
+      useForMatching: false,
+      includeInMerge: true,
       normalizer: "text",
     }],
-    mappingVersion: "confirmed-mappings-v1",
+    mappingVersion: "confirmed-mappings-v2",
     semanticMappingProvenance: null,
     matcherVersion: "explainable-matcher-v0.2.0",
     matcherProvenance: {

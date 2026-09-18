@@ -12,6 +12,7 @@ export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.3.0" as const;
 export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
 export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0" as const;
 export const MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0" as const;
+export const CONFIRMED_MAPPINGS_VERSION = "confirmed-mappings-v2" as const;
 
 export const DatasetSideSchema = z.enum(["A", "B"]);
 export type DatasetSide = z.infer<typeof DatasetSideSchema>;
@@ -39,7 +40,7 @@ export type DatasetProfile = z.infer<typeof DatasetProfileSchema>;
 
 export const MappingRoleSchema = z.enum(["identity", "comparison"]);
 export const NormalizerSchema = z.enum(["text", "phone", "email", "number", "date"]);
-export const ManualMappingSchema = z.object({
+export const LegacyManualMappingSchema = z.object({
   mappingId: z.string().min(1),
   label: z.string().min(1),
   aColumn: z.string().min(1),
@@ -47,7 +48,30 @@ export const ManualMappingSchema = z.object({
   role: MappingRoleSchema,
   normalizer: NormalizerSchema,
 }).strict();
+export type LegacyManualMapping = z.infer<typeof LegacyManualMappingSchema>;
+
+export const ManualMappingSchema = z.object({
+  mappingId: z.string().min(1),
+  label: z.string().min(1),
+  aColumn: z.string().min(1),
+  bColumn: z.string().min(1),
+  normalizer: NormalizerSchema,
+  useForMatching: z.boolean(),
+  includeInMerge: z.boolean(),
+}).strict();
 export type ManualMapping = z.infer<typeof ManualMappingSchema>;
+
+export function normalizeLegacyMapping(mapping: LegacyManualMapping): ManualMapping {
+  return {
+    mappingId: mapping.mappingId,
+    label: mapping.label,
+    aColumn: mapping.aColumn,
+    bColumn: mapping.bColumn,
+    normalizer: mapping.normalizer,
+    useForMatching: mapping.role === "identity",
+    includeInMerge: mapping.role === "comparison",
+  };
+}
 
 export const FieldEvidenceSchema = z.object({
   mappingId: z.string().min(1),
@@ -319,7 +343,7 @@ export const RunViewSchema = z.object({
   stage: z.enum(["upload", "profile", "mapping", "results", "review", "resolution", "export"]),
   datasets: z.object({ A: DatasetProfileSchema.optional(), B: DatasetProfileSchema.optional() }).strict(),
   mappings: z.array(ManualMappingSchema),
-  mappingVersion: z.literal("confirmed-mappings-v1"),
+  mappingVersion: z.literal(CONFIRMED_MAPPINGS_VERSION),
   semanticMappingProvenance: z.object({
     provider: z.literal("openai"),
     model: z.string().min(1),
@@ -348,6 +372,16 @@ export const ConflictSummarySchema = z.object({
   total: z.number().int().nonnegative(),
   resolved: z.number().int().nonnegative(),
   unresolved: z.number().int().nonnegative(),
+  manualDecisions: z.number().int().nonnegative().optional(),
+  preservedBoth: z.number().int().nonnegative().optional(),
+  fields: z.array(z.object({
+    mappingId: z.string().min(1),
+    label: z.string().min(1),
+    total: z.number().int().nonnegative(),
+    resolved: z.number().int().nonnegative(),
+    unresolved: z.number().int().nonnegative(),
+    currentPolicy: z.string().min(1).nullable(),
+  }).strict()).max(200).optional(),
 }).strict();
 
 export const ConflictProjectionItemSchema = FieldConflictSchema.extend({

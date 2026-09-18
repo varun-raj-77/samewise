@@ -6,7 +6,7 @@ import type { ConflictProjectionItem, RunSummary } from "@samewise/contracts";
 import { SurvivorshipWorkspace } from "./SurvivorshipWorkspace.js";
 
 function run(overrides: Partial<RunSummary> = {}): RunSummary {
-  return { contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "resolution", datasets: {}, mappings: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", role: "identity", normalizer: "text" }, { mappingId: "phone", label: "Phone", aColumn: "phone", bColumn: "phone", role: "comparison", normalizer: "phone" }, { mappingId: "updated", label: "Updated", aColumn: "updated", bColumn: "updated", role: "comparison", normalizer: "date" }], mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null, matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: {} }, summary: { matched: 1, needsReview: 0, onlyA: 0, onlyB: 0 }, survivorshipPolicy: null, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["conflict"] }, reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, reviewUndo: null, conflictSummary: { total: 1, resolved: 0, unresolved: 1 }, ...overrides };
+  return { contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "resolution", datasets: {}, mappings: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", useForMatching: true, includeInMerge: false, normalizer: "text" }, { mappingId: "phone", label: "Phone", aColumn: "phone", bColumn: "phone", useForMatching: false, includeInMerge: true, normalizer: "phone" }, { mappingId: "updated", label: "Updated", aColumn: "updated", bColumn: "updated", useForMatching: false, includeInMerge: true, normalizer: "date" }], mappingVersion: "confirmed-mappings-v2", semanticMappingProvenance: null, matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: {} }, summary: { matched: 1, needsReview: 0, onlyA: 0, onlyB: 0 }, survivorshipPolicy: null, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["conflict"] }, reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, reviewUndo: null, conflictSummary: { total: 1, resolved: 0, unresolved: 1 }, ...overrides };
 }
 
 const conflict = { conflictId: "conflict-phone", runId: "run-1", candidateId: "candidate-1", mappingId: "phone", label: "Phone", aColumn: "phone", bColumn: "phone", aValue: "", bValue: "+1 216", identityDecisionId: "decision-1", identitySource: "human" as const, status: "unresolved" as const, resolution: null, resolutionHistory: [], aRowId: "A1", bRowId: "B1" };
@@ -25,15 +25,15 @@ describe("bounded survivorship workspace", () => {
     const unresolved = run({ reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["identity"] }, conflictSummary: { total: 0, resolved: 0, unresolved: 0 } });
     render(<SurvivorshipWorkspace run={unresolved} busy={false} onRun={vi.fn()} onBusy={vi.fn()} onError={vi.fn()} onReview={onReview} onBack={vi.fn()} onContinue={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "Identity review isn't finished" })).toBeInTheDocument();
-    expect(screen.getByText(/1 candidate still needs a SAME or DIFFERENT decision/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Go to Review identity" }));
+    expect(screen.getByText(/1 possible match still needs a Same entity or Different entities decision/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Review matches" }));
     expect(onReview).toHaveBeenCalledOnce();
   });
 
   it("distinguishes a run with no comparison mappings", () => {
-    render(<Harness initial={run({ mappings: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", role: "identity", normalizer: "text" }], conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} />);
-    expect(screen.getByRole("heading", { name: "No comparison fields were configured" })).toBeInTheDocument();
-    expect(screen.getByText(/Start a new reconciliation to configure comparison fields/)).toBeInTheDocument();
+    render(<Harness initial={run({ mappings: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", useForMatching: true, includeInMerge: false, normalizer: "text" }], conflictSummary: { total: 0, resolved: 0, unresolved: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} />);
+    expect(screen.getByRole("heading", { name: "No merge fields were configured" })).toBeInTheDocument();
+    expect(screen.getByText(/no business fields were selected/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Map fields/ })).not.toBeInTheDocument();
   });
 
@@ -75,12 +75,12 @@ describe("bounded survivorship workspace", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<Harness />);
-    expect(screen.getByRole("button", { name: "Apply previewed rule" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Save policy" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Preview rule" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Preview rule" }));
+    expect(screen.getByRole("button", { name: "Apply after confirmation" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save rule" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Preview impact" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Preview impact" }));
     expect(await screen.findByText(/Preview: 1 resolvable/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Apply previewed rule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply after confirmation" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("survivorship-apply"))).toBe(true));
   });
 });

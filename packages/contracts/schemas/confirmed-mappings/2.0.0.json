@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.local/contracts/confirmed-mappings/2.0.0.json",
+  "title": "Samewise confirmed mappings v2",
+  "x-mapping-version": "confirmed-mappings-v2",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["mappingId", "label", "aColumn", "bColumn", "normalizer", "useForMatching", "includeInMerge"],
+    "properties": {
+      "mappingId": { "type": "string", "minLength": 1 },
+      "label": { "type": "string", "minLength": 1 },
+      "aColumn": { "type": "string", "minLength": 1 },
+      "bColumn": { "type": "string", "minLength": 1 },
+      "normalizer": { "enum": ["text", "phone", "email", "number", "date"] },
+      "useForMatching": { "type": "boolean" },
+      "includeInMerge": { "type": "boolean" }
+    }
+  }
+}

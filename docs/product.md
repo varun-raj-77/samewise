@@ -10,12 +10,19 @@ Drop in two messy files. Samewise determines which records refer to the same ent
 
 ## Core workflow
 
-1. Accept two source datasets without modifying them.
-2. Generate plausible cross-dataset candidates with recall as a gate.
-3. Evaluate identity evidence and surface uncertainty for human review.
-4. Record explainable, versioned identity decisions.
-5. Resolve conflicting field values as a separate survivorship step.
-6. Produce a reproducible reconciled result and evaluation evidence.
+The primary product is organized around five user jobs:
+
+1. Upload files.
+2. Set up matching.
+3. Review matches.
+4. Choose merge rules.
+5. Export.
+
+The sources remain immutable and identity remains separate from choosing surviving
+values. A mapped field may participate in both phases: `useForMatching` controls
+identity evidence and `includeInMerge` controls post-identity value comparison.
+Profiles, complete result inspection, and Matching quality are secondary surfaces,
+not peer workflow steps.
 
 The local-development vertical slice implements CSV upload, profiling, optional
 AI-assisted semantic mapping with explicit human confirmation, a first-class manual
@@ -34,7 +41,7 @@ DIFFERENT leaves other alternatives available; DEFER preserves unresolved identi
 The queue distinguishes system proposals from human confirmations and reports
 reviewed, remaining, deferred, and filtered counts from the live run.
 
-The SW-008 survivorship product starts only after an effective identity link. Raw
+The merge-values product starts only after an effective identity link. Raw
 A/B comparison values remain visible and unresolved until a manual Use A, Use B,
 or Keep Both action, or the explicit application of a previewed deterministic rule.
 Policies support conservative non-null selection, explicitly mapped recency, and
@@ -42,7 +49,7 @@ per-field trusted sources. Rule-created values retain their policy version and n
 masquerade as manual choices.
 
 The reconciliation report remains available with unresolved identity or fields.
-Trusted merged output is a separate gated CSV: all review items and relevant field
+Ready-to-export merged output is a separate gated CSV: all review items and relevant field
 conflicts must be resolved. A-only and B-only rows retain source-only provenance;
 KEEP BOTH retains dedicated source columns instead of inventing a canonical value.
 

@@ -59,6 +59,9 @@ export function validateModelOutput(raw: unknown, input: SemanticMappingModelInp
     }
     const pair = `${mapping.leftColumn}\0${mapping.rightColumn}`;
     if (pairs.has(pair)) throw new SemanticMapperError("invalid_output", "The model returned a duplicate mapping.");
+    if (mapping.sourceSpecific && (mapping.useForMatching || mapping.includeInMerge)) {
+      throw new SemanticMapperError("invalid_output", "A source-specific mapping cannot be recommended for matching or merged output.");
+    }
     pairs.add(pair);
     mappedLeft.add(mapping.leftColumn);
     mappedRight.add(mapping.rightColumn);

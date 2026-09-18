@@ -18,11 +18,12 @@ import { EvaluationWorkspace } from "./EvaluationWorkspace.js";
 import "./survivorship-workspace.css";
 
 type Screen = "upload" | "profile" | "mapping" | "results" | "review" | "resolution" | "export" | "evaluation";
-const STEPS: { id: Screen; label: string }[] = [
-  { id: "upload", label: "Upload" }, { id: "profile", label: "Profile" },
-  { id: "mapping", label: "Map fields" }, { id: "results", label: "Results" },
-  { id: "review", label: "Review identity" }, { id: "resolution", label: "Resolve fields" },
-  { id: "export", label: "Export" },
+const STEPS: { id: Screen; label: string; screens: Screen[] }[] = [
+  { id: "upload", label: "Upload", screens: ["upload", "profile"] },
+  { id: "mapping", label: "Match setup", screens: ["mapping"] },
+  { id: "review", label: "Review matches", screens: ["results", "review"] },
+  { id: "resolution", label: "Merge values", screens: ["resolution"] },
+  { id: "export", label: "Export", screens: ["export"] },
 ];
 
 interface AppProps { initialRun?: RunSummary; initialScreen?: Screen }
@@ -48,13 +49,12 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [screen, setScreen] = useState<Screen>(() => {
     if (initialScreen) return initialScreen;
     const requested = new URLSearchParams(window.location.search).get("screen");
-    return requested === "evaluation" || STEPS.some((step) => step.id === requested) ? requested as Screen : "upload";
+    return requested === "evaluation" || ["upload", "profile", "mapping", "results", "review", "resolution", "export"].includes(requested ?? "") ? requested as Screen : "upload";
   });
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
   const [draftMappings, setDraftMappings] = useState<ManualMapping[]>(initialRun?.mappings ?? []);
   const [mappingProposal, setMappingProposal] = useState<SemanticMappingProposal | null>(null);
-  const [suggestionEdits, setSuggestionEdits] = useState<Record<string, { bColumn: string; role: ManualMapping["role"] }>>({});
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionNotice, setSuggestionNotice] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
@@ -132,7 +132,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     try {
       const freshRun = await parseRun(await fetch("/api/runs", { method: "POST" }));
       setRun(freshRun); setFileA(null); setFileB(null); setDraftMappings([]);
-      setMappingProposal(null); setSuggestionEdits({}); setSuggestionNotice(null); setSelectedCandidateId(null);
+      setMappingProposal(null); setSuggestionNotice(null); setSelectedCandidateId(null);
       setScreen("upload");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "A new reconciliation could not be created.");
@@ -144,7 +144,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     const aColumn = run.datasets.A.columns.find((column) => !draftMappings.some((mapping) => mapping.aColumn === column.name))?.name ?? run.datasets.A.columns[0]?.name;
     const bColumn = run.datasets.B.columns.find((column) => !draftMappings.some((mapping) => mapping.bColumn === column.name))?.name ?? run.datasets.B.columns[0]?.name;
     if (!aColumn || !bColumn) return;
-    setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, role: "identity", normalizer: "text" }]);
+    setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, useForMatching: true, includeInMerge: true, normalizer: "text" }]);
   }
 
   async function requestSuggestions() {
@@ -154,45 +154,32 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions`, { method: "POST" }));
       setMappingProposal(response.proposal);
       setDraftMappings(response.confirmedMappings);
-      setSuggestionEdits(Object.fromEntries(response.proposal.suggestions.map((suggestion) => [
-        suggestion.suggestionId,
-        { bColumn: suggestion.rightColumn, role: suggestion.role },
-      ])));
     } catch (caught) {
       setSuggestionNotice(caught instanceof Error ? caught.message : "AI suggestions unavailable. You can continue mapping columns manually.");
     } finally { setSuggestionsLoading(false); }
   }
 
-  async function reviewSuggestion(suggestionId: string, decision: "accept" | "reject" | "remap") {
+  async function useRecommendedSetup() {
     if (!run || !mappingProposal) return;
-    const suggestion = mappingProposal.suggestions.find((item) => item.suggestionId === suggestionId);
-    if (!suggestion) return;
-    const edit = suggestionEdits[suggestionId] ?? { bColumn: suggestion.rightColumn, role: suggestion.role };
-    const finalMapping = decision === "remap" ? {
-      mappingId: `mapping-${crypto.randomUUID()}`,
-      label: suggestion.leftColumn.replaceAll("_", " "),
-      aColumn: suggestion.leftColumn,
-      bColumn: edit.bColumn,
-      role: edit.role,
-      normalizer: suggestion.normalizationHints.includes("phone_digits") ? "phone" as const : "text" as const,
-    } : undefined;
     setSuggestionsLoading(true); setSuggestionNotice(null);
     try {
-      const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, ...(finalMapping ? { finalMapping } : {}) }),
-      }));
-      setMappingProposal(response.proposal);
-      setDraftMappings(response.confirmedMappings);
+      let latest: MappingSuggestionResponse | null = null;
+      for (const suggestion of mappingProposal.suggestions.filter((item) => item.status === "pending")) {
+        latest = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestion.suggestionId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "accept" }),
+        }));
+        setMappingProposal(latest.proposal);
+        setDraftMappings(latest.confirmedMappings);
+      }
+      setSuggestionNotice("Recommended setup added. Inspect or adjust it before running matching.");
     } catch (caught) {
-      setSuggestionNotice(caught instanceof Error ? caught.message : "That suggestion decision could not be saved. Manual mapping is still available.");
+      setSuggestionNotice(caught instanceof Error ? caught.message : "The recommended setup could not be applied. Manual setup remains available.");
     } finally { setSuggestionsLoading(false); }
   }
 
   async function saveAndRun() {
     if (!run) return;
-    if (!draftMappings.some((mapping) => mapping.role === "identity")) { setError("Add at least one identity-evidence mapping."); return; }
+    if (!draftMappings.some((mapping) => mapping.useForMatching)) { setError("Choose at least one field Samewise can use to look for the same record."); return; }
     await action(async () => {
       const mapped = await parseRun(await fetch(`/api/runs/${run.runId}/mappings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mappings: draftMappings }) }));
       return parseRun(await fetch(`/api/runs/${mapped.runId}/match`, { method: "POST" }));
@@ -234,17 +221,40 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         <div className="product-nav">
           <button aria-current={screen !== "evaluation" ? "page" : undefined} onClick={() => setScreen(run?.stage ?? "upload")}><span aria-hidden="true">R</span>Reconciliation</button>
           <button ref={newRunButton} className="new-reconciliation" onClick={requestNewReconciliation} disabled={busy}><span aria-hidden="true">+</span>New reconciliation</button>
-          <button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => setScreen("evaluation")}><span aria-hidden="true">E</span>Matcher evaluation</button>
+          <details className="advanced-nav"><summary>Advanced</summary><button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => setScreen("evaluation")}><span aria-hidden="true">Q</span>Matching quality</button></details>
         </div>
-        {screen !== "evaluation" && <div className="run-navigation"><p>Current workflow</p><ol>{STEPS.map((step, index) => { const currentIndex = STEPS.findIndex((item) => item.id === screen); const state = screen === step.id ? "active" : index < currentIndex ? "complete" : "upcoming"; return <li key={step.id} className={state} aria-current={screen === step.id ? "step" : undefined}><span aria-hidden="true">{index < currentIndex ? "✓" : index + 1}</span>{step.label}</li>; })}</ol></div>}
+        {screen !== "evaluation" && <div className="run-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const currentIndex = Math.max(0, STEPS.findIndex((item) => item.screens.includes(screen))); const state = step.screens.includes(screen) ? "active" : index < currentIndex ? "complete" : "upcoming"; return <li key={step.id} className={state} aria-current={step.screens.includes(screen) ? "step" : undefined}><span aria-hidden="true">{index < currentIndex ? "✓" : index + 1}</span>{step.label}</li>; })}</ol></div>}
       </nav>
     </aside>
     <main className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
       <section className={screen === "review" ? "content review-content" : "content"}>
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
-        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p><button className="primary" onClick={requestNewReconciliation}>New reconciliation</button></section> : <section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker side="A" file={fileA} onChange={setFileA} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker side="B" file={fileB} onChange={setFileB} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section>}</section>}
-        {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">Step 2 · Source profile</p><h1 id="profile-title">Know what arrived.</h1><p className="lede">Profiles are derived in the matcher process. Samples are intentionally limited.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Map corresponding fields</button></section>}
-        {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title"><p className="eyebrow">Step 3 · Human-confirmed mapping</p><h1 id="mapping-title">Review what corresponds.</h1><p className="lede">AI may propose schema mappings from metadata only. Nothing becomes active until you accept, reject, remap, or create it manually.</p><div className="mapping-guidance" role="note"><strong>Pending suggestions are not used.</strong><p>Accept or remap a suggestion to include it in reconciliation. Rejected and pending suggestions do not affect matching or field resolution.</p><dl><div><dt>Identity evidence</dt><dd>Used to determine whether records represent the same entity.</dd></div><div><dt>Post-identity comparison</dt><dd>Compared only after identity is confirmed; differences can become field conflicts to resolve.</dd></div></dl></div><div className="ai-mapping-panel"><header><div><small>Optional assistant</small><h2>Semantic mapping suggestions</h2></div><button className="secondary" onClick={() => void requestSuggestions()} disabled={suggestionsLoading}>{mappingProposal ? "Refresh suggestions" : "Request AI suggestions"}</button></header>{suggestionsLoading && <p className="ai-loading" aria-live="polite">Loading AI suggestions…</p>}{suggestionNotice && <div className="mapping-notice" role="status">{suggestionNotice}</div>}{mappingProposal && <><p className="proposal-note">Model {mappingProposal.provenance.model} · prompt {mappingProposal.provenance.promptVersion}. Confidence is advisory.</p><div className="suggestion-list">{mappingProposal.suggestions.map((suggestion) => { const edit = suggestionEdits[suggestion.suggestionId] ?? { bColumn: suggestion.rightColumn, role: suggestion.role }; return <article className={`suggestion-card ${suggestion.status}`} key={suggestion.suggestionId}><header><div className="suggestion-pair"><strong>{suggestion.leftColumn}</strong><span>↔</span><strong>{suggestion.rightColumn}</strong></div><span className="suggestion-status">{suggestion.status}</span></header><div className="suggestion-meta"><span>{suggestion.relation.replaceAll("_", " ")}</span><span>{suggestion.role === "identity" ? "Identity evidence" : "Post-identity comparison"}</span><span>Model confidence · {Math.round(suggestion.confidence * 100)}% (advisory)</span></div><p>{suggestion.reason}</p>{suggestion.status === "pending" ? <div className="suggestion-review"><label>Remap Dataset B<select aria-label={`Remap ${suggestion.leftColumn} Dataset B column`} value={edit.bColumn} onChange={(event) => setSuggestionEdits({ ...suggestionEdits, [suggestion.suggestionId]: { ...edit, bColumn: event.target.value } })}>{run.datasets.B!.columns.map((column) => <option key={column.name}>{column.name}</option>)}</select></label><label>Confirmed role<select aria-label={`Confirmed role for ${suggestion.leftColumn}`} value={edit.role} onChange={(event) => setSuggestionEdits({ ...suggestionEdits, [suggestion.suggestionId]: { ...edit, role: event.target.value as ManualMapping["role"] } })}><option value="identity">Identity evidence</option><option value="comparison">Post-identity comparison</option></select></label><div><button className="accept" onClick={() => void reviewSuggestion(suggestion.suggestionId, "accept")}>Accept</button><button className="reject" onClick={() => void reviewSuggestion(suggestion.suggestionId, "reject")}>Reject</button><button className="remap" onClick={() => void reviewSuggestion(suggestion.suggestionId, "remap")}>Remap</button></div></div> : suggestion.finalMapping && <p className="final-mapping">Confirmed: {suggestion.finalMapping.aColumn} ↔ {suggestion.finalMapping.bColumn} · {suggestion.finalMapping.role}</p>}</article>; })}</div>{(mappingProposal.unmappedLeft.length > 0 || mappingProposal.unmappedRight.length > 0) && <p className="unmapped-note">Left unmapped: {mappingProposal.unmappedLeft.join(", ") || "none"} · Right unmapped: {mappingProposal.unmappedRight.join(", ") || "none"}</p>}</>}</div><div className="manual-heading"><div><small>Manual fallback</small><h2>Confirmed mappings</h2></div><p>Add mappings the assistant missed, change any confirmed role, or continue entirely without AI.</p></div><div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index))} />)}</div><div className="actions"><button className="secondary" onClick={addMapping}>+ Add manual mapping</button><button className="primary" onClick={() => void saveAndRun()} disabled={busy || suggestionsLoading}>Save confirmed mappings & run matcher</button></div></section>}
+        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p><button className="primary" onClick={requestNewReconciliation}>New reconciliation</button></section> : <section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker key={`${run?.runId ?? "new"}-A`} side="A" file={fileA} onChange={setFileA} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker key={`${run?.runId ?? "new"}-B`} side="B" file={fileB} onChange={setFileB} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section>}</section>}
+        {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">File details</p><h1 id="profile-title">Your files are ready.</h1><p className="lede">Review the bounded file profile, then set up how corresponding fields should be used.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Set up matching</button></section>}
+        {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title">
+          <p className="eyebrow">Step 2 · Match setup</p>
+          <h1 id="mapping-title">Set up matching.</h1>
+          <p className="lede">Choose which corresponding fields help find the same record and which business values belong in the reconciled result. A field can do both.</p>
+          <div className="ai-mapping-panel">
+            <header><div><small>Optional assistant</small><h2>{mappingProposal ? `Samewise found ${mappingProposal.suggestions.length} corresponding fields.` : "Find corresponding fields"}</h2></div><button className="secondary" onClick={() => void requestSuggestions()} disabled={suggestionsLoading}>{mappingProposal ? "Refresh recommendations" : "Get recommended setup"}</button></header>
+            {suggestionsLoading && <p className="ai-loading" aria-live="polite">Reviewing schema metadata…</p>}
+            {suggestionNotice && <div className="mapping-notice" role="status">{suggestionNotice}</div>}
+            {mappingProposal && <>
+              <p className="proposal-note">Recommendations use bounded profile metadata only. They do not inspect rows or decide identity.</p>
+              <div className="setup-table-wrap"><table className="setup-table"><thead><tr><th>Field correspondence</th><th>Use to match</th><th>Keep in result</th><th>Recommendation</th></tr></thead><tbody>{mappingProposal.suggestions.map((suggestion) => <tr key={suggestion.suggestionId}><td><strong>{suggestion.leftColumn}</strong><span> ↔ </span><strong>{suggestion.rightColumn}</strong><small>{suggestion.reason}</small></td><td>{suggestion.useForMatching ? "✓" : "—"}</td><td>{suggestion.includeInMerge ? "✓" : "—"}</td><td>{suggestion.sourceSpecific ? "Source-specific / metadata" : suggestion.relation.replaceAll("_", " ")}</td></tr>)}</tbody></table></div>
+              {mappingProposal.suggestions.some((item) => item.status === "pending") && <button className="primary recommended-setup" onClick={() => void useRecommendedSetup()} disabled={suggestionsLoading}>Use recommended setup</button>}
+              <p className="proposal-note">Model {mappingProposal.provenance.model} · {mappingProposal.provenance.promptVersion}. Recommendations stay inactive until you confirm them.</p>
+            </>}
+          </div>
+          <details className="advanced-setup" open={!mappingProposal}>
+            <summary>Advanced setup</summary>
+            <p>Pair columns manually, override recommendations, or continue here when AI is unavailable.</p>
+            <div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index))} />)}</div>
+            <button className="secondary" onClick={addMapping}>+ Add manual mapping</button>
+          </details>
+          <MatchingSafetyGuidance mappings={draftMappings} run={run} />
+          <div className="actions"><button className="primary" onClick={() => void saveAndRun()} disabled={busy || suggestionsLoading || !draftMappings.some((mapping) => mapping.useForMatching)}>Confirm setup & run matching</button></div>
+        </section>}
         {screen === "results" && run?.summary && <ResultsWorkspace run={run} onReview={review} onResolution={() => setScreen("resolution")} onOpenReview={() => setScreen("review")} onExport={() => setScreen("export")} />}
         {screen === "review" && run && <ReviewWorkspace run={run} initialCandidateId={selectedCandidateId} busy={busy} onDecision={decide} onDefer={setDeferred} onUndo={undoReview} onGoResolution={() => setScreen("resolution")} />}
         {screen === "resolution" && run && <SurvivorshipWorkspace run={run} busy={busy} onRun={setRun} onBusy={setBusy} onError={setError} onReview={() => setScreen("review")} onBack={() => setScreen("results")} onContinue={() => setScreen("export")} />}
@@ -268,26 +278,25 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
   onReview: () => void;
   onResolution: () => void;
 }) {
-  const comparisonCount = run.mappings.filter((mapping) => mapping.role === "comparison").length;
+  const comparisonCount = run.mappings.filter((mapping) => mapping.includeInMerge).length;
   const unresolvedIdentity = run.trustedExportReadiness.unresolvedIdentityCount;
   const readiness = unresolvedIdentity > 0
     ? { tone: "blocked", title: "Identity review isn't finished", detail: `${unresolvedIdentity} identity decision${unresolvedIdentity === 1 ? "" : "s"} must be resolved before trusted output is ready.` }
     : comparisonCount === 0
-      ? { tone: "informational", title: "Identity resolved · no comparison fields configured", detail: "Trusted output is ready for resolved identity and source-only records, but it contains no reconciled comparison fields." }
+      ? { tone: "informational", title: "Identity resolved · no merge fields configured", detail: "Reconciled output is ready for resolved identity and unmatched records, but it contains no merged business fields." }
       : run.trustedExportReadiness.unresolvedConflictCount > 0
         ? { tone: "blocked", title: "Field conflicts still need resolution", detail: `${run.trustedExportReadiness.unresolvedConflictCount} comparison-field conflict${run.trustedExportReadiness.unresolvedConflictCount === 1 ? "" : "s"} must be resolved before trusted output is ready.` }
-        : { tone: "ready", title: "Trusted-ready", detail: "Identity is resolved and every required comparison-field conflict has a recorded resolution." };
+        : { tone: "ready", title: "Ready to export", detail: "Identity is resolved and every surfaced merge-value difference has an explicit outcome." };
   const trustedLabel = run.trustedExportReadiness.ready ? (comparisonCount === 0 ? "Ready · identity only" : "Ready") : "Blocked";
 
   return <section aria-labelledby="export-title">
-    <p className="eyebrow">Step 7 · Reproducible artifacts</p><h1 id="export-title">Report everything. Trust only what is ready.</h1>
-    <p className="lede">The reconciliation report preserves uncertainty. Trusted merged output is gated until identity review and every relevant field conflict are resolved. The manifest records the versions and hashes that produced this snapshot.</p>
+    <p className="eyebrow">Step 5 · Export</p><h1 id="export-title">Download reconciled data.</h1>
+    <p className="lede">Ready to export means every surfaced reconciliation decision has an explicit outcome. It does not guarantee that every possible real-world match was found.</p>
     <section className={`readiness-status ${readiness.tone}`} role="note" aria-labelledby="readiness-title"><div><small>Current readiness</small><h2 id="readiness-title">{readiness.title}</h2></div><p>{readiness.detail}</p></section>
     <div className="export-run-context"><span><small>Run</small><code>{run.runId}</code></span><span><small>Dataset A</small><code>{run.datasets.A?.sha256.slice(0, 12)}…</code></span><span><small>Dataset B</small><code>{run.datasets.B?.sha256.slice(0, 12)}…</code></span></div>
     <div className="export-artifact-list">
-      <article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human identity outcomes, deferred or pending work, source-only records, and field-resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article>
-      <article className="export-artifact"><div><small>Trusted merged output</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>Contains only confirmed identities and resolved required field state. KEEP BOTH remains explicit.</p></div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !run.trustedExportReadiness.ready}>Download trusted merged output</button></article>
-      <article className="export-artifact"><div><small>Run provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher provenance, decision summaries, policies, artifact names, and SHA-256 hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article>
+      <article className="export-artifact primary-export"><div><small>Reconciled data</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>{run.trustedExportReadiness.eligibleConfirmedCount} matched {run.trustedExportReadiness.eligibleConfirmedCount === 1 ? "entity" : "entities"} · {run.conflictSummary.resolved} differences handled · {run.conflictSummary.manualDecisions ?? 0} manual {(run.conflictSummary.manualDecisions ?? 0) === 1 ? "decision" : "decisions"} · {run.conflictSummary.unresolved} unfinished decisions.</p>{(run.conflictSummary.preservedBoth ?? 0) > 0 && <p>Some fields intentionally preserve both source values.</p>}</div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !run.trustedExportReadiness.ready}>Download reconciled data</button></article>
+      <details className="audit-files"><summary>Audit & technical files</summary><article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human match outcomes, deferred work, unmatched records, and resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article><article className="export-artifact"><div><small>Provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher versions, decisions, policies, and hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article></details>
     </div>
     {!run.trustedExportReadiness.ready && <div className="warning" role="status"><strong>Trusted export blocked.</strong><ul>{run.trustedExportReadiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div>}
     <div className="actions">{unresolvedIdentity > 0 ? <button className="secondary" onClick={onReview}>Review identity</button> : run.trustedExportReadiness.unresolvedConflictCount > 0 ? <button className="secondary" onClick={onResolution}>Review unresolved conflicts</button> : <button className="secondary" onClick={onResults}>Back to results</button>}</div>
@@ -307,4 +316,19 @@ function FilePicker({ side, file, onChange }: { side: "A" | "B"; file: File | nu
   </div>;
 }
 function ProfileCard({ profile }: { profile: NonNullable<RunSummary["datasets"]["A"]> }) { return <article className="profile-card"><header><span className="dataset-badge">{profile.side}</span><div><h2>{profile.originalFilename}</h2><small>{profile.rowCount} rows · SHA-256 {profile.sha256.slice(0, 10)}…</small></div></header><div className="profile-columns">{profile.columns.map((column) => <div key={column.name}><strong>{column.name}</strong><span>{column.inferredType}</span><small>{column.nullCount} null · {column.distinctCount} distinct</small><p>{column.samples.join(" · ") || "No sample"}</p></div>)}</div></article>; }
-function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className={`mapping-row ${mapping.role}`}><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select><span>↔</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select><select aria-label="Mapping role" value={mapping.role} onChange={(event) => onChange({ ...mapping, role: event.target.value as ManualMapping["role"] })}><option value="identity">Identity evidence</option><option value="comparison">Post-identity comparison</option></select><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
+function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className="mapping-row"><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select><span>↔</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select><label className="mapping-check"><input type="checkbox" checked={mapping.useForMatching} onChange={(event) => onChange({ ...mapping, useForMatching: event.target.checked })} />Use to match</label><label className="mapping-check"><input type="checkbox" checked={mapping.includeInMerge} onChange={(event) => onChange({ ...mapping, includeInMerge: event.target.checked })} />Keep in result</label><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
+
+function MatchingSafetyGuidance({ mappings, run }: { mappings: ManualMapping[]; run: RunSummary }) {
+  const matching = mappings.filter((mapping) => mapping.useForMatching);
+  const warnings: string[] = [];
+  if (matching.length === 0) warnings.push("Choose at least one field Samewise can use to look for the same record.");
+  if (matching.length === 1 && /(^|[_\s-])name($|[_\s-])/i.test(`${matching[0]?.label} ${matching[0]?.aColumn} ${matching[0]?.bColumn}`)) warnings.push("Name alone is weak evidence. Different people or companies can share the same name. Samewise will not treat name alone as sufficient for an automatic match.");
+  else if (matching.length === 1) warnings.push("Only one matching signal is selected. Missing or conflicting values may leave records unmatched or send them to review.");
+  for (const mapping of matching) {
+    const a = run.datasets.A?.columns.find((column) => column.name === mapping.aColumn);
+    const b = run.datasets.B?.columns.find((column) => column.name === mapping.bColumn);
+    if ((a?.nullCount ?? 0) > 0 || (b?.nullCount ?? 0) > 0) warnings.push(`${mapping.label} is missing in some ${[(a?.nullCount ?? 0) > 0 ? "Dataset A" : "", (b?.nullCount ?? 0) > 0 ? "Dataset B" : ""].filter(Boolean).join(" and ")} records. Consider adding another matching field.`);
+    if (/(^|[_\s-])(record_?id|row_?id|id)($|[_\s-])/i.test(`${mapping.aColumn} ${mapping.bColumn}`)) warnings.push(`${mapping.label} looks like a source-specific row ID. Row IDs often differ between source systems.`);
+  }
+  return warnings.length ? <aside className="mapping-safety" aria-label="Matching setup guidance"><strong>{matching.length === 0 ? "Matching cannot start yet" : "Check this setup"}</strong><ul>{[...new Set(warnings)].map((warning) => <li key={warning}>{warning}</li>)}</ul></aside> : null;
+}

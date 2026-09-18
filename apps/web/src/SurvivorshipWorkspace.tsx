@@ -27,7 +27,7 @@ async function apiError(response: Response): Promise<Error> {
 }
 
 export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onReview, onBack, onContinue }: Props) {
-  const comparisonMappings = run.mappings.filter((mapping) => mapping.role === "comparison");
+  const comparisonMappings = run.mappings.filter((mapping) => mapping.includeInMerge);
   const unresolvedIdentity = run.reviewProgress.remaining + run.reviewProgress.deferred;
   const shouldLoadConflicts = unresolvedIdentity === 0 && comparisonMappings.length > 0 && run.conflictSummary.total > 0;
   const [semanticField, setSemanticField] = useState(comparisonMappings[0]?.mappingId ?? "");
@@ -151,51 +151,52 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
 
   if (unresolvedIdentity > 0) return <EmptyResolutionState
     title="Identity review isn't finished"
-    description={`${unresolvedIdentity} candidate${unresolvedIdentity === 1 ? "" : "s"} still need${unresolvedIdentity === 1 ? "s" : ""} a SAME or DIFFERENT decision before field conflicts can be resolved.`}
-    action="Go to Review identity"
+    description={`${unresolvedIdentity} possible match${unresolvedIdentity === 1 ? "" : "es"} still need${unresolvedIdentity === 1 ? "s" : ""} a Same entity or Different entities decision before merge values can be resolved.`}
+    action="Go to Review matches"
     onAction={onReview}
     onBack={onBack}
   />;
 
   if (comparisonMappings.length === 0) return <EmptyResolutionState
-    title="No comparison fields were configured"
-    description="Identity is confirmed, but no post-identity comparison mappings were accepted, so there are no conflicting values to resolve. Start a new reconciliation to configure comparison fields without rewriting this completed run."
+    title="No merge fields were configured"
+    description="Identity reconciliation can still complete, but no business fields were selected for merged-value reconciliation. Start a new reconciliation to change this confirmed setup."
     onBack={onBack}
   />;
 
   if (run.conflictSummary.total === 0) return <EmptyResolutionState
     title="No conflicting values need resolution"
-    description="Identity is confirmed and comparison fields are configured. Samewise found no differing values across those fields for confirmed identities."
+    description="Identity is confirmed and merge fields are configured. Samewise found no differing values across those fields for confirmed identities."
     onBack={onBack}
     onContinue={onContinue}
   />;
 
   return <section aria-labelledby="resolution-title" className="survivorship-workspace">
-    <p className="eyebrow">Step 6 · Survivorship</p>
-    <h1 id="resolution-title">Identity is settled. Values are not.</h1>
-    <p className="lede">Inspect source provenance, resolve deliberately, or preview a deterministic field rule before applying it. Identity evidence never chooses a value.</p>
+    <p className="eyebrow">Step 4 · Merge values</p>
+    <h1 id="resolution-title">Choose which values to keep.</h1>
+    <p className="lede">{run.conflictSummary.total} differences across {run.trustedExportReadiness.eligibleConfirmedCount} matched records. Set a rule once per field, then review only the exceptions.</p>
     <p className="sr-announcement" aria-live="polite">{announcement}</p>
     <div className="survivorship-summary" aria-label="Conflict status">
-      <div><small>Unresolved</small><strong>{run.conflictSummary.unresolved}</strong></div>
-      <div><small>Resolved</small><strong>{run.conflictSummary.resolved}</strong></div>
-      <div><small>Confirmed links</small><strong>{run.trustedExportReadiness.eligibleConfirmedCount}</strong></div>
+      <div><small>Total differences</small><strong>{run.conflictSummary.total}</strong></div>
+      <div><small>Handled by rules or decisions</small><strong>{run.conflictSummary.resolved}</strong></div>
+      <div><small>Still need attention</small><strong>{run.conflictSummary.unresolved}</strong></div>
     </div>
+    <section className="field-summary" aria-labelledby="field-summary-title"><h2 id="field-summary-title">Differences by field</h2>{(run.conflictSummary.fields ?? []).map((field) => <button type="button" key={field.mappingId} className={semanticField === field.mappingId ? "selected" : ""} onClick={() => { setSemanticField(field.mappingId); setPreview(null); }}><span><strong>{field.label}</strong><small>{field.total} differences · {field.unresolved} still need attention</small></span><b>{field.currentPolicy ? field.currentPolicy.replaceAll("_", " ") : "Rule not configured"}</b></button>)}</section>
 
     <section className="policy-panel" aria-labelledby="policy-title">
-      <header><div><small>Deterministic policy</small><h2 id="policy-title">Preview before apply</h2></div>{run.survivorshipPolicy && <code>{run.survivorshipPolicy.policyVersion}</code>}</header>
+      <header><div><small>Rule for one field</small><h2 id="policy-title">Preview impact before applying</h2></div>{run.survivorshipPolicy && <code>{run.survivorshipPolicy.policyVersion}</code>}</header>
       <div className="policy-controls">
-        <label>Comparison field<select value={semanticField} onChange={(event) => { setSemanticField(event.target.value); setPreview(null); }}>{comparisonMappings.map((mapping) => <option key={mapping.mappingId} value={mapping.mappingId}>{mapping.label}</option>)}</select></label>
+        <label>Field<select value={semanticField} onChange={(event) => { setSemanticField(event.target.value); setPreview(null); }}>{comparisonMappings.map((mapping) => <option key={mapping.mappingId} value={mapping.mappingId}>{mapping.label}</option>)}</select></label>
         <label>Rule<select value={strategy} onChange={(event) => { setStrategy(event.target.value as RuleStrategy); setPreview(null); }}>
-          <option value="prefer_non_null">Prefer non-null</option><option value="prefer_newest">Prefer newest</option><option value="prefer_trusted_source">Prefer trusted source</option><option value="keep_both">Keep both</option>
+          <option value="prefer_non_null">Use the value that exists</option><option value="prefer_newest">Use the most recently updated value</option><option value="prefer_trusted_source">Prefer a dataset when available</option><option value="keep_both">Preserve both values</option>
         </select></label>
         {strategy === "prefer_trusted_source" && <label>Trusted source<select value={trustedSource} onChange={(event) => setTrustedSource(event.target.value as "A" | "B")}><option value="A">Dataset A</option><option value="B">Dataset B</option></select></label>}
         {strategy === "prefer_newest" && <label>Timestamp mapping<select value={timestampMappingId} onChange={(event) => setTimestampMappingId(event.target.value)}><option value="">Choose mapped date</option>{dateMappings.map((mapping) => <option key={mapping.mappingId} value={mapping.mappingId}>{mapping.label}</option>)}</select></label>}
       </div>
-      <div className="policy-actions"><button className="secondary" disabled={busy || !semanticField} onClick={() => void savePolicy()}>Save policy</button><button className="secondary" disabled={busy || !existingRule} onClick={() => void previewRule()}>Preview rule</button><button className="primary" disabled={busy || !preview} onClick={() => void applyRule()}>Apply previewed rule</button></div>
+      <div className="policy-actions"><button className="secondary" disabled={busy || !semanticField} onClick={() => void savePolicy()}>Save rule</button><button className="secondary" disabled={busy || !existingRule} onClick={() => void previewRule()}>Preview impact</button><button className="primary" disabled={busy || !preview} onClick={() => void applyRule()}>Apply after confirmation</button></div>
       {preview && <div className="rule-preview" role="status"><strong>Preview: {preview.resolvableCount} resolvable · {preview.unresolvedCount} unresolved · {preview.skippedManualCount} manual preserved</strong><p>{preview.items[0]?.reason ?? "No conflicts are affected by this rule."}</p><small>Affected {preview.affectedCount}. Nothing changes until Apply previewed rule is pressed.</small></div>}
     </section>
 
-    <div className="conflicts">
+    <details className="conflicts" open={run.conflictSummary.unresolved > 0}><summary>Review individual exceptions ({run.conflictSummary.unresolved})</summary>
       {conflictError && <div className="warning" role="alert"><span>{conflictError}</span><button type="button" onClick={() => setConflictRequestVersion((value) => value + 1)}>Retry</button></div>}
       {!conflictError && !conflictPage && <p role="status">Loading field conflicts…</p>}
       {conflictPage?.items.length ? conflictPage.items.map((conflict) => {
@@ -203,20 +204,20 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
         return <article className={`conflict-card ${resolution ? "is-resolved" : "is-unresolved"}`} key={conflict.conflictId}>
           <header><div><small>{conflict.aRowId} ↔ {conflict.bRowId} · {conflict.aColumn} ↔ {conflict.bColumn}</small><h2>{conflict.label}</h2></div><span className="resolution-badge">{resolution ? `${resolution.resolutionSource.replace("_", " ")} · ${resolution.strategy.replaceAll("_", " ")}` : "Unresolved"}</span></header>
           <div className="conflict-values"><div><small>Dataset A · raw value</small><strong>{conflict.aValue || "Empty"}</strong><button aria-pressed={resolution?.strategy === "use_a"} disabled={busy} onClick={() => void manual(conflict.conflictId, "use_a", Boolean(resolution))}>Use A</button></div><div><small>Dataset B · raw value</small><strong>{conflict.bValue || "Empty"}</strong><button aria-pressed={resolution?.strategy === "use_b"} disabled={busy} onClick={() => void manual(conflict.conflictId, "use_b", Boolean(resolution))}>Use B</button></div></div>
-          <div className="conflict-footer"><button className="secondary" aria-pressed={resolution?.strategy === "keep_both"} disabled={busy} onClick={() => void manual(conflict.conflictId, "keep_both", Boolean(resolution))}>Keep both</button>{resolution && <button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button>}</div>
+          <div className="conflict-footer"><button className="secondary" aria-pressed={resolution?.strategy === "keep_both"} disabled={busy} onClick={() => void manual(conflict.conflictId, "keep_both", Boolean(resolution))}>Preserve both</button>{resolution && <button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button>}</div>
           {resolution && <div className="provenance"><strong>Why this value won</strong><p>{resolution.reason}</p><small>{resolution.chosenSource ? `Selected Dataset ${resolution.chosenSource}` : "Both source values retained in dedicated A/B output columns"} · {resolution.policyVersion ?? "manual action"} · {new Date(resolution.resolvedAt).toLocaleString()}</small>{conflict.resolutionHistory.length > 0 && <small>{conflict.resolutionHistory.length} prior resolution{conflict.resolutionHistory.length === 1 ? "" : "s"} retained.</small>}</div>}
         </article>;
       }) : conflictPage && <p className="empty">No field conflicts are available on this page.</p>}
       {conflictPage && <div className="actions" aria-label="Conflict pagination"><button type="button" className="secondary" disabled={conflictPage.page.previousOffset === null} onClick={() => setOffset(conflictPage.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={conflictPage.page.nextOffset === null} onClick={() => setOffset(conflictPage.page.nextOffset ?? offset)}>Next</button></div>}
-    </div>
+    </details>
     <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button><button className="primary" onClick={onContinue}>Continue to exports</button></div>
   </section>;
 }
 
 function EmptyResolutionState({ title, description, action, onAction, onBack, onContinue }: { title: string; description: string; action?: string; onAction?: () => void; onBack: () => void; onContinue?: () => void }) {
   return <section aria-labelledby="resolution-title" className="survivorship-workspace">
-    <p className="eyebrow">Step 6 · Survivorship</p>
-    <h1 id="resolution-title">Resolve field conflicts.</h1>
+    <p className="eyebrow">Step 4 · Merge values</p>
+    <h1 id="resolution-title">Choose merge rules.</h1>
     <section className="resolution-empty-state" aria-labelledby="resolution-state-title"><span aria-hidden="true">—</span><div><h2 id="resolution-state-title">{title}</h2><p>{description}</p></div></section>
     <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button>{action && onAction && <button className="primary" onClick={onAction}>{action}</button>}{onContinue && <button className="primary" onClick={onContinue}>Continue to exports</button>}</div>
   </section>;

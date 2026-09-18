@@ -81,8 +81,8 @@ describe("SW-003 API workflow", () => {
       expect(response.statusCode).toBe(201);
     }
     const mapped = await app.inject({ method: "PUT", url: `/api/runs/${created.runId}/mappings`, payload: { mappings: [
-      { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", role: "identity", normalizer: "text" },
-      { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", role: "comparison", normalizer: "text" },
+      { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: false, normalizer: "text" },
+      { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", useForMatching: false, includeInMerge: true, normalizer: "text" },
     ] } });
     expect(mapped.statusCode).toBe(200);
     const result = await app.inject({ method: "POST", url: `/api/runs/${created.runId}/match` });
@@ -105,7 +105,7 @@ describe("SW-003 API workflow", () => {
   it("uploads, profiles, maps, matches, decides SAME, resolves explicitly, and exports without mutating sources", async () => {
     const { runId, result } = await setup();
     expect(result.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 });
-    expect(result.mappingVersion).toBe("confirmed-mappings-v1");
+    expect(result.mappingVersion).toBe("confirmed-mappings-v2");
     expect(result.matcherProvenance).toMatchObject({
       matcherVersion: MATCHER_VERSION,
       candidateEngineVersion: "candidate-engine-v0.3.0",
@@ -142,7 +142,8 @@ describe("SW-003 API workflow", () => {
     expect(conflictsAfterSame.items).toHaveLength(1);
     expect(conflictsAfterSame.items[0]?.resolution).toBeNull();
 
-    await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictsAfterSame.items[0]!.conflictId}/resolutions`, payload: { action: "use_a" } });
+    const resolvedResponse = await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictsAfterSame.items[0]!.conflictId}/resolutions`, payload: { action: "use_a" } });
+    expect(RunSummarySchema.parse(resolvedResponse.json()).conflictSummary).toMatchObject({ manualDecisions: 1, preservedBoth: 0 });
     expect((await conflictPage(runId)).items[0]?.resolution?.strategy).toBe("use_a");
     const exported = await app.inject({ method: "GET", url: `/api/runs/${runId}/export` });
     expect(exported.statusCode).toBe(200);
@@ -151,6 +152,28 @@ describe("SW-003 API workflow", () => {
     expect(exported.body).toContain("'=SUM(1,2)");
     const after = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect(after).toEqual(before);
+  });
+
+  it("uses matching and merge flags independently and summarizes merge differences by field", async () => {
+    const capturedMappings: Parameters<MatcherRunner["match"]>[0]["mappings"] = [];
+    await app.close();
+    app = buildApp({ dataRoot, matcher: {
+      ...matcher,
+      async match(input) { capturedMappings.push(...input.mappings); return baseMatcherResult(); },
+    } });
+    const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
+    for (const [side, bytes] of [["A", aBytes], ["B", bBytes]] as const) {
+      await app.inject({ method: "POST", url: `/api/runs/${created.runId}/datasets/${side}`, headers: { "content-type": "text/csv", "x-file-name": `${side}.csv` }, payload: bytes });
+    }
+    await app.inject({ method: "PUT", url: `/api/runs/${created.runId}/mappings`, payload: { mappings: [
+      { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", useForMatching: true, includeInMerge: true, normalizer: "text" },
+      { mappingId: "record-id", label: "Record ID", aColumn: "id", bColumn: "id", useForMatching: false, includeInMerge: false, normalizer: "text" },
+    ] } });
+    await app.inject({ method: "POST", url: `/api/runs/${created.runId}/match` });
+    expect(capturedMappings.map((item) => item.mappingId)).toEqual(["status"]);
+    const afterSame = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${created.runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).json());
+    expect(afterSame.conflictSummary).toMatchObject({ total: 1, unresolved: 1, fields: [{ mappingId: "status", total: 1, unresolved: 1 }] });
+    expect((await conflictPage(created.runId)).items[0]).toMatchObject({ mappingId: "status", aValue: "=SUM(1,2)", bValue: "inactive" });
   });
 
   it("keeps an exact generic identity pair in review instead of exporting source-only rows", async () => {
@@ -206,7 +229,7 @@ describe("SW-003 API workflow", () => {
       }
       await hotfixApp.inject({
         method: "PUT", url: `/api/runs/${created.runId}/mappings`,
-        payload: { mappings: [{ mappingId: "stable-id", label: "Stable ID", aColumn: "stable_id", bColumn: "stable_id", role: "identity", normalizer: "text" }] },
+        payload: { mappings: [{ mappingId: "stable-id", label: "Stable ID", aColumn: "stable_id", bColumn: "stable_id", useForMatching: true, includeInMerge: false, normalizer: "text" }] },
       });
       const matched = RunSummarySchema.parse((await hotfixApp.inject({ method: "POST", url: `/api/runs/${created.runId}/match` })).json());
       expect(matched.summary).toMatchObject({ matched: 0, needsReview: 1, onlyA: 0 });
@@ -347,7 +370,7 @@ describe("SW-003 API workflow", () => {
     expect(manifest.run.status).toBe("identity_unresolved");
     expect(manifest.sourceDatasets.A).toMatchObject({ originalFilename: "a.csv", sha256: createHash("sha256").update(aBytes).digest("hex"), rowCount: 1 });
     expect(manifest.sourceDatasets.B).toMatchObject({ originalFilename: "b.csv", sha256: createHash("sha256").update(bBytes).digest("hex"), rowCount: 2 });
-    expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v1", ai: null });
+    expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v2", ai: null });
     expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: null });
     expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.2.0" });
     expect(manifest.identity).toMatchObject({ systemEstablishedLinkCount: 0, humanSameCount: 0, humanDifferentCount: 0, pendingCount: 1, deferredCount: 0 });

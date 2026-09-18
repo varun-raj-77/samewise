@@ -5,6 +5,11 @@ import { basename, dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
+import {
+  LegacyManualMappingSchema,
+  normalizeLegacyMapping,
+} from "../packages/contracts/src/index.js";
+
 import { buildApp } from "../apps/api/src/app.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,7 +47,14 @@ async function inject(input: Parameters<typeof app.inject>[0], expected = 200) {
 try {
   const sourceA = await readFile(aPath);
   const sourceB = await readFile(bPath);
-  const mappings = JSON.parse(await readFile(mappingsPath, "utf8")) as { mappings: unknown[] };
+  const legacyMappings = JSON.parse(await readFile(mappingsPath, "utf8")) as {
+    mappings: unknown[];
+  };
+  const mappings = {
+    mappings: legacyMappings.mappings.map((mapping) =>
+      normalizeLegacyMapping(LegacyManualMappingSchema.parse(mapping)),
+    ),
+  };
   const created = await inject({ method: "POST", url: "/api/runs" }, 201);
   const runId = (created.response.json() as { runId: string }).runId;
 

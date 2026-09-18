@@ -1,0 +1,53 @@
+{
+  "mappingVersion": "confirmed-mappings-v2",
+  "valid": [
+    {
+      "name": "field used for matching and merge",
+      "value": {
+        "mappingId": "phone",
+        "label": "Phone",
+        "aColumn": "phone",
+        "bColumn": "telephone",
+        "normalizer": "phone",
+        "useForMatching": true,
+        "includeInMerge": true
+      }
+    },
+    {
+      "name": "timestamp helper excluded by default",
+      "value": {
+        "mappingId": "updated-at",
+        "label": "Updated at",
+        "aColumn": "updated_at",
+        "bColumn": "last_modified",
+        "normalizer": "date",
+        "useForMatching": false,
+        "includeInMerge": false
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "legacy role is not valid v2",
+      "value": {
+        "mappingId": "name",
+        "label": "Name",
+        "aColumn": "name",
+        "bColumn": "name",
+        "normalizer": "text",
+        "role": "identity"
+      }
+    },
+    {
+      "name": "missing independent merge flag",
+      "value": {
+        "mappingId": "email",
+        "label": "Email",
+        "aColumn": "email",
+        "bColumn": "email",
+        "normalizer": "email",
+        "useForMatching": true
+      }
+    }
+  ]
+}

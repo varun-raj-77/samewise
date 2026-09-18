@@ -33,31 +33,27 @@ proven broad advantage over it. The remaining hypothesis is a smaller review and
 audit experience for high-risk, one-time migrations and consolidations; that needs
 real-user testing before further product investment.
 
-SW-012 adds bounded result/review/conflict projections and on-demand full evidence
-on top of the frozen matcher, review, survivorship, evaluation, and export surfaces:
+The guided product presents five user jobs on top of the frozen matcher, review,
+field-resolution, evaluation, and export capabilities:
 
-1. Upload immutable Dataset A and Dataset B CSV files.
-2. Inspect Python-generated profiles and limited representative samples.
-3. Request metadata-only AI column suggestions or map manually; accept, reject, or remap every suggestion before it can become active.
-4. Generate candidates from confirmed identity mappings, then run
-   `feature-pipeline-v0.1.0` and `explainable-matcher-v0.2.0` only on those pairs.
-5. Work a virtualized per-A Needs Review queue with real progress, filters,
-   deterministic evidence labels, aligned raw values, ranked alternatives, and
-   explicit collision context.
-6. Record **Same entity**, **Different entity**, or **Defer** with mouse or keyboard;
-   decisions auto-advance and an eligible recent decision can be undone safely.
-7. Only after identity confirmation, manually choose **Use A**, **Use B**, or
-   **Keep both**, or configure a safe per-field rule.
-8. Preview a versioned rule before explicitly applying it; unresolvable cases and
-   existing manual choices remain untouched.
-9. Export a formula-safe reconciliation report at any time. Export trusted merged
-   output only when identity and relevant field conflicts are fully resolved.
-10. Open Evaluation to inspect frozen stage metrics, compatible version deltas,
-    score-band evidence, gates, and paged failure examples without exposing hidden
-    truth to ordinary reconciliation.
-11. Download a deterministic run manifest that identifies source fingerprints,
-    mapping/matcher/policy versions, decision summaries, artifact names, and exact
-    SHA-256 hashes for the CSV bytes.
+1. **Upload files** without modifying either source.
+2. **Set up matching** in a compact correspondence table. Each confirmed mapping
+   independently records whether it helps identity (`useForMatching`) and whether
+   it is retained for value reconciliation (`includeInMerge`). Metadata-only AI
+   recommendations remain inactive until a human confirms them, and manual setup
+   remains available when AI fails.
+3. **Review matches** through an aggregate match summary and a bounded uncertain-case
+   queue. Human-readable agreement and contradiction leads; score, blocker,
+   candidate-rank, collision, and version evidence remains available on demand.
+4. **Choose merge rules** field-first, preview exact impact, explicitly apply a
+   closed deterministic policy, then review only paged exceptions.
+5. **Export** reconciled data only when readiness passes, with audit report and
+   provenance manifest available as secondary files.
+
+File profiles are secondary details, complete result browsing sits beneath Review
+matches, and the unchanged synthetic benchmark is under **Advanced → Matching
+quality** rather than appearing as a reconciliation step. See
+[the guided-redesign note](docs/guided-reconciliation-redesign.md).
 
 Identity and survivorship are separate state transitions. Confirming identity never chooses a field value.
 
@@ -165,12 +161,13 @@ authoritatively and is not recomputed. This is a wire-payload improvement, not a
 server-memory or durability claim. See
 [docs/sw-012-bounded-evidence.md](docs/sw-012-bounded-evidence.md).
 
-After candidate generation, only confirmed identity mappings enter the explicit
+After candidate generation, only confirmed mappings with `useForMatching: true`
+enter the explicit
 feature pipeline. Name, phone, email, domain, address, city, region, postal, and
 generic text evidence have versioned Samewise-owned feature definitions. Each field
 stores its normalized values, bounded feature values, evidence class, configured
 weight, positive contribution, conflict contribution, and deterministic explanation
-code. Comparison/survivorship mappings never enter identity scoring.
+code. Mappings selected only for merged output never enter identity scoring.
 
 The bounded match score is
 `max(0, weighted positive evidence - weighted conflict evidence) / total configured identity weight`.

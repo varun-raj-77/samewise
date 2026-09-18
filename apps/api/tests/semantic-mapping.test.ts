@@ -28,8 +28,8 @@ const bBytes = Buffer.from("id,organization,state,secret\nB1,Acme,active,HIDDEN_
 
 const validOutput: SemanticMappingModelOutput = {
   mappings: [
-    { leftColumn: "name", rightColumn: "organization", relation: "equivalent", role: "identity", confidence: 0.94, reason: "Both names indicate an organization field.", normalizationHints: ["casefold"] },
-    { leftColumn: "status", rightColumn: "state", relation: "equivalent", role: "comparison", confidence: 0.76, reason: "Both appear to contain business status.", normalizationHints: ["trim_whitespace"] },
+    { leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, confidence: 0.94, reason: "Both names indicate an organization field.", normalizationHints: ["casefold"] },
+    { leftColumn: "status", rightColumn: "state", relation: "equivalent", useForMatching: false, includeInMerge: true, sourceSpecific: false, confidence: 0.76, reason: "Both appear to contain business status.", normalizationHints: ["trim_whitespace"] },
   ],
   unmappedLeft: ["id", "private_value"],
   unmappedRight: ["id", "secret"],
@@ -90,7 +90,7 @@ describe("SW-004 semantic mapping API", () => {
     expect(response.statusCode).toBe(201);
     const payload = MappingSuggestionResponseSchema.parse(response.json());
     expect(payload.proposal.suggestions.every((item) => item.status === "pending" && item.finalMapping === null)).toBe(true);
-    expect(payload.proposal.provenance).toMatchObject({ provider: "openai", model: "test-model", responseId: "response-test", promptVersion: "semantic-mapping-prompt-v1", requestVersion: "metadata-first-v1" });
+    expect(payload.proposal.provenance).toMatchObject({ provider: "openai", model: "test-model", responseId: "response-test", promptVersion: "semantic-mapping-prompt-v2", requestVersion: "metadata-first-v2" });
     expect(payload.confirmedMappings).toEqual([]);
     expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(400);
   });
@@ -99,6 +99,7 @@ describe("SW-004 semantic mapping API", () => {
     ["unknown column", { ...validOutput, mappings: [{ ...validOutput.mappings[0]!, leftColumn: "fabricated" }] }],
     ["invalid confidence", { ...validOutput, mappings: [{ ...validOutput.mappings[0]!, confidence: 1.1 }] }],
     ["duplicate pair", { ...validOutput, mappings: [validOutput.mappings[0]!, validOutput.mappings[0]!] }],
+    ["enabled source-specific field", { ...validOutput, mappings: [{ ...validOutput.mappings[0]!, sourceSpecific: true, useForMatching: true }] }],
   ])("rejects %s as a safe unavailable proposal", async (_label, output) => {
     const runId = await setup(mapperWith(output));
     const response = await suggest(runId);
@@ -112,7 +113,7 @@ describe("SW-004 semantic mapping API", () => {
     const runId = await setup(semanticMapper);
     await suggest(runId);
     const serialized = JSON.stringify(captured);
-    expect(captured).toEqual({ requestVersion: "metadata-first-v1", datasets: {
+    expect(captured).toEqual({ requestVersion: "metadata-first-v2", datasets: {
       A: { columns: ["id", "name", "status", "private_value"].map((name) => ({ name, inferredType: "string", nullRate: 0, distinctRate: 1 })) },
       B: { columns: ["id", "organization", "state", "secret"].map((name) => ({ name, inferredType: "string", nullRate: 0, distinctRate: 1 })) },
     } });
@@ -122,7 +123,7 @@ describe("SW-004 semantic mapping API", () => {
   it("keeps manual mapping and immutable source bytes intact when OpenAI is unavailable", async () => {
     const unavailable: SemanticMapper = { async propose() { throw new SemanticMapperError("provider", "provider detail"); } };
     const runId = await setup(unavailable);
-    const manual = { mappingId: "manual-name", label: "Organization", aColumn: "name", bColumn: "organization", role: "identity", normalizer: "text" };
+    const manual = { mappingId: "manual-name", label: "Organization", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: true, normalizer: "text" };
     await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings: [manual] } });
     const paths = (await readdir(join(dataRoot, runId))).map((name) => join(dataRoot, runId, name));
     const before = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
@@ -149,7 +150,7 @@ describe("SW-004 semantic mapping API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const runId = await setup(createSemanticMapperFromEnvironment({ OPENAI_API_KEY: "test-key" }));
-    const manual = { mappingId: "manual-name", label: "Organization", aColumn: "name", bColumn: "organization", role: "identity", normalizer: "text" };
+    const manual = { mappingId: "manual-name", label: "Organization", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: true, normalizer: "text" };
     await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings: [manual] } });
 
     vi.useFakeTimers();
@@ -188,8 +189,8 @@ describe("SW-004 semantic mapping API", () => {
     expect(consumed.map((item) => [item.aColumn, item.bColumn])).toEqual([["name", "organization"]]);
     const manifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
     expect(manifest.semanticMapping.ai).toMatchObject({
-      provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v1",
-      structuredOutputSchemaVersion: "1.0.0", requestVersion: "metadata-first-v1",
+      provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v2",
+      structuredOutputSchemaVersion: "2.0.0", requestVersion: "metadata-first-v2",
       suggestionDecisions: expect.arrayContaining([
         expect.objectContaining({ suggestionId: nameSuggestion!.suggestionId, status: "accepted" }),
         expect.objectContaining({ suggestionId: statusSuggestion!.suggestionId, status: "rejected", finalMappingId: null }),
@@ -202,7 +203,7 @@ describe("SW-004 semantic mapping API", () => {
     const remapRunId = await setup(mapperWith(remapOutput));
     const remapProposal = MappingSuggestionResponseSchema.parse((await suggest(remapRunId)).json()).proposal;
     const original = remapProposal.suggestions[0]!;
-    const finalMapping = { mappingId: "edited-name", label: "Corrected name", aColumn: "name", bColumn: "state", role: "comparison", normalizer: "text" };
+    const finalMapping = { mappingId: "edited-name", label: "Corrected name", aColumn: "name", bColumn: "state", useForMatching: false, includeInMerge: true, normalizer: "text" };
     const remapped = MappingSuggestionResponseSchema.parse((await app.inject({ method: "PATCH", url: `/api/runs/${remapRunId}/mapping-suggestions/${original.suggestionId}`, payload: { decision: "remap", finalMapping } })).json());
     expect(remapped.proposal.suggestions[0]).toMatchObject({ leftColumn: "name", rightColumn: "organization", confidence: 0.94, status: "edited", finalMapping });
   });

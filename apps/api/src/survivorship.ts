@@ -34,7 +34,7 @@ export function buildSurvivorshipPolicy(
   mappings: ManualMapping[],
   configuredAt = new Date().toISOString(),
 ): SurvivorshipPolicy {
-  const comparisonById = new Map(mappings.filter((mapping) => mapping.role === "comparison").map((mapping) => [mapping.mappingId, mapping]));
+  const comparisonById = new Map(mappings.filter((mapping) => mapping.includeInMerge).map((mapping) => [mapping.mappingId, mapping]));
   const mappedById = new Map(mappings.map((mapping) => [mapping.mappingId, mapping]));
   const seen = new Set<string>();
   for (const fieldPolicy of input.fieldPolicies) {

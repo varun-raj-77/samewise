@@ -11,9 +11,9 @@ import {
 } from "../src/survivorship.js";
 
 const mappings: ManualMapping[] = [
-  { mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", role: "identity", normalizer: "text" },
-  { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", role: "comparison", normalizer: "text" },
-  { mappingId: "updated", label: "Updated", aColumn: "updated", bColumn: "updated", role: "comparison", normalizer: "date" },
+  { mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", useForMatching: true, includeInMerge: true, normalizer: "text" },
+  { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", useForMatching: false, includeInMerge: true, normalizer: "text" },
+  { mappingId: "updated", label: "Updated", aColumn: "updated", bColumn: "updated", useForMatching: false, includeInMerge: false, normalizer: "date" },
 ];
 
 function conflict(aValue = "Active", bValue = "Inactive"): FieldConflict {

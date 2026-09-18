@@ -36,22 +36,16 @@ describe("SW-003 workflow contract", () => {
   });
 
   it("classifies shared manual-mapping examples with Zod", async () => {
-    const path = new URL("../examples/workflow/1.0.0.json", import.meta.url);
+    const path = new URL("../examples/confirmed-mappings/2.0.0.json", import.meta.url);
     const examples = JSON.parse(await readFile(path, "utf8")) as {
-      manualMappings: { valid: { name: string; value: unknown }[]; invalid: { name: string; value: unknown }[] };
-      runSummaries: { valid: { name: string; value: unknown }[]; invalid: { name: string; value: unknown }[] };
+      valid: { name: string; value: unknown }[];
+      invalid: { name: string; value: unknown }[];
     };
-    for (const example of examples.manualMappings.valid) {
+    for (const example of examples.valid) {
       expect(ManualMappingSchema.safeParse(example.value).success, example.name).toBe(true);
     }
-    for (const example of examples.manualMappings.invalid) {
+    for (const example of examples.invalid) {
       expect(ManualMappingSchema.safeParse(example.value).success, example.name).toBe(false);
-    }
-    for (const example of examples.runSummaries.valid) {
-      expect(RunSummarySchema.safeParse(example.value).success, example.name).toBe(true);
-    }
-    for (const example of examples.runSummaries.invalid) {
-      expect(RunSummarySchema.safeParse(example.value).success, example.name).toBe(false);
     }
   });
 
@@ -66,7 +60,7 @@ describe("SW-003 workflow contract", () => {
   it("validates explicit bounded projection contracts and enforces the page maximum", () => {
     const summary = RunSummarySchema.parse({
       contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "results",
-      datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v1", semanticMappingProvenance: null,
+      datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v2", semanticMappingProvenance: null,
       matcherVersion: null, matcherProvenance: null, summary: null, survivorshipPolicy: null,
       trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["The matcher has not completed."] },
       reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, reviewUndo: null,
