@@ -28,8 +28,8 @@ const bBytes = Buffer.from("id,organization,state,secret\nB1,Acme,active,HIDDEN_
 
 const validOutput: SemanticMappingModelOutput = {
   mappings: [
-    { leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, confidence: 0.94, reason: "Both names indicate an organization field.", normalizationHints: ["casefold"] },
-    { leftColumn: "status", rightColumn: "state", relation: "equivalent", useForMatching: false, includeInMerge: true, sourceSpecific: false, confidence: 0.76, reason: "Both appear to contain business status.", normalizationHints: ["trim_whitespace"] },
+    { leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, semanticFamily: "name_or_title", confidence: 0.94, reason: "Both names indicate an organization field.", normalizationHints: ["casefold"] },
+    { leftColumn: "status", rightColumn: "state", relation: "equivalent", useForMatching: false, includeInMerge: true, sourceSpecific: false, semanticFamily: "categorical", confidence: 0.76, reason: "Both appear to contain business status.", normalizationHints: ["trim_whitespace"] },
   ],
   unmappedLeft: ["id", "private_value"],
   unmappedRight: ["id", "secret"],
@@ -54,7 +54,7 @@ function matcherWithCapture(capture: (mappings: Parameters<MatcherRunner["match"
     },
     async match(input): Promise<MatcherResult> {
       capture(input.mappings);
-      return { contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true }, candidates: [], onlyA: [], onlyB: [] };
+      return { contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.4.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.2.0", matcherConfigVersion: "matcher-config-v0.3.0", matcherConfig: { frozen: true }, candidates: [], onlyA: [], onlyB: [] };
     },
   };
 }
@@ -90,7 +90,7 @@ describe("SW-004 semantic mapping API", () => {
     expect(response.statusCode).toBe(201);
     const payload = MappingSuggestionResponseSchema.parse(response.json());
     expect(payload.proposal.suggestions.every((item) => item.status === "pending" && item.finalMapping === null)).toBe(true);
-    expect(payload.proposal.provenance).toMatchObject({ provider: "openai", model: "test-model", responseId: "response-test", promptVersion: "semantic-mapping-prompt-v2", requestVersion: "metadata-first-v2" });
+    expect(payload.proposal.provenance).toMatchObject({ provider: "openai", model: "test-model", responseId: "response-test", promptVersion: "semantic-mapping-prompt-v3", requestVersion: "metadata-first-v3" });
     expect(payload.confirmedMappings).toEqual([]);
     expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(400);
   });
@@ -113,7 +113,7 @@ describe("SW-004 semantic mapping API", () => {
     const runId = await setup(semanticMapper);
     await suggest(runId);
     const serialized = JSON.stringify(captured);
-    expect(captured).toEqual({ requestVersion: "metadata-first-v2", datasets: {
+    expect(captured).toEqual({ requestVersion: "metadata-first-v3", datasets: {
       A: { columns: ["id", "name", "status", "private_value"].map((name) => ({ name, inferredType: "string", nullRate: 0, distinctRate: 1 })) },
       B: { columns: ["id", "organization", "state", "secret"].map((name) => ({ name, inferredType: "string", nullRate: 0, distinctRate: 1 })) },
     } });
@@ -129,7 +129,7 @@ describe("SW-004 semantic mapping API", () => {
     const before = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect((await suggest(runId)).statusCode).toBe(503);
     const current = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
-    expect(current.mappings).toEqual([manual]);
+    expect(current.mappings).toEqual([{ ...manual, semanticFamily: "name_or_title" }]);
     const after = await Promise.all(paths.map(async (path) => createHash("sha256").update(await readFile(path)).digest("hex")));
     expect(after).toEqual(before);
   });
@@ -171,7 +171,7 @@ describe("SW-004 semantic mapping API", () => {
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ error: { code: "ai_timeout", message: "AI suggestions unavailable. You can continue mapping columns manually." } });
     const current = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
-    expect(current.mappings).toEqual([manual]);
+    expect(current.mappings).toEqual([{ ...manual, semanticFamily: "name_or_title" }]);
   });
 
   it("consumes accepted mappings, ignores rejected suggestions, and preserves original proposal when remapped", async () => {
@@ -189,8 +189,8 @@ describe("SW-004 semantic mapping API", () => {
     expect(consumed.map((item) => [item.aColumn, item.bColumn])).toEqual([["name", "organization"]]);
     const manifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
     expect(manifest.semanticMapping.ai).toMatchObject({
-      provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v2",
-      structuredOutputSchemaVersion: "2.0.0", requestVersion: "metadata-first-v2",
+      provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v3",
+      structuredOutputSchemaVersion: "3.0.0", requestVersion: "metadata-first-v3",
       suggestionDecisions: expect.arrayContaining([
         expect.objectContaining({ suggestionId: nameSuggestion!.suggestionId, status: "accepted" }),
         expect.objectContaining({ suggestionId: statusSuggestion!.suggestionId, status: "rejected", finalMappingId: null }),

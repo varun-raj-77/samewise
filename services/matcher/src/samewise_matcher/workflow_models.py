@@ -3,10 +3,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 WORKFLOW_CONTRACT_VERSION = "1.0.0"
-MATCHER_VERSION = "explainable-matcher-v0.2.0"
+MATCHER_VERSION = "explainable-matcher-v0.3.0"
 LEGACY_MATCHER_VERSION = "baseline-matcher-v0.1.0"
-FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0"
-MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0"
+FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.2.0"
+MATCHER_CONFIG_VERSION = "matcher-config-v0.3.0"
+EVIDENCE_PLAN_VERSION = "evidence-plan-v1.0.0"
 
 
 class StrictModel(BaseModel):
@@ -20,6 +21,22 @@ class ColumnProfile(StrictModel):
     nullRate: float = Field(ge=0, le=1)
     distinctCount: int = Field(ge=0)
     distinctRate: float = Field(ge=0, le=1)
+    normalizedDistinctCount: int = Field(default=0, ge=0)
+    normalizedDistinctRate: float = Field(default=0, ge=0, le=1)
+    mostCommonValueCount: int = Field(default=0, ge=0)
+    mostCommonValueRate: float = Field(default=0, ge=0, le=1)
+    averageValueLength: float = Field(default=0, ge=0)
+    patternShape: Literal[
+        "empty",
+        "uuid_like",
+        "email_like",
+        "phone_like",
+        "numeric",
+        "date_like",
+        "short_code",
+        "text",
+        "mixed",
+    ] = "mixed"
     samples: list[str] = Field(max_length=3)
 
 
@@ -40,6 +57,22 @@ class ManualMapping(StrictModel):
     bColumn: str = Field(min_length=1)
     role: Literal["identity", "comparison"]
     normalizer: Literal["text", "phone", "email", "number", "date"]
+    semanticFamily: Literal[
+        "persistent_identifier",
+        "source_local_identifier",
+        "name_or_title",
+        "contact_person",
+        "email",
+        "phone",
+        "domain",
+        "address",
+        "geography",
+        "categorical",
+        "numeric",
+        "date_or_timestamp",
+        "free_text",
+        "unknown",
+    ] = "unknown"
 
 
 class FeatureValue(StrictModel):
@@ -62,6 +95,16 @@ class FieldEvidence(StrictModel):
     normalizedA: str
     normalizedB: str
     fieldKind: Literal[
+        "persistent_identifier",
+        "source_local_identifier",
+        "name_or_title",
+        "contact_person",
+        "geography",
+        "categorical",
+        "numeric",
+        "date_or_timestamp",
+        "free_text",
+        "unknown",
         "name",
         "phone",
         "email",
@@ -73,7 +116,9 @@ class FieldEvidence(StrictModel):
         "other",
     ]
     featurePipelineVersion: Literal[
-        "baseline-feature-pipeline-v0.1.0", "feature-pipeline-v0.1.0"
+        "baseline-feature-pipeline-v0.1.0",
+        "feature-pipeline-v0.1.0",
+        "feature-pipeline-v0.2.0",
     ]
     features: list[FeatureValue]
     outcome: Literal["exact", "similar", "conflict", "missing_one", "missing_both"]
@@ -91,6 +136,12 @@ class FieldEvidence(StrictModel):
     contribution: float
     explanationCode: str = Field(min_length=1)
     explanation: str
+    valueFrequencyA: int = Field(default=0, ge=0)
+    valueFrequencyB: int = Field(default=0, ge=0)
+    informationClass: Literal[
+        "distinctive", "repeated", "common", "not_applicable", "unknown"
+    ] = "unknown"
+    informationMultiplier: float = Field(default=1.0, ge=0, le=1)
 
 
 class CandidatePair(StrictModel):
@@ -114,14 +165,31 @@ class CandidatePair(StrictModel):
 
 class MatcherResult(StrictModel):
     contractVersion: Literal["1.0.0"]
-    matcherVersion: Literal["baseline-matcher-v0.1.0", "explainable-matcher-v0.2.0"]
-    candidateEngineVersion: Literal["candidate-engine-v0.3.0"]
+    matcherVersion: Literal[
+        "baseline-matcher-v0.1.0",
+        "explainable-matcher-v0.2.0",
+        "explainable-matcher-v0.3.0",
+    ]
+    candidateEngineVersion: Literal[
+        "candidate-engine-v0.1.0",
+        "candidate-engine-v0.2.0",
+        "candidate-engine-v0.3.0",
+        "candidate-engine-v0.4.0",
+    ]
     blockingNormalizationVersion: Literal["blocking-normalization-v0.1.0"]
     featurePipelineVersion: Literal[
-        "baseline-feature-pipeline-v0.1.0", "feature-pipeline-v0.1.0"
+        "baseline-feature-pipeline-v0.1.0",
+        "feature-pipeline-v0.1.0",
+        "feature-pipeline-v0.2.0",
     ]
-    matcherConfigVersion: Literal["baseline-config-v0.1.0", "matcher-config-v0.2.0"]
+    matcherConfigVersion: Literal[
+        "baseline-config-v0.1.0",
+        "matcher-config-v0.2.0",
+        "matcher-config-v0.3.0",
+    ]
     matcherConfig: dict[str, object]
+    evidencePlanVersion: Literal["evidence-plan-v1.0.0"] = EVIDENCE_PLAN_VERSION
+    evidencePlan: dict[str, object] = Field(default_factory=dict)
     candidates: list[CandidatePair]
     onlyA: list[dict[str, object]]
     onlyB: list[dict[str, object]]
@@ -142,6 +210,10 @@ class MatchRequest(StrictModel):
     bPath: str = Field(min_length=1)
     mappings: list[ManualMapping] = Field(min_length=1)
     candidateMode: Literal["candidate_engine", "all_pairs"] = "candidate_engine"
-    matcherVersion: Literal["baseline-matcher-v0.1.0", "explainable-matcher-v0.2.0"] = (
+    matcherVersion: Literal[
+        "baseline-matcher-v0.1.0",
+        "explainable-matcher-v0.2.0",
+        "explainable-matcher-v0.3.0",
+    ] = (
         MATCHER_VERSION
     )

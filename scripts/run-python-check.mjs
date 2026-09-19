@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -11,8 +12,8 @@ const checks = {
     moduleArgs: ["-m", "ruff", "check", join(root, "services", "matcher")],
   },
   test: {
-    uvArgs: ["run", "--project", matcherProject, "pytest", join(root, "services", "matcher"), "--basetemp", join(root, ".samewise-data", "pytest-tmp")],
-    moduleArgs: ["-m", "pytest", join(root, "services", "matcher"), "--basetemp", join(root, ".samewise-data", "pytest-tmp")],
+    uvArgs: ["run", "--project", matcherProject, "pytest", join(root, "services", "matcher"), "--basetemp", join(tmpdir(), `samewise-pytest-${process.pid}`), "-p", "no:cacheprovider"],
+    moduleArgs: ["-m", "pytest", join(root, "services", "matcher"), "--basetemp", join(tmpdir(), `samewise-pytest-${process.pid}`), "-p", "no:cacheprovider"],
   },
 };
 

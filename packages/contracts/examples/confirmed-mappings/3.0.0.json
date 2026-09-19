@@ -1,0 +1,46 @@
+{
+  "mappingVersion": "confirmed-mappings-v3",
+  "valid": [
+    {
+      "name": "persistent identifier used for matching",
+      "value": {
+        "mappingId": "supplier-key",
+        "label": "Supplier key",
+        "aColumn": "supplier_uuid",
+        "bColumn": "vendor_uuid",
+        "normalizer": "text",
+        "useForMatching": true,
+        "includeInMerge": false,
+        "semanticFamily": "persistent_identifier"
+      }
+    },
+    {
+      "name": "contact person retained as supporting evidence",
+      "value": {
+        "mappingId": "representative",
+        "label": "Representative",
+        "aColumn": "representative",
+        "bColumn": "account_contact",
+        "normalizer": "text",
+        "useForMatching": true,
+        "includeInMerge": true,
+        "semanticFamily": "contact_person"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown free-form semantic family",
+      "value": {
+        "mappingId": "code",
+        "label": "Code",
+        "aColumn": "code",
+        "bColumn": "code",
+        "normalizer": "text",
+        "useForMatching": true,
+        "includeInMerge": false,
+        "semanticFamily": "magic_identifier"
+      }
+    }
+  ]
+}

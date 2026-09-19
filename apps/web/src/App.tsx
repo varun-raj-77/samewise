@@ -1,5 +1,6 @@
 import {
   MappingSuggestionResponseSchema,
+  BatchIdentityDecisionResponseSchema,
   RECONCILIATION_EXPORT_VERSION,
   RUN_MANIFEST_VERSION,
   RunSummarySchema,
@@ -144,7 +145,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     const aColumn = run.datasets.A.columns.find((column) => !draftMappings.some((mapping) => mapping.aColumn === column.name))?.name ?? run.datasets.A.columns[0]?.name;
     const bColumn = run.datasets.B.columns.find((column) => !draftMappings.some((mapping) => mapping.bColumn === column.name))?.name ?? run.datasets.B.columns[0]?.name;
     if (!aColumn || !bColumn) return;
-    setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, useForMatching: true, includeInMerge: true, normalizer: "text" }]);
+    setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, useForMatching: true, includeInMerge: true, normalizer: "text", semanticFamily: "unknown" }]);
   }
 
   async function requestSuggestions() {
@@ -198,6 +199,14 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   async function undoReview() {
     if (!run) return null;
     return action(() => fetch(`/api/runs/${run.runId}/review-undo`, { method: "POST" }).then(parseRun));
+  }
+  async function batchDecide(groupId: string, decision: "same_entity" | "different_entity") {
+    if (!run) return null;
+    return action(async () => {
+      const response = await fetch(`/api/runs/${run.runId}/review-groups/${encodeURIComponent(groupId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, confirmed: true }) });
+      if (!response.ok) { const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null; throw new Error(payload?.error?.message ?? "The batch decision could not be applied."); }
+      return BatchIdentityDecisionResponseSchema.parse(await response.json()).run;
+    });
   }
   async function downloadExport(kind: "reconciliation" | "trusted" | "manifest") {
     if (!run) return;
@@ -256,7 +265,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           <div className="actions"><button className="primary" onClick={() => void saveAndRun()} disabled={busy || suggestionsLoading || !draftMappings.some((mapping) => mapping.useForMatching)}>Confirm setup & run matching</button></div>
         </section>}
         {screen === "results" && run?.summary && <ResultsWorkspace run={run} onReview={review} onResolution={() => setScreen("resolution")} onOpenReview={() => setScreen("review")} onExport={() => setScreen("export")} />}
-        {screen === "review" && run && <ReviewWorkspace run={run} initialCandidateId={selectedCandidateId} busy={busy} onDecision={decide} onDefer={setDeferred} onUndo={undoReview} onGoResolution={() => setScreen("resolution")} />}
+        {screen === "review" && run && <ReviewWorkspace run={run} initialCandidateId={selectedCandidateId} busy={busy} onDecision={decide} onBatchDecision={batchDecide} onDefer={setDeferred} onUndo={undoReview} onGoResolution={() => setScreen("resolution")} />}
         {screen === "resolution" && run && <SurvivorshipWorkspace run={run} busy={busy} onRun={setRun} onBusy={setBusy} onError={setError} onReview={() => setScreen("review")} onBack={() => setScreen("results")} onContinue={() => setScreen("export")} />}
         {screen === "export" && run?.summary && <ExportWorkspace run={run} busy={busy} onDownload={downloadExport} onResults={() => setScreen("results")} onReview={() => setScreen("review")} onResolution={() => setScreen("resolution")} />}
         {screen === "evaluation" && <EvaluationWorkspace runId={run?.runId ?? null} onBack={() => setScreen(run?.summary ? "results" : run?.stage ?? "upload")} />}
@@ -316,19 +325,29 @@ function FilePicker({ side, file, onChange }: { side: "A" | "B"; file: File | nu
   </div>;
 }
 function ProfileCard({ profile }: { profile: NonNullable<RunSummary["datasets"]["A"]> }) { return <article className="profile-card"><header><span className="dataset-badge">{profile.side}</span><div><h2>{profile.originalFilename}</h2><small>{profile.rowCount} rows · SHA-256 {profile.sha256.slice(0, 10)}…</small></div></header><div className="profile-columns">{profile.columns.map((column) => <div key={column.name}><strong>{column.name}</strong><span>{column.inferredType}</span><small>{column.nullCount} null · {column.distinctCount} distinct</small><p>{column.samples.join(" · ") || "No sample"}</p></div>)}</div></article>; }
-function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className="mapping-row"><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select><span>↔</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select><label className="mapping-check"><input type="checkbox" checked={mapping.useForMatching} onChange={(event) => onChange({ ...mapping, useForMatching: event.target.checked })} />Use to match</label><label className="mapping-check"><input type="checkbox" checked={mapping.includeInMerge} onChange={(event) => onChange({ ...mapping, includeInMerge: event.target.checked })} />Keep in result</label><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
+function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className="mapping-row"><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select><span>↔</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select><label className="mapping-check"><input type="checkbox" checked={mapping.useForMatching} onChange={(event) => onChange({ ...mapping, useForMatching: event.target.checked })} />Use to match</label><label className="mapping-check"><input type="checkbox" checked={mapping.includeInMerge} onChange={(event) => onChange({ ...mapping, includeInMerge: event.target.checked })} />Keep in result</label><select aria-label="Field type" value={mapping.semanticFamily ?? "unknown"} onChange={(event) => onChange({ ...mapping, semanticFamily: event.target.value as NonNullable<ManualMapping["semanticFamily"]> })}><option value="unknown">Unknown</option><option value="persistent_identifier">Persistent ID</option><option value="source_local_identifier">Source-local ID</option><option value="name_or_title">Entity name / title</option><option value="contact_person">Contact person</option><option value="email">Email</option><option value="phone">Phone</option><option value="domain">Website / domain</option><option value="address">Address</option><option value="geography">Geography</option><option value="categorical">Category</option><option value="numeric">Numeric</option><option value="date_or_timestamp">Date / timestamp</option><option value="free_text">Free text</option></select><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
 
 function MatchingSafetyGuidance({ mappings, run }: { mappings: ManualMapping[]; run: RunSummary }) {
   const matching = mappings.filter((mapping) => mapping.useForMatching);
   const warnings: string[] = [];
   if (matching.length === 0) warnings.push("Choose at least one field Samewise can use to look for the same record.");
-  if (matching.length === 1 && /(^|[_\s-])name($|[_\s-])/i.test(`${matching[0]?.label} ${matching[0]?.aColumn} ${matching[0]?.bColumn}`)) warnings.push("Name alone is weak evidence. Different people or companies can share the same name. Samewise will not treat name alone as sufficient for an automatic match.");
+  if (matching.length === 1 && matching[0]?.semanticFamily === "name_or_title") warnings.push("Name alone is weak evidence. Different people or companies can share the same name. Samewise will not treat name alone as sufficient for an automatic match.");
   else if (matching.length === 1) warnings.push("Only one matching signal is selected. Missing or conflicting values may leave records unmatched or send them to review.");
+  const weakFamilies = new Set(["source_local_identifier", "contact_person", "geography", "categorical", "free_text", "unknown"]);
+  if (matching.length > 0 && matching.every((mapping) => weakFamilies.has(mapping.semanticFamily ?? "unknown"))) warnings.push("Matching evidence is weak. Different entities may share these values. Samewise will avoid unsafe automatic matches and may leave more records unmatched or requiring review.");
+  const duplicateSignal = matching.some((mapping) => {
+    if (mapping.semanticFamily !== "persistent_identifier") return false;
+    const a = run.datasets.A?.columns.find((column) => column.name === mapping.aColumn);
+    const b = run.datasets.B?.columns.find((column) => column.name === mapping.bColumn);
+    return Boolean((a && (a.normalizedDistinctCount ?? a.distinctCount) < run.datasets.A!.rowCount - a.nullCount) || (b && (b.normalizedDistinctCount ?? b.distinctCount) < run.datasets.B!.rowCount - b.nullCount));
+  });
+  if (duplicateSignal) warnings.push("Possible duplicate entities exist within this source. Competing matches will be routed to review.");
   for (const mapping of matching) {
     const a = run.datasets.A?.columns.find((column) => column.name === mapping.aColumn);
     const b = run.datasets.B?.columns.find((column) => column.name === mapping.bColumn);
     if ((a?.nullCount ?? 0) > 0 || (b?.nullCount ?? 0) > 0) warnings.push(`${mapping.label} is missing in some ${[(a?.nullCount ?? 0) > 0 ? "Dataset A" : "", (b?.nullCount ?? 0) > 0 ? "Dataset B" : ""].filter(Boolean).join(" and ")} records. Consider adding another matching field.`);
-    if (/(^|[_\s-])(record_?id|row_?id|id)($|[_\s-])/i.test(`${mapping.aColumn} ${mapping.bColumn}`)) warnings.push(`${mapping.label} looks like a source-specific row ID. Row IDs often differ between source systems.`);
+    if (mapping.semanticFamily === "source_local_identifier") warnings.push(`${mapping.label} is marked as a source-local identifier. Such fields are excluded by default because row IDs often differ between systems; this override remains auditable.`);
+    if (["contact_person", "geography", "categorical", "free_text", "unknown"].includes(mapping.semanticFamily ?? "unknown") && (a?.mostCommonValueRate ?? 0) >= 0.05 && (b?.mostCommonValueRate ?? 0) >= 0.05) warnings.push(`${mapping.label} contains repeated supporting values. It can help with context but should not be the only reason to review a pair.`);
   }
   return warnings.length ? <aside className="mapping-safety" aria-label="Matching setup guidance"><strong>{matching.length === 0 ? "Matching cannot start yet" : "Check this setup"}</strong><ul>{[...new Set(warnings)].map((warning) => <li key={warning}>{warning}</li>)}</ul></aside> : null;
 }

@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { ManualMappingSchema } from "./workflow.js";
+import { ManualMappingSchema, SemanticFamilySchema } from "./workflow.js";
 
-export const SEMANTIC_MAPPING_CONTRACT_VERSION = "2.0.0" as const;
-export const SEMANTIC_MAPPING_PROMPT_VERSION = "semantic-mapping-prompt-v2" as const;
-export const SEMANTIC_MAPPING_REQUEST_VERSION = "metadata-first-v2" as const;
+export const SEMANTIC_MAPPING_CONTRACT_VERSION = "3.0.0" as const;
+export const SEMANTIC_MAPPING_PROMPT_VERSION = "semantic-mapping-prompt-v3" as const;
+export const SEMANTIC_MAPPING_REQUEST_VERSION = "metadata-first-v3" as const;
 
 export const SemanticRelationSchema = z.enum([
   "equivalent",
@@ -26,6 +26,9 @@ export const ModelColumnProfileSchema = z.object({
   inferredType: z.enum(["string", "integer", "number", "boolean", "date", "unknown"]),
   nullRate: z.number().finite().min(0).max(1),
   distinctRate: z.number().finite().min(0).max(1),
+  normalizedDistinctRate: z.number().finite().min(0).max(1).optional(),
+  mostCommonValueRate: z.number().finite().min(0).max(1).optional(),
+  patternShape: z.enum(["empty", "uuid_like", "email_like", "phone_like", "numeric", "date_like", "short_code", "text", "mixed"]).optional(),
 }).strict();
 
 export const SemanticMappingModelInputSchema = z.object({
@@ -44,6 +47,7 @@ export const SemanticMappingModelSuggestionSchema = z.object({
   useForMatching: z.boolean(),
   includeInMerge: z.boolean(),
   sourceSpecific: z.boolean(),
+  semanticFamily: SemanticFamilySchema,
   confidence: z.number().finite().min(0).max(1),
   reason: z.string().min(1).max(300),
   normalizationHints: z.array(NormalizationHintSchema).max(5),

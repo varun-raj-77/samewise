@@ -7,12 +7,14 @@ import {
 
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
 export const WORKFLOW_PROJECTION_CONTRACT_VERSION = "1.0.0" as const;
-export const MATCHER_VERSION = "explainable-matcher-v0.2.0" as const;
-export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.3.0" as const;
+export const MATCHER_VERSION = "explainable-matcher-v0.3.0" as const;
+export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.4.0" as const;
 export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
-export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.1.0" as const;
-export const MATCHER_CONFIG_VERSION = "matcher-config-v0.2.0" as const;
-export const CONFIRMED_MAPPINGS_VERSION = "confirmed-mappings-v2" as const;
+export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.2.0" as const;
+export const MATCHER_CONFIG_VERSION = "matcher-config-v0.3.0" as const;
+export const EVIDENCE_PLAN_VERSION = "evidence-plan-v1.0.0" as const;
+export const REVIEW_SIGNATURE_VERSION = "review-signature-v1.0.0" as const;
+export const CONFIRMED_MAPPINGS_VERSION = "confirmed-mappings-v3" as const;
 
 export const DatasetSideSchema = z.enum(["A", "B"]);
 export type DatasetSide = z.infer<typeof DatasetSideSchema>;
@@ -24,6 +26,12 @@ export const ColumnProfileSchema = z.object({
   nullRate: z.number().min(0).max(1),
   distinctCount: z.number().int().nonnegative(),
   distinctRate: z.number().min(0).max(1),
+  normalizedDistinctCount: z.number().int().nonnegative().optional(),
+  normalizedDistinctRate: z.number().min(0).max(1).optional(),
+  mostCommonValueCount: z.number().int().nonnegative().optional(),
+  mostCommonValueRate: z.number().min(0).max(1).optional(),
+  averageValueLength: z.number().nonnegative().optional(),
+  patternShape: z.enum(["empty", "uuid_like", "email_like", "phone_like", "numeric", "date_like", "short_code", "text", "mixed"]).optional(),
   samples: z.array(z.string()).max(3),
 }).strict();
 
@@ -40,6 +48,23 @@ export type DatasetProfile = z.infer<typeof DatasetProfileSchema>;
 
 export const MappingRoleSchema = z.enum(["identity", "comparison"]);
 export const NormalizerSchema = z.enum(["text", "phone", "email", "number", "date"]);
+export const SemanticFamilySchema = z.enum([
+  "persistent_identifier",
+  "source_local_identifier",
+  "name_or_title",
+  "contact_person",
+  "email",
+  "phone",
+  "domain",
+  "address",
+  "geography",
+  "categorical",
+  "numeric",
+  "date_or_timestamp",
+  "free_text",
+  "unknown",
+]);
+export type SemanticFamily = z.infer<typeof SemanticFamilySchema>;
 export const LegacyManualMappingSchema = z.object({
   mappingId: z.string().min(1),
   label: z.string().min(1),
@@ -58,6 +83,7 @@ export const ManualMappingSchema = z.object({
   normalizer: NormalizerSchema,
   useForMatching: z.boolean(),
   includeInMerge: z.boolean(),
+  semanticFamily: SemanticFamilySchema.optional(),
 }).strict();
 export type ManualMapping = z.infer<typeof ManualMappingSchema>;
 
@@ -70,7 +96,28 @@ export function normalizeLegacyMapping(mapping: LegacyManualMapping): ManualMapp
     normalizer: mapping.normalizer,
     useForMatching: mapping.role === "identity",
     includeInMerge: mapping.role === "comparison",
+    semanticFamily: inferSemanticFamily(mapping),
   };
+}
+
+export function inferSemanticFamily(mapping: Pick<LegacyManualMapping, "mappingId" | "label" | "aColumn" | "bColumn" | "normalizer">): SemanticFamily {
+  if (mapping.normalizer === "email") return "email";
+  if (mapping.normalizer === "phone") return "phone";
+  if (mapping.normalizer === "number") return "numeric";
+  if (mapping.normalizer === "date") return "date_or_timestamp";
+  const text = `${mapping.mappingId} ${mapping.label} ${mapping.aColumn} ${mapping.bColumn}`.toLowerCase().replaceAll(/[^a-z0-9]+/g, " ");
+  const has = (pattern: RegExp) => pattern.test(text);
+  if (has(/\b(record|row|source|internal)\s*(id|key|number|no|pk)\b|\b(primary\s*key|source\s*pk)\b/)) return "source_local_identifier";
+  if (has(/\b(contact|representative|attention|attn|salesperson|owner)\b/) && has(/\b(name|person|representative|contact)\b/)) return "contact_person";
+  if (has(/\b(email|e mail)\b/)) return "email";
+  if (has(/\b(phone|telephone|mobile|fax)\b/)) return "phone";
+  if (has(/\b(domain|website|web site|url|host name|hostname)\b/)) return "domain";
+  if (has(/\b(address|street|road|avenue|boulevard)\b/)) return "address";
+  if (has(/\b(city|state|province|region|country|postal|postcode|zip)\b/)) return "geography";
+  if (has(/\b(category|status|type|class|segment|department|brand)\b/)) return "categorical";
+  if (has(/\b(description|notes?|comments?|memo|details?)\b/)) return "free_text";
+  if (has(/\b(name|title|organization|organisation|company|vendor|supplier|customer|product|facility|location|item)\b/)) return "name_or_title";
+  return "unknown";
 }
 
 export const FieldEvidenceSchema = z.object({
@@ -82,7 +129,7 @@ export const FieldEvidenceSchema = z.object({
   bValue: z.string(),
   normalizedA: z.string(),
   normalizedB: z.string(),
-  fieldKind: z.enum(["name", "phone", "email", "domain", "address", "city", "region", "postal", "other"]),
+  fieldKind: z.enum(["persistent_identifier", "source_local_identifier", "name_or_title", "contact_person", "geography", "categorical", "numeric", "date_or_timestamp", "free_text", "unknown", "name", "phone", "email", "domain", "address", "city", "region", "postal", "other"]),
   featurePipelineVersion: z.literal(FEATURE_PIPELINE_VERSION),
   features: z.array(z.object({ name: z.string().min(1), value: z.number().min(0).max(1) }).strict()),
   outcome: z.enum(["exact", "similar", "conflict", "missing_one", "missing_both"]),
@@ -93,6 +140,10 @@ export const FieldEvidenceSchema = z.object({
   contribution: z.number(),
   explanationCode: z.string().min(1),
   explanation: z.string().min(1),
+  valueFrequencyA: z.number().int().nonnegative().optional(),
+  valueFrequencyB: z.number().int().nonnegative().optional(),
+  informationClass: z.enum(["distinctive", "repeated", "common", "not_applicable", "unknown"]).optional(),
+  informationMultiplier: z.number().min(0).max(1).optional(),
 }).strict();
 export type FieldEvidence = z.infer<typeof FieldEvidenceSchema>;
 
@@ -127,6 +178,8 @@ export const MatcherResultSchema = z.object({
   featurePipelineVersion: z.literal(FEATURE_PIPELINE_VERSION),
   matcherConfigVersion: z.literal(MATCHER_CONFIG_VERSION),
   matcherConfig: z.record(z.string(), z.unknown()),
+  evidencePlanVersion: z.literal(EVIDENCE_PLAN_VERSION).optional(),
+  evidencePlan: z.record(z.string(), z.unknown()).optional(),
   candidates: z.array(CandidatePairSchema),
   onlyA: z.array(z.object({ rowId: z.string().min(1), record: z.record(z.string(), z.string()) }).strict()),
   onlyB: z.array(z.object({ rowId: z.string().min(1), record: z.record(z.string(), z.string()) }).strict()),
@@ -140,6 +193,8 @@ export const MatcherProvenanceSchema = MatcherResultSchema.pick({
   featurePipelineVersion: true,
   matcherConfigVersion: true,
   matcherConfig: true,
+  evidencePlanVersion: true,
+  evidencePlan: true,
 });
 
 export const IdentityDecisionSchema = z.object({
@@ -154,6 +209,10 @@ export const IdentityDecisionSchema = z.object({
   candidateEngineVersion: z.literal(CANDIDATE_ENGINE_VERSION),
   matchScore: z.number().min(0).max(1),
   evidenceShown: z.array(FieldEvidenceSchema).min(1),
+  decisionOrigin: z.enum(["human_individual", "human_batch_rule"]),
+  reviewSignatureVersion: z.literal(REVIEW_SIGNATURE_VERSION).nullable(),
+  reviewGroupId: z.string().min(1).nullable(),
+  evidenceSnapshotSha256: z.string().regex(/^[a-f0-9]{64}$/),
   decidedAt: z.string().datetime(),
 }).strict();
 export type IdentityDecision = z.infer<typeof IdentityDecisionSchema>;
@@ -307,6 +366,67 @@ export const ReviewProgressSchema = z.object({
 }).strict();
 export type ReviewProgress = z.infer<typeof ReviewProgressSchema>;
 
+export const ReviewSafetyClassSchema = z.enum([
+  "quick_decision",
+  "competing_candidates",
+  "strong_contradiction",
+  "low_information_noise",
+  "individual_review",
+]);
+export const ReviewGroupPatternItemSchema = z.object({
+  semanticFamily: FieldEvidenceSchema.shape.fieldKind,
+  evidenceClass: FieldEvidenceSchema.shape.evidenceClass,
+  informationClass: z.enum(["distinctive", "repeated", "common", "not_applicable", "unknown"]),
+  labels: z.array(z.string().min(1)).min(1),
+}).strict();
+export const ReviewGroupSummarySchema = z.object({
+  groupId: z.string().regex(/^review-group-[a-f0-9]{20}$/),
+  signatureVersion: z.literal(REVIEW_SIGNATURE_VERSION),
+  signature: z.string().min(1),
+  safetyClass: ReviewSafetyClassSchema,
+  caseCount: z.number().int().positive(),
+  eligibleSameCount: z.number().int().nonnegative(),
+  eligibleDifferentCount: z.number().int().nonnegative(),
+  suggestedDecision: z.enum(["same_entity", "different_entity"]).nullable(),
+  pattern: z.array(ReviewGroupPatternItemSchema).min(1),
+  marginBand: z.enum(["near_tie", "narrow", "clear"]),
+  alternativeBand: z.enum(["single", "multiple"]),
+  collision: z.boolean(),
+  strongContradiction: z.boolean(),
+}).strict();
+export type ReviewGroupSummary = z.infer<typeof ReviewGroupSummarySchema>;
+export const ReviewWorkloadSummarySchema = z.object({
+  signatureVersion: z.literal(REVIEW_SIGNATURE_VERSION),
+  totalNeedsAttention: z.number().int().nonnegative(),
+  quickDecisions: z.number().int().nonnegative(),
+  competingCandidates: z.number().int().nonnegative(),
+  strongContradictions: z.number().int().nonnegative(),
+  lowInformationNoise: z.number().int().nonnegative(),
+  individualReview: z.number().int().nonnegative(),
+  deferred: z.number().int().nonnegative(),
+  groupCount: z.number().int().nonnegative(),
+}).strict();
+export type ReviewWorkloadSummary = z.infer<typeof ReviewWorkloadSummarySchema>;
+export const ReviewGroupListSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  workload: ReviewWorkloadSummarySchema,
+  groups: z.array(ReviewGroupSummarySchema),
+}).strict();
+export type ReviewGroupList = z.infer<typeof ReviewGroupListSchema>;
+export const ReviewGroupPreviewSchema = z.object({
+  contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  group: ReviewGroupSummarySchema,
+  items: z.array(ReviewQueueProjectionItemSchema).max(100),
+  page: PaginationSchema,
+}).strict();
+export type ReviewGroupPreview = z.infer<typeof ReviewGroupPreviewSchema>;
+export const BatchIdentityDecisionInputSchema = z.object({
+  decision: z.enum(["same_entity", "different_entity"]),
+  confirmed: z.literal(true),
+}).strict();
+
 export const ReviewQueuePageSchema = z.object({
   contractVersion: z.literal(WORKFLOW_PROJECTION_CONTRACT_VERSION),
   runId: z.string().min(1),
@@ -327,15 +447,18 @@ export const ReviewUndoSchema = z.object({
   humanDecision: z.enum(["same_entity", "different_entity"]),
   canUndo: z.boolean(),
   blockedReason: z.string().min(1).nullable(),
+  decisionOrigin: z.enum(["human_individual", "human_batch_rule"]),
+  affectedCount: z.number().int().positive(),
+  reviewGroupId: z.string().min(1).nullable(),
 }).strict();
 export type ReviewUndo = z.infer<typeof ReviewUndoSchema>;
 
 export const ResultSummarySchema = z.object({
-  matched: z.number().int().nonnegative(),
-  needsReview: z.number().int().nonnegative(),
-  onlyA: z.number().int().nonnegative(),
-  onlyB: z.number().int().nonnegative(),
-}).strict();
+  matched: z.number().int().nonnegative().describe("A records automatically or manually linked to B"),
+  needsReview: z.number().int().nonnegative().describe("A records awaiting or deferring identity review"),
+  onlyA: z.number().int().nonnegative().describe("A records with no remaining match after review state is excluded"),
+  onlyB: z.number().int().nonnegative().describe("B records with no remaining match after review state is excluded"),
+}).strict().describe("Mutually exclusive primary product result states");
 
 export const RunViewSchema = z.object({
   contractVersion: z.literal(WORKFLOW_CONTRACT_VERSION),
@@ -411,6 +534,16 @@ export const RunSummarySchema = RunViewSchema.omit({
   conflictSummary: ConflictSummarySchema,
 }).strict();
 export type RunSummary = z.infer<typeof RunSummarySchema>;
+
+export const BatchIdentityDecisionResponseSchema = z.object({
+  run: RunSummarySchema,
+  groupId: z.string().min(1),
+  signatureVersion: z.literal(REVIEW_SIGNATURE_VERSION),
+  decision: z.enum(["same_entity", "different_entity"]),
+  appliedCount: z.number().int().nonnegative(),
+  excludedCount: z.number().int().nonnegative(),
+}).strict();
+export type BatchIdentityDecisionResponse = z.infer<typeof BatchIdentityDecisionResponseSchema>;
 
 export const RuleApplicationResponseSchema = z.object({
   run: RunSummarySchema,

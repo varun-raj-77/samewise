@@ -15,7 +15,7 @@
     "candidateBand": { "enum": ["auto_match", "needs_review"] },
     "humanDecision": { "enum": ["same_entity", "different_entity"] },
     "resolutionAction": { "enum": ["use_a", "use_b", "keep_both", "prefer_non_null", "prefer_newest", "prefer_trusted_source"] },
-    "matcherVersion": { "const": "explainable-matcher-v0.2.0" },
+    "matcherVersion": { "const": "explainable-matcher-v0.3.0" },
     "columnProfile": {
       "type": "object",
       "additionalProperties": false,
@@ -27,20 +27,28 @@
         "nullRate": { "type": "number", "minimum": 0, "maximum": 1 },
         "distinctCount": { "type": "integer", "minimum": 0 },
         "distinctRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "normalizedDistinctCount": { "type": "integer", "minimum": 0 },
+        "normalizedDistinctRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mostCommonValueCount": { "type": "integer", "minimum": 0 },
+        "mostCommonValueRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "averageValueLength": { "type": "number", "minimum": 0 },
+        "patternShape": { "enum": ["empty", "uuid_like", "email_like", "phone_like", "numeric", "date_like", "short_code", "text", "mixed"] },
         "samples": { "type": "array", "maxItems": 3, "items": { "type": "string" } }
       }
     },
     "manualMapping": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mappingId", "label", "aColumn", "bColumn", "role", "normalizer"],
+      "required": ["mappingId", "label", "aColumn", "bColumn", "normalizer", "useForMatching", "includeInMerge"],
       "properties": {
         "mappingId": { "type": "string", "minLength": 1 },
         "label": { "type": "string", "minLength": 1 },
         "aColumn": { "type": "string", "minLength": 1 },
         "bColumn": { "type": "string", "minLength": 1 },
-        "role": { "$ref": "#/$defs/mappingRole" },
-        "normalizer": { "$ref": "#/$defs/normalizer" }
+        "normalizer": { "$ref": "#/$defs/normalizer" },
+        "useForMatching": { "type": "boolean" },
+        "includeInMerge": { "type": "boolean" },
+        "semanticFamily": { "enum": ["persistent_identifier", "source_local_identifier", "name_or_title", "contact_person", "email", "phone", "domain", "address", "geography", "categorical", "numeric", "date_or_timestamp", "free_text", "unknown"] }
       }
     },
     "fieldEvidence": {
@@ -50,8 +58,8 @@
       "properties": {
         "mappingId": { "type": "string" }, "label": { "type": "string" }, "aColumn": { "type": "string" }, "bColumn": { "type": "string" },
         "aValue": { "type": "string" }, "bValue": { "type": "string" }, "normalizedA": { "type": "string" }, "normalizedB": { "type": "string" },
-        "fieldKind": { "enum": ["name", "phone", "email", "domain", "address", "city", "region", "postal", "other"] },
-        "featurePipelineVersion": { "const": "feature-pipeline-v0.1.0" },
+        "fieldKind": { "enum": ["persistent_identifier", "source_local_identifier", "name_or_title", "contact_person", "geography", "categorical", "numeric", "date_or_timestamp", "free_text", "unknown", "name", "phone", "email", "domain", "address", "city", "region", "postal", "other"] },
+        "featurePipelineVersion": { "const": "feature-pipeline-v0.2.0" },
         "features": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["name", "value"], "properties": { "name": { "type": "string", "minLength": 1 }, "value": { "type": "number", "minimum": 0, "maximum": 1 } } } },
         "outcome": { "$ref": "#/$defs/evidenceOutcome" },
         "evidenceClass": { "enum": ["exact_agreement", "partial_agreement", "conflict", "missing_left", "missing_right", "missing_both"] },
@@ -60,7 +68,11 @@
         "conflictContribution": { "type": "number", "minimum": 0 },
         "contribution": { "type": "number" },
         "explanationCode": { "type": "string", "minLength": 1 },
-        "explanation": { "type": "string", "minLength": 1 }
+        "explanation": { "type": "string", "minLength": 1 },
+        "valueFrequencyA": { "type": "integer", "minimum": 0 },
+        "valueFrequencyB": { "type": "integer", "minimum": 0 },
+        "informationClass": { "enum": ["distinctive", "repeated", "common", "not_applicable", "unknown"] },
+        "informationMultiplier": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "datasetProfile": {
@@ -116,11 +128,13 @@
       "properties": {
         "contractVersion": { "const": "1.0.0" },
         "matcherVersion": { "$ref": "#/$defs/matcherVersion" },
-        "candidateEngineVersion": { "const": "candidate-engine-v0.3.0" },
+        "candidateEngineVersion": { "const": "candidate-engine-v0.4.0" },
         "blockingNormalizationVersion": { "const": "blocking-normalization-v0.1.0" },
-        "featurePipelineVersion": { "const": "feature-pipeline-v0.1.0" },
-        "matcherConfigVersion": { "const": "matcher-config-v0.2.0" },
+        "featurePipelineVersion": { "const": "feature-pipeline-v0.2.0" },
+        "matcherConfigVersion": { "const": "matcher-config-v0.3.0" },
         "matcherConfig": { "type": "object" },
+        "evidencePlanVersion": { "const": "evidence-plan-v1.0.0" },
+        "evidencePlan": { "type": "object" },
         "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidatePair" } },
         "onlyA": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } },
         "onlyB": { "type": "array", "items": { "$ref": "#/$defs/rowRecord" } }
@@ -129,15 +143,19 @@
     "identityDecision": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decisionId", "runId", "candidateId", "aRowId", "bRowId", "systemProposal", "humanDecision", "matcherVersion", "candidateEngineVersion", "matchScore", "evidenceShown", "decidedAt"],
+      "required": ["decisionId", "runId", "candidateId", "aRowId", "bRowId", "systemProposal", "humanDecision", "matcherVersion", "candidateEngineVersion", "matchScore", "evidenceShown", "decisionOrigin", "reviewSignatureVersion", "reviewGroupId", "evidenceSnapshotSha256", "decidedAt"],
       "properties": {
         "decisionId": { "type": "string", "minLength": 1 }, "runId": { "type": "string", "minLength": 1 },
         "candidateId": { "type": "string", "minLength": 1 }, "aRowId": { "type": "string", "minLength": 1 }, "bRowId": { "type": "string", "minLength": 1 },
         "systemProposal": { "$ref": "#/$defs/candidateBand" }, "humanDecision": { "$ref": "#/$defs/humanDecision" },
         "matcherVersion": { "$ref": "#/$defs/matcherVersion" },
-        "candidateEngineVersion": { "const": "candidate-engine-v0.3.0" },
+        "candidateEngineVersion": { "const": "candidate-engine-v0.4.0" },
         "matchScore": { "type": "number", "minimum": 0, "maximum": 1 },
         "evidenceShown": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fieldEvidence" } },
+        "decisionOrigin": { "enum": ["human_individual", "human_batch_rule"] },
+        "reviewSignatureVersion": { "type": ["string", "null"], "enum": ["review-signature-v1.0.0", null] },
+        "reviewGroupId": { "type": ["string", "null"] },
+        "evidenceSnapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "decidedAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -218,10 +236,13 @@
     },
     "resultSummary": {
       "type": "object", "additionalProperties": false,
+      "description": "Mutually exclusive primary product result states.",
       "required": ["matched", "needsReview", "onlyA", "onlyB"],
       "properties": {
-        "matched": { "type": "integer", "minimum": 0 }, "needsReview": { "type": "integer", "minimum": 0 },
-        "onlyA": { "type": "integer", "minimum": 0 }, "onlyB": { "type": "integer", "minimum": 0 }
+        "matched": { "type": "integer", "minimum": 0, "description": "A records automatically or manually linked to B." },
+        "needsReview": { "type": "integer", "minimum": 0, "description": "A records awaiting or deferring identity review." },
+        "onlyA": { "type": "integer", "minimum": 0, "description": "A records with no remaining match after review state is excluded." },
+        "onlyB": { "type": "integer", "minimum": 0, "description": "B records with no remaining match after review state is excluded." }
       }
     },
     "runView": {

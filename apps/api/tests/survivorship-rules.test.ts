@@ -23,7 +23,7 @@ function conflict(aValue = "Active", bValue = "Inactive"): FieldConflict {
 function candidate(aTimestamp = "2026-01-02T00:00:00Z", bTimestamp = "2026-01-01T00:00:00Z"): CandidatePair {
   return {
     candidateId: "candidate-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme", status: "Active", updated: aTimestamp }, bRecord: { name: "Acme", status: "Inactive", updated: bTimestamp }, rank: 1, matchScore: 0.8, runnerUpMargin: 0.5, band: "needs_review", collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name", keyHash: "0123456789abcdef" }], positiveEvidence: 1, conflictEvidence: 0, totalWeight: 1,
-    evidence: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", aValue: "Acme", bValue: "Acme", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [{ name: "exact", value: 1 }], outcome: "exact", evidenceClass: "exact_agreement", weight: 1, positiveContribution: 1, conflictContribution: 0, contribution: 1, explanationCode: "exact", explanation: "Exact." }],
+    evidence: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", aValue: "Acme", bValue: "Acme", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.2.0", features: [{ name: "exact", value: 1 }], outcome: "exact", evidenceClass: "exact_agreement", weight: 1, positiveContribution: 1, conflictContribution: 0, contribution: 1, explanationCode: "exact", explanation: "Exact." }],
   };
 }
 

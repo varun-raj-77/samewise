@@ -36,8 +36,8 @@ export function buildMetadataFirstInput(a: DatasetProfile, b: DatasetProfile): S
   return SemanticMappingModelInputSchema.parse({
     requestVersion: SEMANTIC_MAPPING_REQUEST_VERSION,
     datasets: {
-      A: { columns: a.columns.map(({ name, inferredType, nullRate, distinctRate }) => ({ name, inferredType, nullRate, distinctRate })) },
-      B: { columns: b.columns.map(({ name, inferredType, nullRate, distinctRate }) => ({ name, inferredType, nullRate, distinctRate })) },
+      A: { columns: a.columns.map(({ name, inferredType, nullRate, distinctRate, normalizedDistinctRate, mostCommonValueRate, patternShape }) => ({ name, inferredType, nullRate, distinctRate, ...(normalizedDistinctRate == null ? {} : { normalizedDistinctRate }), ...(mostCommonValueRate == null ? {} : { mostCommonValueRate }), ...(patternShape == null ? {} : { patternShape }) })) },
+      B: { columns: b.columns.map(({ name, inferredType, nullRate, distinctRate, normalizedDistinctRate, mostCommonValueRate, patternShape }) => ({ name, inferredType, nullRate, distinctRate, ...(normalizedDistinctRate == null ? {} : { normalizedDistinctRate }), ...(mostCommonValueRate == null ? {} : { mostCommonValueRate }), ...(patternShape == null ? {} : { patternShape }) })) },
     },
   });
 }

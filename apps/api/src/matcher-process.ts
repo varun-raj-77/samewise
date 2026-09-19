@@ -66,8 +66,8 @@ export function createMatcherRunner(): MatcherRunner {
     async match(input) {
       const matcherMappings = input.mappings
         .filter((mapping) => mapping.useForMatching)
-        .map(({ mappingId, label, aColumn, bColumn, normalizer }) => ({
-          mappingId, label, aColumn, bColumn, normalizer, role: "identity" as const,
+        .map(({ mappingId, label, aColumn, bColumn, normalizer, semanticFamily }) => ({
+          mappingId, label, aColumn, bColumn, normalizer, semanticFamily: semanticFamily ?? "unknown", role: "identity" as const,
         }));
       return MatcherResultSchema.parse(await runPython({
         operation: "match",

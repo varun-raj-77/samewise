@@ -9,6 +9,9 @@ import {
   RUN_MANIFEST_VERSION,
   CandidateEvidenceDetailSchema,
   ConflictPageSchema,
+  BatchIdentityDecisionResponseSchema,
+  ReviewGroupListSchema,
+  ReviewGroupPreviewSchema,
   ResultsPageSchema,
   ReviewQueuePageSchema,
   RunManifestSchema,
@@ -16,6 +19,7 @@ import {
   RunSummarySchema,
   TRUSTED_EXPORT_VERSION,
   type MatcherResult,
+  type RunSummary,
 } from "@samewise/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -31,10 +35,10 @@ let matcherResultOverride: MatcherResult | undefined;
 function baseMatcherResult(): MatcherResult {
   return {
     contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
-    candidateEngineVersion: "candidate-engine-v0.3.0",
+    candidateEngineVersion: "candidate-engine-v0.4.0",
     blockingNormalizationVersion: "blocking-normalization-v0.1.0",
-    featurePipelineVersion: "feature-pipeline-v0.1.0",
-    matcherConfigVersion: "matcher-config-v0.2.0",
+    featurePipelineVersion: "feature-pipeline-v0.2.0",
+    matcherConfigVersion: "matcher-config-v0.3.0",
     matcherConfig: { frozen: true },
     candidates: [{
       candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1",
@@ -44,7 +48,7 @@ function baseMatcherResult(): MatcherResult {
       strongContradiction: false,
       blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }],
       positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2,
-      evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [{ name: "token_similarity", value: 1 }], outcome: "similar", evidenceClass: "partial_agreement", weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." }],
+      evidence: [{ mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name_or_title", featurePipelineVersion: "feature-pipeline-v0.2.0", features: [{ name: "token_similarity", value: 1 }], outcome: "similar", evidenceClass: "partial_agreement", weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." }],
     }],
     onlyA: [], onlyB: [
       { rowId: "B1", record: { id: "B1", organization: "Acme Corporation", status: "inactive" } },
@@ -104,13 +108,13 @@ describe("SW-003 API workflow", () => {
 
   it("uploads, profiles, maps, matches, decides SAME, resolves explicitly, and exports without mutating sources", async () => {
     const { runId, result } = await setup();
-    expect(result.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 });
-    expect(result.mappingVersion).toBe("confirmed-mappings-v2");
+    expect(result.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 1 });
+    expect(result.mappingVersion).toBe("confirmed-mappings-v3");
     expect(result.matcherProvenance).toMatchObject({
       matcherVersion: MATCHER_VERSION,
-      candidateEngineVersion: "candidate-engine-v0.3.0",
-      featurePipelineVersion: "feature-pipeline-v0.1.0",
-      matcherConfigVersion: "matcher-config-v0.2.0",
+      candidateEngineVersion: "candidate-engine-v0.4.0",
+      featurePipelineVersion: "feature-pipeline-v0.2.0",
+      matcherConfigVersion: "matcher-config-v0.3.0",
     });
     const runDirectory = join(dataRoot, runId);
     const paths = (await readdir(runDirectory)).map((name) => join(runDirectory, name));
@@ -124,8 +128,8 @@ describe("SW-003 API workflow", () => {
     const detailAfterSame = await candidateDetail(runId);
     expect(detailAfterSame.humanDecision?.humanDecision).toBe("same_entity");
     expect(detailAfterSame.humanDecision).toMatchObject({
-      matcherVersion: "explainable-matcher-v0.2.0",
-      candidateEngineVersion: "candidate-engine-v0.3.0",
+      matcherVersion: "explainable-matcher-v0.3.0",
+      candidateEngineVersion: "candidate-engine-v0.4.0",
       matchScore: 0.72,
       systemProposal: "needs_review",
     });
@@ -134,10 +138,11 @@ describe("SW-003 API workflow", () => {
       source: { type: "HUMAN_REVIEW_LABELS", representative: false },
       labeledCandidateCount: 1, sameLabels: 1, differentLabels: 0,
       systemProposalAgreementRate: null,
-      labels: [{ matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", humanLabel: "SAME" }],
+      labels: [{ matcherVersion: "explainable-matcher-v0.3.0", candidateEngineVersion: "candidate-engine-v0.4.0", humanLabel: "SAME" }],
     });
     expect(humanEvidence.json().source.caveat).toContain("may not represent the full dataset distribution");
     expect(afterSame.summary?.onlyB).toBe(1);
+    expect(afterSame.summary).toEqual({ matched: 1, needsReview: 0, onlyA: 0, onlyB: 1 });
     const conflictsAfterSame = await conflictPage(runId);
     expect(conflictsAfterSame.items).toHaveLength(1);
     expect(conflictsAfterSame.items[0]?.resolution).toBeNull();
@@ -188,10 +193,10 @@ describe("SW-003 API workflow", () => {
       async match() {
         return {
           contractVersion: "1.0.0", matcherVersion: MATCHER_VERSION,
-          candidateEngineVersion: "candidate-engine-v0.3.0",
+          candidateEngineVersion: "candidate-engine-v0.4.0",
           blockingNormalizationVersion: "blocking-normalization-v0.1.0",
-          featurePipelineVersion: "feature-pipeline-v0.1.0",
-          matcherConfigVersion: "matcher-config-v0.2.0",
+          featurePipelineVersion: "feature-pipeline-v0.2.0",
+          matcherConfigVersion: "matcher-config-v0.3.0",
           matcherConfig: { frozen: true, decisions: { minimumAutoAgreementFields: 2 } },
           candidates: [{
             candidateId: "candidate-stable-id", aRowId: "A-IV-701", bRowId: "B-IV-301",
@@ -204,7 +209,7 @@ describe("SW-003 API workflow", () => {
             evidence: [{
               mappingId: "stable-id", label: "Stable ID", aColumn: "stable_id", bColumn: "stable_id",
               aValue: "VEND-7001", bValue: "VEND-7001", normalizedA: "vend 7001", normalizedB: "vend 7001",
-              fieldKind: "other", featurePipelineVersion: "feature-pipeline-v0.1.0",
+              fieldKind: "unknown", featurePipelineVersion: "feature-pipeline-v0.2.0",
               features: [{ name: "normalized_exact", value: 1 }], outcome: "exact", evidenceClass: "exact_agreement",
               weight: 0.5, positiveContribution: 0.5, conflictContribution: 0, contribution: 0.5,
               explanationCode: "other_exact", explanation: "Stable ID has exact normalized agreement.",
@@ -250,7 +255,7 @@ describe("SW-003 API workflow", () => {
     expect(summaryResponse.json()).not.toHaveProperty("candidates");
     expect(summaryResponse.json()).not.toHaveProperty("reviewQueue");
     expect(summaryResponse.json()).not.toHaveProperty("onlyA");
-    expect(summary.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 2 });
+    expect(summary.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 1 });
 
     const results = ResultsPageSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/results?offset=0&limit=1` })).json());
     expect(results.items).toHaveLength(1);
@@ -265,7 +270,7 @@ describe("SW-003 API workflow", () => {
 
     const detail = await candidateDetail(runId);
     expect(detail.candidate).toEqual(baseMatcherResult().candidates[0]);
-    expect(detail).toMatchObject({ matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.3.0" });
+    expect(detail).toMatchObject({ matcherVersion: MATCHER_VERSION, candidateEngineVersion: "candidate-engine-v0.4.0" });
     const serialized = JSON.stringify(detail);
     expect(serialized).not.toMatch(/canonicalEntityId|corruptionProvenance|groundTruth|OPENAI_API_KEY/i);
     expect((await app.inject({ method: "GET", url: `/api/runs/${runId}/candidates/not-in-this-run` })).statusCode).toBe(404);
@@ -370,9 +375,9 @@ describe("SW-003 API workflow", () => {
     expect(manifest.run.status).toBe("identity_unresolved");
     expect(manifest.sourceDatasets.A).toMatchObject({ originalFilename: "a.csv", sha256: createHash("sha256").update(aBytes).digest("hex"), rowCount: 1 });
     expect(manifest.sourceDatasets.B).toMatchObject({ originalFilename: "b.csv", sha256: createHash("sha256").update(bBytes).digest("hex"), rowCount: 2 });
-    expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v2", ai: null });
-    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: null });
-    expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.2.0" });
+    expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v3", ai: null });
+    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.4.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: "candidate-engine-v0.4.0", candidateConfigAvailability: "retained_in_evidence_plan" });
+    expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.3.0" });
     expect(manifest.identity).toMatchObject({ systemEstablishedLinkCount: 0, humanSameCount: 0, humanDifferentCount: 0, pendingCount: 1, deferredCount: 0 });
     expect(manifest.evaluation).toMatchObject({ applicable: false, snapshotId: null });
     expect(manifest.export.artifacts).toHaveLength(1);
@@ -497,12 +502,14 @@ describe("SW-003 API workflow", () => {
       strongestPositive: expect.objectContaining({ mappingId: "name" }),
     })]);
     expect(result.reviewProgress).toEqual({ total: 1, reviewed: 0, remaining: 1, deferred: 0 });
+    expect(result.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 1 });
 
     const deferred = RunSummarySchema.parse((await app.inject({
       method: "PATCH", url: `/api/runs/${runId}/review-items/A1`, payload: { deferred: true },
     })).json());
     expect((await reviewPage(runId)).items[0]?.state).toBe("deferred");
     expect(deferred.reviewProgress).toEqual({ total: 1, reviewed: 0, remaining: 0, deferred: 1 });
+    expect(deferred.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 1 });
 
     const returned = RunSummarySchema.parse((await app.inject({
       method: "PATCH", url: `/api/runs/${runId}/review-items/A1`, payload: { deferred: false },
@@ -523,13 +530,15 @@ describe("SW-003 API workflow", () => {
       }],
     };
     const { runId } = await setup();
-    await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "different_entity" } });
+    const afterFirst = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "different_entity" } })).json());
     expect((await reviewPage(runId)).items[0]).toMatchObject({ state: "needs_review", candidateCount: 2, topCandidateId: "candidate-1-2", topBRowId: "B2" });
     expect((await candidateDetail(runId)).humanDecision?.humanDecision).toBe("different_entity");
+    expect(afterFirst.summary).toEqual({ matched: 0, needsReview: 1, onlyA: 0, onlyB: 1 });
 
     const afterSecond = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-2/decisions`, payload: { decision: "different_entity" } })).json());
     expect((await reviewPage(runId)).items[0]?.state).toBe("reviewed_different");
     expect(afterSecond.reviewProgress).toEqual({ total: 1, reviewed: 1, remaining: 0, deferred: 0 });
+    expect(afterSecond.summary).toEqual({ matched: 0, needsReview: 0, onlyA: 1, onlyB: 2 });
 
     await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` });
     expect((await candidateDetail(runId, "candidate-1-1")).humanDecision?.humanDecision).toBe("different_entity");
@@ -575,17 +584,162 @@ describe("SW-003 API workflow", () => {
     expect(review.items).toHaveLength(2);
     expect(review.items[0]).toMatchObject({ collision: true, collisionARowIds: ["A2"] });
     expect(review.items[1]).toMatchObject({ collision: true, collisionARowIds: ["A1"] });
+    const summary = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    expect(summary.summary).toEqual({ matched: 0, needsReview: 2, onlyA: 0, onlyB: 1 });
   });
 
-  it("keeps a system auto-match distinct from a human SAME confirmation", async () => {
+  it("keeps an automatic match out of review and no-match even with a retained alternative", async () => {
     const base = baseMatcherResult();
-    matcherResultOverride = { ...base, candidates: [{ ...base.candidates[0]!, band: "auto_match" }] };
+    const automatic = { ...base.candidates[0]!, band: "auto_match" as const };
+    matcherResultOverride = { ...base, candidates: [automatic, {
+      ...automatic,
+      candidateId: "candidate-1-2",
+      bRowId: "B2",
+      bRecord: { id: "B2", organization: "Other", status: "active" },
+      rank: 2,
+      band: "needs_review",
+    }] };
     const { runId, result } = await setup();
-    expect(result.summary?.matched).toBe(1);
+    expect(result.summary).toEqual({ matched: 1, needsReview: 0, onlyA: 0, onlyB: 1 });
     expect((await reviewPage(runId)).items).toEqual([]);
     await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } });
     expect((await reviewPage(runId)).items[0]).toMatchObject({ state: "reviewed_same", humanDecision: { humanDecision: "same_entity" } });
     expect((await candidateDetail(runId)).humanDecision?.systemProposal).toBe("auto_match");
+  });
+
+  it("groups generic evidence signatures, previews them boundedly, records per-pair batch provenance, and undoes atomically", async () => {
+    const base = baseMatcherResult();
+    const template = base.candidates[0]!;
+    const exactEvidence = (mappingId: string, label: string, fieldKind: "name_or_title" | "email") => ({
+      ...template.evidence[0]!, mappingId, label, fieldKind,
+      featurePipelineVersion: "feature-pipeline-v0.2.0" as const,
+      outcome: "exact" as const, evidenceClass: "exact_agreement" as const,
+      positiveContribution: fieldKind === "email" ? 1.5 : 2,
+      conflictContribution: 0, contribution: fieldKind === "email" ? 1.5 : 2,
+      informationClass: "distinctive" as const, informationMultiplier: 1,
+    });
+    const grouped = [
+      { id: "1", nameId: "org-name", nameLabel: "Organization name", emailId: "email", emailLabel: "Email" },
+      { id: "2", nameId: "vendor-title", nameLabel: "Vendor title", emailId: "mailbox", emailLabel: "Mailbox" },
+      { id: "3", nameId: "product-title", nameLabel: "Product title", emailId: "support-email", emailLabel: "Support email" },
+    ].map(({ id, nameId, nameLabel, emailId, emailLabel }) => ({
+      ...template,
+      candidateId: `candidate-${id}-${id}`,
+      aRowId: `A${id}`,
+      bRowId: `B${id}`,
+      aRecord: { id: `A${id}`, name: `Entity ${id}`, status: "active" },
+      bRecord: { id: `B${id}`, organization: `Entity ${id}`, status: "inactive" },
+      matchScore: 0.78,
+      runnerUpMargin: 0.2,
+      collision: false,
+      positiveEvidence: 3.5,
+      conflictEvidence: 0,
+      totalWeight: 3.5,
+      evidence: [exactEvidence(nameId, nameLabel, "name_or_title"), exactEvidence(emailId, emailLabel, "email")],
+    }));
+    matcherResultOverride = { ...base, candidates: grouped };
+    const { runId } = await setup();
+
+    const first = ReviewGroupListSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/review-groups` })).json());
+    const second = ReviewGroupListSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/review-groups` })).json());
+    expect(second).toEqual(first);
+    expect(first.workload).toMatchObject({ totalNeedsAttention: 3, quickDecisions: 3, groupCount: 1 });
+    expect(first.groups[0]).toMatchObject({ caseCount: 3, eligibleSameCount: 3, suggestedDecision: "same_entity", signatureVersion: "review-signature-v1.0.0" });
+    const groupId = first.groups[0]!.groupId;
+
+    const preview = ReviewGroupPreviewSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/review-groups/${groupId}?offset=0&limit=1` })).json());
+    expect(preview.items).toHaveLength(1);
+    expect(preview.page).toMatchObject({ total: 3, returned: 1, nextOffset: 1 });
+    const missingConfirmation = await app.inject({ method: "POST", url: `/api/runs/${runId}/review-groups/${groupId}/decisions`, payload: { decision: "same_entity" } });
+    expect(missingConfirmation.statusCode).toBe(400);
+
+    const applied = BatchIdentityDecisionResponseSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/review-groups/${groupId}/decisions`, payload: { decision: "same_entity", confirmed: true } })).json());
+    expect(applied).toMatchObject({ appliedCount: 3, excludedCount: 0, decision: "same_entity", signatureVersion: "review-signature-v1.0.0" });
+    expect(applied.run.reviewUndo).toMatchObject({ decisionOrigin: "human_batch_rule", affectedCount: 3, reviewGroupId: groupId, canUndo: true });
+    for (const candidate of grouped) {
+      expect((await candidateDetail(runId, candidate.candidateId)).humanDecision).toMatchObject({
+        decisionOrigin: "human_batch_rule", reviewGroupId: groupId, reviewSignatureVersion: "review-signature-v1.0.0",
+        evidenceSnapshotSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      });
+    }
+    const manifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
+    expect(manifest.identity).toMatchObject({ humanBatchPairCount: 3, reviewSignatureVersion: "review-signature-v1.0.0" });
+
+    const individualRun = await setup();
+    let individualSummary: RunSummary["summary"] = null;
+    for (const candidate of grouped) {
+      individualSummary = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${individualRun.runId}/candidates/${candidate.candidateId}/decisions`, payload: { decision: "same_entity" } })).json()).summary;
+    }
+    expect(applied.run.summary).toEqual(individualSummary);
+
+    const undone = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` })).json());
+    expect(undone.reviewProgress.remaining).toBe(3);
+    expect(undone.conflictSummary.total).toBe(0);
+  });
+
+  it("batch DIFFERENT accepts only low-information support and rejects exact persistent evidence", async () => {
+    const base = baseMatcherResult();
+    const template = base.candidates[0]!;
+    const lowInformation = {
+      ...template.evidence[0]!, mappingId: "representative", label: "Representative", fieldKind: "contact_person" as const,
+      featurePipelineVersion: "feature-pipeline-v0.2.0" as const, outcome: "exact" as const, evidenceClass: "exact_agreement" as const,
+      weight: 0.75, positiveContribution: 0.2, conflictContribution: 0, contribution: 0.2,
+      informationClass: "common" as const, informationMultiplier: 0.25,
+    };
+    matcherResultOverride = { ...base, candidates: ["1", "2"].map((id) => ({
+      ...template, candidateId: `candidate-low-${id}`, aRowId: `A${id}`, bRowId: `B${id}`,
+      runnerUpMargin: 0.2, collision: false, positiveEvidence: 0.2, conflictEvidence: 0, totalWeight: 0.75, evidence: [{ ...lowInformation, mappingId: `contact-${id}`, label: `Contact ${id}` }],
+    })) };
+    const lowRun = await setup();
+    const lowGroups = ReviewGroupListSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${lowRun.runId}/review-groups` })).json());
+    expect(lowGroups.workload.lowInformationNoise).toBe(2);
+    expect(lowGroups.groups[0]).toMatchObject({ eligibleDifferentCount: 2, suggestedDecision: "different_entity" });
+    const different = BatchIdentityDecisionResponseSchema.parse((await app.inject({ method: "POST", url: `/api/runs/${lowRun.runId}/review-groups/${lowGroups.groups[0]!.groupId}/decisions`, payload: { decision: "different_entity", confirmed: true } })).json());
+    expect(different.appliedCount).toBe(2);
+    const individualDifferentRun = await setup();
+    let individualDifferentSummary: RunSummary["summary"] = null;
+    for (const candidate of matcherResultOverride.candidates) {
+      individualDifferentSummary = RunSummarySchema.parse((await app.inject({ method: "POST", url: `/api/runs/${individualDifferentRun.runId}/candidates/${candidate.candidateId}/decisions`, payload: { decision: "different_entity" } })).json()).summary;
+    }
+    expect(different.run.summary).toEqual(individualDifferentSummary);
+
+    const persistent = {
+      ...template.evidence[0]!, mappingId: "account-key", label: "Account key", fieldKind: "persistent_identifier" as const,
+      featurePipelineVersion: "feature-pipeline-v0.2.0" as const, outcome: "exact" as const, evidenceClass: "exact_agreement" as const,
+      weight: 2.5, positiveContribution: 2.5, conflictContribution: 0, contribution: 2.5,
+      informationClass: "distinctive" as const, informationMultiplier: 1,
+    };
+    matcherResultOverride = { ...base, candidates: [{ ...template, evidence: [persistent], positiveEvidence: 2.5, conflictEvidence: 0, totalWeight: 2.5, runnerUpMargin: 0.2, collision: false }] };
+    const persistentRun = await setup();
+    const persistentGroups = ReviewGroupListSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${persistentRun.runId}/review-groups` })).json());
+    expect(persistentGroups.groups[0]?.eligibleDifferentCount).toBe(0);
+    const rejected = await app.inject({ method: "POST", url: `/api/runs/${persistentRun.runId}/review-groups/${persistentGroups.groups[0]!.groupId}/decisions`, payload: { decision: "different_entity", confirmed: true } });
+    expect(rejected.statusCode).toBe(409);
+    expect(rejected.json().error.code).toBe("batch_decision_not_safe");
+  });
+
+  it("excludes collisions, near ties, alternatives, and strong contradictions from batch SAME", async () => {
+    const base = baseMatcherResult();
+    const template = base.candidates[0]!;
+    const strongEvidence = [
+      { ...template.evidence[0]!, mappingId: "title", label: "Title", fieldKind: "name_or_title" as const, featurePipelineVersion: "feature-pipeline-v0.2.0" as const, evidenceClass: "exact_agreement" as const, outcome: "exact" as const, positiveContribution: 2, conflictContribution: 0, contribution: 2, informationClass: "distinctive" as const },
+      { ...template.evidence[0]!, mappingId: "email", label: "Email", fieldKind: "email" as const, featurePipelineVersion: "feature-pipeline-v0.2.0" as const, evidenceClass: "exact_agreement" as const, outcome: "exact" as const, positiveContribution: 1.5, conflictContribution: 0, contribution: 1.5, informationClass: "distinctive" as const },
+    ];
+    matcherResultOverride = { ...base, candidates: [
+      { ...template, candidateId: "unsafe-collision", aRowId: "A1", bRowId: "B1", collision: true, runnerUpMargin: 0.2, evidence: strongEvidence, positiveEvidence: 3.5, conflictEvidence: 0, totalWeight: 3.5 },
+      { ...template, candidateId: "unsafe-near-tie", aRowId: "A2", bRowId: "B2", collision: false, runnerUpMargin: 0.01, evidence: strongEvidence, positiveEvidence: 3.5, conflictEvidence: 0, totalWeight: 3.5 },
+      { ...template, candidateId: "unsafe-strong", aRowId: "A3", bRowId: "B3", collision: false, strongContradiction: true, runnerUpMargin: 0.2, evidence: strongEvidence, positiveEvidence: 3.5, conflictEvidence: 0, totalWeight: 3.5 },
+      { ...template, candidateId: "unsafe-alt-1", aRowId: "A4", bRowId: "B4", rank: 1, collision: false, runnerUpMargin: 0.01, evidence: strongEvidence, positiveEvidence: 3.5, conflictEvidence: 0, totalWeight: 3.5 },
+      { ...template, candidateId: "unsafe-alt-2", aRowId: "A4", bRowId: "B5", rank: 2, collision: false, runnerUpMargin: 0.01, evidence: strongEvidence, positiveEvidence: 3.5, conflictEvidence: 0, totalWeight: 3.5 },
+    ] };
+    const { runId } = await setup();
+    const groups = ReviewGroupListSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/review-groups` })).json());
+    expect(groups.workload.totalNeedsAttention).toBe(4);
+    expect(groups.groups.every((group) => group.eligibleSameCount === 0)).toBe(true);
+    for (const group of groups.groups) {
+      const response = await app.inject({ method: "POST", url: `/api/runs/${runId}/review-groups/${group.groupId}/decisions`, payload: { decision: "same_entity", confirmed: true } });
+      expect(response.statusCode).toBe(409);
+    }
   });
 
   it("rejects unsupported, empty, duplicate, and invalid mapping uploads safely", async () => {

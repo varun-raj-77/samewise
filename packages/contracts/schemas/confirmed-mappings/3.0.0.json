@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://samewise.local/contracts/confirmed-mappings/3.0.0.json",
+  "title": "Samewise confirmed mappings v3",
+  "x-mapping-version": "confirmed-mappings-v3",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["mappingId", "label", "aColumn", "bColumn", "normalizer", "useForMatching", "includeInMerge", "semanticFamily"],
+    "properties": {
+      "mappingId": { "type": "string", "minLength": 1 },
+      "label": { "type": "string", "minLength": 1 },
+      "aColumn": { "type": "string", "minLength": 1 },
+      "bColumn": { "type": "string", "minLength": 1 },
+      "normalizer": { "enum": ["text", "phone", "email", "number", "date"] },
+      "useForMatching": { "type": "boolean" },
+      "includeInMerge": { "type": "boolean" },
+      "semanticFamily": { "enum": ["persistent_identifier", "source_local_identifier", "name_or_title", "contact_person", "email", "phone", "domain", "address", "geography", "categorical", "numeric", "date_or_timestamp", "free_text", "unknown"] }
+    }
+  }
+}

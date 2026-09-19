@@ -2,6 +2,7 @@ import csv
 import hashlib
 import re
 import unicodedata
+from collections import Counter
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from difflib import SequenceMatcher
@@ -126,15 +127,73 @@ def profile_rows(
         populated = [value for value in values if value.strip()]
         samples = list(dict.fromkeys(populated))[:3]
         distinct = len(set(populated))
+        normalized = [normalize(value, "text") for value in populated]
+        normalized_distinct = len(set(normalized))
+        frequencies = Counter(normalized)
+        most_common_count = frequencies.most_common(1)[0][1] if frequencies else 0
         null_count = count - len(populated)
+        inferred_type = infer_type(values)
+        populated_count = len(populated)
+        shapes = {
+            "uuid_like": sum(
+                bool(
+                    re.fullmatch(
+                        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+                        value.strip(),
+                    )
+                )
+                for value in populated
+            ),
+            "email_like": sum(value.count("@") == 1 for value in populated),
+            "phone_like": sum(
+                len(re.sub(r"\D", "", value)) >= 7 for value in populated
+            ),
+            "short_code": sum(
+                bool(re.fullmatch(r"[A-Za-z0-9._/-]{1,24}", value.strip()))
+                for value in populated
+            ),
+        }
+        if not populated:
+            pattern_shape = "empty"
+        elif inferred_type in {"integer", "number"}:
+            pattern_shape = "numeric"
+        elif inferred_type == "date":
+            pattern_shape = "date_like"
+        else:
+            dominant = max(shapes, key=shapes.get)
+            pattern_shape = (
+                dominant
+                if shapes[dominant] / populated_count >= 0.9
+                else "text"
+                if all(" " in value or len(value) > 24 for value in populated[:100])
+                else "mixed"
+            )
         profiles.append(
             ColumnProfile(
                 name=header,
-                inferredType=infer_type(values),
+                inferredType=inferred_type,
                 nullCount=null_count,
                 nullRate=round(null_count / count, 6) if count else 0,
                 distinctCount=distinct,
                 distinctRate=round(distinct / count, 6) if count else 0,
+                normalizedDistinctCount=normalized_distinct,
+                normalizedDistinctRate=(
+                    round(normalized_distinct / populated_count, 6)
+                    if populated_count
+                    else 0
+                ),
+                mostCommonValueCount=most_common_count,
+                mostCommonValueRate=(
+                    round(most_common_count / populated_count, 6)
+                    if populated_count
+                    else 0
+                ),
+                averageValueLength=(
+                    round(sum(len(value) for value in populated) / populated_count, 3)
+                    if populated_count
+                    else 0
+                ),
+                patternShape=pattern_shape,
                 samples=samples,
             )
         )

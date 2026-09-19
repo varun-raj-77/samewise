@@ -24,8 +24,11 @@ from samewise_matcher.blocking_normalization import (
 )
 from samewise_matcher.workflow_models import ManualMapping
 
-CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.3.0"
+CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.4.0"
 BlockerId = Literal[
+    "persistent_exact_v1",
+    "exact_supporting_v1",
+    "supporting_context_v1",
     "exact_strong_v1",
     "name_token_v1",
     "name_character_v1",
@@ -42,6 +45,9 @@ V1_BLOCKERS: tuple[BlockerId, ...] = (
     "address_name_v1",
 )
 DEFAULT_BLOCKERS: tuple[BlockerId, ...] = (
+    "persistent_exact_v1",
+    "exact_supporting_v1",
+    "supporting_context_v1",
     "exact_strong_v1",
     "name_token_v1",
     "name_character_v1",
@@ -74,6 +80,7 @@ class CandidateEngineConfig(StrictModel):
         "candidate-engine-v0.1.0",
         "candidate-engine-v0.2.0",
         "candidate-engine-v0.3.0",
+        "candidate-engine-v0.4.0",
     ] = CANDIDATE_ENGINE_VERSION
     normalizationVersion: Literal["blocking-normalization-v0.1.0"] = (
         NORMALIZATION_VERSION
@@ -112,6 +119,7 @@ class CandidateGenerationResult(StrictModel):
         "candidate-engine-v0.1.0",
         "candidate-engine-v0.2.0",
         "candidate-engine-v0.3.0",
+        "candidate-engine-v0.4.0",
     ]
     normalizationVersion: Literal["blocking-normalization-v0.1.0"]
     config: CandidateEngineConfig
@@ -124,6 +132,13 @@ class CandidateGenerationResult(StrictModel):
 
 
 def _mapping_kind(mapping: ManualMapping) -> str:
+    # An explicitly confirmed unknown family is authoritative and receives the
+    # conservative exact comparator. Only pre-semantic legacy mappings receive
+    # the historical name-based inference below.
+    if "semanticFamily" in mapping.model_fields_set:
+        return mapping.semanticFamily
+    if mapping.semanticFamily != "unknown":
+        return mapping.semanticFamily
     text = " ".join(
         (mapping.mappingId, mapping.label, mapping.aColumn, mapping.bColumn)
     ).casefold()
@@ -183,6 +198,7 @@ def record_blocking_keys(
         blocker: set() for blocker in config.enabledBlockers
     }
     name_values: list[tuple[str, set[str]]] = []
+    supporting_values: list[tuple[str, str]] = []
     location_values: list[str] = []
     address_values: list[str] = []
     prepared_mappings = mapping_kinds or tuple(
@@ -196,7 +212,19 @@ def record_blocking_keys(
             continue
         column = mapping.aColumn if side == "A" else mapping.bColumn
         raw = row.get(column, "")
-        if kind == "phone":
+        if kind == "persistent_identifier":
+            normalized = normalize_text(raw)
+            if normalized and "persistent_exact_v1" in keys:
+                keys["persistent_exact_v1"].add(
+                    f"{mapping.mappingId}:identifier:{normalized}"
+                )
+        elif kind == "source_local_identifier":
+            normalized = normalize_text(raw)
+            if normalized and "exact_supporting_v1" in keys:
+                keys["exact_supporting_v1"].add(
+                    f"{mapping.mappingId}:source-local:{normalized}"
+                )
+        elif kind == "phone":
             normalized = normalize_phone(raw)
             if normalized and "exact_strong_v1" in keys:
                 keys["exact_strong_v1"].add(f"{mapping.mappingId}:phone:{normalized}")
@@ -213,16 +241,20 @@ def record_blocking_keys(
             normalized = normalize_domain(raw)
             if normalized and "exact_strong_v1" in keys:
                 keys["exact_strong_v1"].add(f"{mapping.mappingId}:domain:{normalized}")
-        elif kind == "name":
+        elif kind in {"name", "name_or_title"}:
             normalized = normalize_name(raw)
             tokens = _meaningful_tokens(raw, stop)
             if normalized:
                 name_values.append((normalized, tokens))
+        elif kind == "contact_person":
+            normalized = normalize_name(raw)
+            if normalized:
+                supporting_values.append((mapping.mappingId, normalized))
         elif kind == "postal":
             normalized = normalize_postal(raw)
             if normalized:
                 location_values.append(f"postal:{normalized}")
-        elif kind in {"city", "region"}:
+        elif kind in {"city", "region", "geography"}:
             normalized = normalize_text(raw)
             if normalized:
                 location_values.append(f"{kind}:{normalized}")
@@ -230,9 +262,22 @@ def record_blocking_keys(
             normalized = normalize_address(raw)
             if normalized:
                 address_values.append(normalized)
+        elif kind in {
+            "categorical",
+            "numeric",
+            "date_or_timestamp",
+            "free_text",
+            "unknown",
+        } and config.engineVersion == "candidate-engine-v0.4.0":
+            normalized = normalize_text(raw)
+            if normalized and "exact_supporting_v1" in keys:
+                keys["exact_supporting_v1"].add(
+                    f"{mapping.mappingId}:supporting:{normalized}"
+                )
         elif (
             kind == "other"
-            and config.engineVersion == "candidate-engine-v0.3.0"
+            and config.engineVersion
+            in {"candidate-engine-v0.3.0", "candidate-engine-v0.4.0"}
             and "exact_strong_v1" in keys
         ):
             normalized = normalize_text(raw)
@@ -240,6 +285,19 @@ def record_blocking_keys(
                 keys["exact_strong_v1"].add(
                     f"{mapping.mappingId}:generic-exact:{normalized}"
                 )
+
+    if "supporting_context_v1" in keys:
+        for mapping_id, supporting in supporting_values:
+            for location in location_values:
+                keys["supporting_context_v1"].add(
+                    f"{mapping_id}:{supporting}:location:{location}"
+                )
+            for address in address_values:
+                number = address_number(address)
+                if number:
+                    keys["supporting_context_v1"].add(
+                        f"{mapping_id}:{supporting}:number:{number}"
+                    )
 
     for name, tokens in name_values:
         compact = re_sub_nonword(name)

@@ -34,6 +34,10 @@ from samewise_matcher.evaluation_product import (
 from samewise_matcher.explainable_matcher import MatcherConfig, match_csvs_explainable
 from samewise_matcher.fixture_generator import generate_fixture, summarize_fixture
 from samewise_matcher.fixture_models import CorruptionConfig, FixtureConfig
+from samewise_matcher.generalization_suite import (
+    run_generalization_suite,
+    write_generalization_artifacts,
+)
 from samewise_matcher.matcher_evaluation import (
     markdown_matcher_report,
     run_fixture_evaluation,
@@ -41,6 +45,11 @@ from samewise_matcher.matcher_evaluation import (
 from samewise_matcher.performance_benchmark import benchmark_fixture
 from samewise_matcher.performance_benchmark import (
     markdown_summary as markdown_performance_summary,
+)
+from samewise_matcher.review_workload import (
+    ReviewWorkloadConfig,
+    analyze_review_workload,
+    write_review_workload_artifacts,
 )
 from samewise_matcher.weak_identifier_fixture import (
     WeakIdentifierFixtureConfig,
@@ -210,6 +219,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip Python allocation tracing for a lower-overhead safety run",
     )
+    review_workload = subcommands.add_parser(
+        "review-workload", help="analyze deterministic review workload composition"
+    )
+    review_workload.add_argument("--config", required=True, type=Path)
+    review_workload.add_argument("--output-dir", required=True, type=Path)
+    review_workload.add_argument("--semantic", action="store_true")
+    generalization = subcommands.add_parser(
+        "generalization-suite", help="run cross-domain semantic acceptance fixtures"
+    )
+    generalization.add_argument("--output-dir", required=True, type=Path)
     return parser
 
 
@@ -309,6 +328,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 json.dumps({"error": {"code": "invalid_input", "message": str(error)}})
             )
             return 2
+
+    if args.command == "review-workload":
+        config = ReviewWorkloadConfig.model_validate_json(
+            args.config.read_text(encoding="utf-8")
+        )
+        report = analyze_review_workload(config, semantic=args.semantic)
+        write_review_workload_artifacts(report, args.output_dir)
+        print(json.dumps(report["metrics"], indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "generalization-suite":
+        report = run_generalization_suite()
+        write_generalization_artifacts(report, args.output_dir)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["passed"] else 1
 
     if args.command == "fixtures" and args.fixture_command == "generate":
         try:

@@ -64,7 +64,10 @@ export const RunManifestSchema = z.object({
     candidateEngineVersion: z.string().min(1),
     blockingNormalizationVersion: z.string().min(1),
     candidateConfigVersion: z.string().min(1).nullable(),
-    candidateConfigAvailability: z.literal("not_retained_by_product_run"),
+    candidateConfigAvailability: z.literal("retained_in_evidence_plan"),
+    evidencePlanVersion: z.string().min(1),
+    evidencePlanSha256: Sha256Schema,
+    evidencePlan: z.record(z.string(), z.unknown()),
   }).strict(),
   matcher: z.object({
     featurePipelineVersion: z.string().min(1), matcherVersion: z.string().min(1),
@@ -78,6 +81,8 @@ export const RunManifestSchema = z.object({
     pendingCount: z.number().int().nonnegative(),
     deferredCount: z.number().int().nonnegative(),
     collisionRelatedCount: z.number().int().nonnegative(),
+    humanBatchPairCount: z.number().int().nonnegative(),
+    reviewSignatureVersion: z.string().min(1),
   }).strict(),
   survivorship: z.object({
     policySchemaVersion: z.string().min(1),

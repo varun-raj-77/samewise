@@ -1,0 +1,15 @@
+{
+  "mappings": [
+    {"mappingId":"organization-name","label":"Organization name","aColumn":"vendor_name","bColumn":"organization","role":"identity","normalizer":"text","semanticFamily":"name_or_title"},
+    {"mappingId":"phone","label":"Phone","aColumn":"phone","bColumn":"telephone","role":"identity","normalizer":"phone","semanticFamily":"phone"},
+    {"mappingId":"email","label":"Email","aColumn":"contact_email","bColumn":"email_address","role":"identity","normalizer":"email","semanticFamily":"email"},
+    {"mappingId":"address","label":"Street address","aColumn":"street","bColumn":"address_line_1","role":"identity","normalizer":"text","semanticFamily":"address"},
+    {"mappingId":"city","label":"City","aColumn":"city","bColumn":"locality","role":"identity","normalizer":"text","semanticFamily":"geography"},
+    {"mappingId":"region","label":"State or region","aColumn":"state","bColumn":"region","role":"identity","normalizer":"text","semanticFamily":"geography"},
+    {"mappingId":"postal","label":"Postal code","aColumn":"zip","bColumn":"postal_code","role":"identity","normalizer":"text","semanticFamily":"geography"},
+    {"mappingId":"website-domain","label":"Website domain","aColumn":"website","bColumn":"domain","role":"identity","normalizer":"text","semanticFamily":"domain"},
+    {"mappingId":"status","label":"Status","aColumn":"account_status","bColumn":"status","role":"comparison","normalizer":"text","semanticFamily":"categorical"},
+    {"mappingId":"balance","label":"Balance","aColumn":"balance","bColumn":"outstanding_balance","role":"comparison","normalizer":"number","semanticFamily":"numeric"},
+    {"mappingId":"updated","label":"Updated at","aColumn":"updated_at","bColumn":"last_updated","role":"comparison","normalizer":"date","semanticFamily":"date_or_timestamp"}
+  ]
+}

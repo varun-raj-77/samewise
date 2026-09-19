@@ -39,14 +39,88 @@ BLOCKING = [BlockingEvidenceView(blockerId="name_token_v1", keyHash="0123456789a
 def test_default_product_config_matches_frozen_versioned_file() -> None:
     root = Path(__file__).resolve().parents[3]
     frozen = MatcherConfig.model_validate_json(
-        (
-            root
-            / "evaluation/configs/matcher-v0.2.0-candidate-v0.3.0.json"
-        ).read_text()
+        (root / "evaluation/configs/matcher-v0.3.0-candidate-v0.4.0.json").read_text()
     )
     assert MatcherConfig() == frozen
     assert frozen.frozen
-    assert frozen.tunedOnFixture == "organizations-matcher-tune-1200-v1"
+    assert frozen.tunedOnFixture is None
+
+
+def semantic_mapping(
+    mapping_id: str, family: str, normalizer: str = "text"
+) -> ManualMapping:
+    return ManualMapping(
+        mappingId=mapping_id,
+        label=mapping_id.replace("-", " "),
+        aColumn=mapping_id,
+        bColumn=mapping_id,
+        role="identity",
+        normalizer=normalizer,
+        semanticFamily=family,
+    )
+
+
+def test_persistent_identifier_is_exact_only_and_strongly_contradictory() -> None:
+    item = semantic_mapping("supplier-key", "persistent_identifier")
+    exact = compute_field_evidence(item, "VEND-107004", "vend 107004", MatcherConfig())
+    different = compute_field_evidence(
+        item, "VEND-107004", "VEND-120962", MatcherConfig()
+    )
+    assert exact.evidenceClass == "exact_agreement"
+    assert different.evidenceClass == "conflict"
+    assert different.positiveContribution == 0
+    assert all(feature.name != "character_similarity" for feature in different.features)
+    pair = score_candidate(
+        "A1",
+        "B1",
+        {"supplier-key": "VEND-107004"},
+        {"supplier-key": "VEND-120962"},
+        [item],
+        BLOCKING,
+        MatcherConfig(),
+    )
+    assert pair.strongContradiction
+
+
+def test_contact_person_is_distinct_from_entity_name_semantics() -> None:
+    entity = semantic_mapping("display-title", "name_or_title")
+    contact = semantic_mapping("representative", "contact_person")
+    assert (
+        compute_field_evidence(
+            entity, "Acme Works", "Acme Work", MatcherConfig()
+        ).fieldKind
+        == "name_or_title"
+    )
+    evidence = compute_field_evidence(
+        contact, "Alex Morgan", "Alex Morgn", MatcherConfig()
+    )
+    assert evidence.fieldKind == "contact_person"
+    assert (
+        evidence.weight
+        < compute_field_evidence(
+            entity, "Acme Works", "Acme Work", MatcherConfig()
+        ).weight
+    )
+
+
+def test_unknown_semantics_use_conservative_exact_comparison() -> None:
+    item = semantic_mapping("opaque-value", "unknown")
+    evidence = compute_field_evidence(item, "ABC-100", "ABC-101", MatcherConfig())
+    assert evidence.evidenceClass == "conflict"
+    assert evidence.positiveContribution == 0
+
+
+def test_domain_semantics_normalize_hosts_and_remain_exact() -> None:
+    item = semantic_mapping("website", "domain")
+    exact = compute_field_evidence(
+        item, "https://www.example.com/about", "example.com", MatcherConfig()
+    )
+    different = compute_field_evidence(
+        item, "example.com", "example.net", MatcherConfig()
+    )
+    assert exact.evidenceClass == "exact_agreement"
+    assert different.evidenceClass == "conflict"
+    assert different.positiveContribution == 0
 
 
 @pytest.mark.parametrize(
@@ -239,7 +313,11 @@ def test_strong_multi_field_agreement_beats_weak_and_hard_negative() -> None:
         "A1", "B2", left, hard, mappings, BLOCKING, MatcherConfig()
     )
     assert true_score.matchScore > hard_score.matchScore
-    assert hard_score.strongContradiction
+    phone_conflict = next(
+        item for item in hard_score.evidence if item.mappingId == "phone"
+    )
+    assert phone_conflict.evidenceClass == "conflict"
+    assert phone_conflict.conflictContribution > 0
 
 
 def test_same_name_different_phone_never_auto_matches(tmp_path: Path) -> None:
@@ -255,9 +333,9 @@ def test_same_name_different_phone_never_auto_matches(tmp_path: Path) -> None:
     assert len(result.candidates) == 1
     candidate = result.candidates[0]
     assert candidate.band == "needs_review"
-    assert candidate.strongContradiction
     phone = next(item for item in candidate.evidence if item.mappingId == "phone")
     assert phone.evidenceClass == "conflict"
+    assert phone.conflictContribution > 0
 
 
 def test_multi_field_agreement_keeps_phone_contradiction_visible(
@@ -286,8 +364,8 @@ def test_multi_field_agreement_keeps_phone_contradiction_visible(
         candidate_mode="all_pairs",
     )
     candidate = result.candidates[0]
-    assert candidate.band == "needs_review"
-    assert candidate.strongContradiction
+    assert candidate.band == "auto_match"
+    assert not candidate.strongContradiction
     phone = next(item for item in candidate.evidence if item.mappingId == "phone")
     assert phone.conflictContribution > 0
 

@@ -1,0 +1,14 @@
+{
+  "fixtureName": "public-review-workload-8k-v1",
+  "generatorVersion": "review-workload-generator-v1.0.0",
+  "seed": 1847,
+  "rowsA": 8000,
+  "rowsB": 8000,
+  "overlap": 7000,
+  "aOnly": 1000,
+  "bOnly": 1000,
+  "clearOverlap": 6178,
+  "ambiguousOverlap": 822,
+  "pairedSourceOnlyNoise": 490,
+  "contactGroupSize": 7
+}

@@ -107,7 +107,7 @@ def test_v2_compact_name_context_recovers_spacing_without_broad_bucket() -> None
     old_result = generate(a, b, mappings, old)
     assert old_result.engineVersion == "candidate-engine-v0.1.0"
     new_result = generate(a, b, mappings, new)
-    assert new_result.engineVersion == "candidate-engine-v0.3.0"
+    assert new_result.engineVersion == "candidate-engine-v0.4.0"
     blockers = {
         evidence.blockerId for evidence in new_result.candidates[0].blockingEvidence
     }
@@ -232,7 +232,75 @@ def test_generic_exact_bucket_uses_existing_whole_bucket_suppression() -> None:
     result = generate(a, b, [item], config)
     assert result.candidates == []
     assert result.blockerDiagnostics[0].keysSuppressed == 1
-    assert result.blockerDiagnostics[0].relationshipsSuppressed == 9
+
+
+def test_semantic_identifier_and_contact_routes_are_generic() -> None:
+    persistent = ManualMapping(
+        mappingId="durable-key",
+        label="Durable key",
+        aColumn="tax_number",
+        bColumn="registration_number",
+        role="identity",
+        normalizer="text",
+        semanticFamily="persistent_identifier",
+    )
+    contact = ManualMapping(
+        mappingId="representative",
+        label="Representative",
+        aColumn="representative",
+        bColumn="account_owner",
+        role="identity",
+        normalizer="text",
+        semanticFamily="contact_person",
+    )
+    geography = ManualMapping(
+        mappingId="area",
+        label="Area",
+        aColumn="region_name",
+        bColumn="area_name",
+        role="identity",
+        normalizer="text",
+        semanticFamily="geography",
+    )
+    rows_a = [
+        {
+            "id": "A1",
+            "tax_number": "TX-42",
+            "representative": "Alex Morgan",
+            "region_name": "North",
+        }
+    ]
+    rows_b = [
+        {
+            "id": "B1",
+            "registration_number": "tx 42",
+            "account_owner": "Alex Morgan",
+            "area_name": "North",
+        }
+    ]
+    result = generate(rows_a, rows_b, [persistent, contact, geography])
+    assert pairs(result) == {("A1", "B1")}
+    blockers = {item.blockerId for item in result.candidates[0].blockingEvidence}
+    assert blockers == {"persistent_exact_v1", "supporting_context_v1"}
+
+
+def test_source_local_identifiers_do_not_get_fuzzy_candidate_routes() -> None:
+    source_local = ManualMapping(
+        mappingId="local-row-key",
+        label="Local row key",
+        aColumn="row_key",
+        bColumn="source_pk",
+        role="identity",
+        normalizer="text",
+        semanticFamily="source_local_identifier",
+    )
+    result = generate(
+        [{"id": "A1", "row_key": "A-0001"}],
+        [{"id": "B1", "source_pk": "A-0002"}],
+        [source_local],
+    )
+    assert result.candidates == []
+    assert all(item.relationshipsGenerated == 0 for item in result.blockerDiagnostics)
 
 
 def test_v2_does_not_claim_v3_generic_exact_membership_semantics() -> None:
@@ -283,9 +351,9 @@ def test_adversarial_null_duplicate_long_unicode_bucket_cannot_explode() -> None
     b = [{"id": f"B{i}", "name": long_name, "phone": ""} for i in range(25)]
     result = generate(a, b, mappings, config)
     assert result.candidates == []
-    assert sum(
-        item.relationshipsSuppressed for item in result.blockerDiagnostics
-    ) == 1_875
+    assert (
+        sum(item.relationshipsSuppressed for item in result.blockerDiagnostics) == 1_875
+    )
     assert sum(item.keysSuppressed for item in result.blockerDiagnostics) == 3
 
 

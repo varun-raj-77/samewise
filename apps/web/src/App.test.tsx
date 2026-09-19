@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MappingSuggestionResponse, RunSummary, SemanticMappingProposal } from "@samewise/contracts";
 import { App } from "./App.js";
 
-const evidence = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name" as const, featurePipelineVersion: "feature-pipeline-v0.1.0" as const, features: [{ name: "token_similarity", value: 1 }], outcome: "similar" as const, evidenceClass: "partial_agreement" as const, weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." };
+const evidence = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", aValue: "Acme Corp", bValue: "Acme Corporation", normalizedA: "acme", normalizedB: "acme", fieldKind: "name_or_title" as const, featurePipelineVersion: "feature-pipeline-v0.2.0" as const, features: [{ name: "token_similarity", value: 1 }], outcome: "similar" as const, evidenceClass: "partial_agreement" as const, weight: 2, positiveContribution: 0.72, conflictContribution: 0, contribution: 0.72, explanationCode: "name_partial", explanation: "Organization name has partial normalized agreement." };
 const candidate = { candidateId: "candidate-1-1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme Corp", status: "active" }, bRecord: { organization: "Acme Corporation", status: "inactive" }, rank: 1, matchScore: 0.72, runnerUpMargin: 0.2, band: "needs_review" as const, collision: false, strongContradiction: false, blockingEvidence: [{ blockerId: "name_token_v1", keyHash: "0123456789abcdef" }], positiveEvidence: 0.72, conflictEvidence: 0, totalWeight: 2, evidence: [evidence] };
 const candidateSummary = { candidateId: candidate.candidateId, bRowId: candidate.bRowId, rank: 1, matchScore: 0.72, band: "needs_review" as const, collision: false, strongContradiction: false, strongestPositive: { mappingId: "name", label: "Organization name", evidenceClass: "partial_agreement" as const, contribution: 0.72 }, strongestContradiction: null, humanDecision: null };
 const mapping = { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: false, normalizer: "text" as const };
@@ -21,9 +21,9 @@ function runView(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "results",
     datasets: { A: profile("A"), B: profile("B") }, mappings: [mapping, comparison],
-    mappingVersion: "confirmed-mappings-v2", semanticMappingProvenance: null,
-    matcherVersion: "explainable-matcher-v0.2.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
-    matcherProvenance: { matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.1.0", matcherConfigVersion: "matcher-config-v0.2.0", matcherConfig: { frozen: true } },
+    mappingVersion: "confirmed-mappings-v3", semanticMappingProvenance: null,
+    matcherVersion: "explainable-matcher-v0.3.0", summary: { matched: 2, needsReview: 1, onlyA: 3, onlyB: 4 },
+    matcherProvenance: { matcherVersion: "explainable-matcher-v0.3.0", candidateEngineVersion: "candidate-engine-v0.4.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", featurePipelineVersion: "feature-pipeline-v0.2.0", matcherConfigVersion: "matcher-config-v0.3.0", matcherConfig: { frozen: true } },
     survivorshipPolicy: null,
     trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 0, onlyACount: 0, onlyBCount: 0, blockers: ["1 identity review item(s) remain unresolved."] },
     reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null,
@@ -36,24 +36,24 @@ function resultsPage() {
 }
 
 function reviewPage() {
-  return { contractVersion: "1.0.0", runId: "run-1", items: [{ aRowId: "A1", topCandidateId: candidate.candidateId, topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: candidateSummary.strongestPositive, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: 0, aIdentity: { name: "Acme Corp" }, topBIdentity: { organization: "Acme Corporation" }, candidates: [candidateSummary] }], page: { offset: 0, limit: 50, total: 1, returned: 1, nextOffset: null, previousOffset: null }, progress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, filter: "unresolved", sort: "ambiguity", query: "" };
+  return { contractVersion: "1.0.0", runId: "run-1", items: [{ aRowId: "A1", topCandidateId: candidate.candidateId, topBRowId: "B1", topMatchScore: 0.72, runnerUpMargin: 0.2, candidateCount: 1, strongestPositive: candidateSummary.strongestPositive, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false, state: "needs_review", deferred: false, humanDecision: null, matcherVersion: "explainable-matcher-v0.3.0", sourceOrder: 0, aIdentity: { name: "Acme Corp" }, topBIdentity: { organization: "Acme Corporation" }, candidates: [candidateSummary] }], page: { offset: 0, limit: 50, total: 1, returned: 1, nextOffset: null, previousOffset: null }, progress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, filter: "unresolved", sort: "ambiguity", query: "" };
 }
 
 function candidateDetail() {
-  return { contractVersion: "1.0.0", runId: "run-1", candidate, alternatives: [candidateSummary], reviewState: "needs_review", deferred: false, collisionARowIds: [], effectiveCollisionARowIds: [], humanDecision: null, conflicts: [], matcherVersion: "explainable-matcher-v0.2.0", candidateEngineVersion: "candidate-engine-v0.3.0" };
+  return { contractVersion: "1.0.0", runId: "run-1", candidate, alternatives: [candidateSummary], reviewState: "needs_review", deferred: false, collisionARowIds: [], effectiveCollisionARowIds: [], humanDecision: null, conflicts: [], matcherVersion: "explainable-matcher-v0.3.0", candidateEngineVersion: "candidate-engine-v0.4.0" };
 }
 
 function proposal(overrides: Partial<SemanticMappingProposal["suggestions"][number]> = {}): SemanticMappingProposal {
   return {
-    contractVersion: "2.0.0", proposalId: "proposal-1", runId: "run-1",
-    provenance: { provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v2", schemaVersion: "2.0.0", requestVersion: "metadata-first-v2", responseId: "response-1" },
-    suggestions: [{ suggestionId: "suggestion-1", leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, confidence: 0.94, reason: "Both columns appear to contain organization names.", normalizationHints: ["casefold"], status: "pending", finalMapping: null, ...overrides }],
+    contractVersion: "3.0.0", proposalId: "proposal-1", runId: "run-1",
+    provenance: { provider: "openai", model: "test-model", promptVersion: "semantic-mapping-prompt-v3", schemaVersion: "3.0.0", requestVersion: "metadata-first-v3", responseId: "response-1" },
+    suggestions: [{ suggestionId: "suggestion-1", leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, semanticFamily: "name_or_title", confidence: 0.94, reason: "Both columns appear to contain organization names.", normalizationHints: ["casefold"], status: "pending", finalMapping: null, ...overrides }],
     unmappedLeft: ["status"], unmappedRight: ["status"], createdAt: "2026-08-31T12:00:00.000Z",
   };
 }
 
 function suggestionResponse(value = proposal(), confirmedMappings: MappingSuggestionResponse["confirmedMappings"] = []): MappingSuggestionResponse {
-  return { contractVersion: "2.0.0", proposal: value, confirmedMappings };
+  return { contractVersion: "3.0.0", proposal: value, confirmedMappings };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
@@ -227,7 +227,7 @@ describe("Samewise vertical slice", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App initialRun={runView()} initialScreen="results" />);
-    expect(screen.getByText("Matched automatically").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Matched automatically / confirmed").parentElement).toHaveTextContent("2");
     expect(screen.getByText("Need your review").parentElement).toHaveTextContent("1");
     expect(screen.getByText("No match found in Dataset B").parentElement).toHaveTextContent("3");
     expect(screen.getByText("No match found in Dataset A").parentElement).toHaveTextContent("4");

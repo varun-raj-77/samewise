@@ -13,7 +13,7 @@ function item(index: number): ReviewQueueProjectionItem {
     topMatchScore: 0.5, runnerUpMargin: 0.02, candidateCount: 1,
     strongestPositive: null, strongestContradiction: null, collision: false, collisionARowIds: [], strongContradiction: false,
     state: "needs_review", deferred: false, humanDecision: null,
-    matcherVersion: "explainable-matcher-v0.2.0", sourceOrder: index,
+    matcherVersion: "explainable-matcher-v0.3.0", sourceOrder: index,
     aIdentity: { name: `A ${index}` }, topBIdentity: { name: `B ${index}` },
     candidates: [{ candidateId, bRowId, rank: 1, matchScore: 0.5, band: "needs_review", collision: false, strongContradiction: false, strongestPositive: null, strongestContradiction: null, humanDecision: null }],
   };

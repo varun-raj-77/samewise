@@ -5,6 +5,7 @@ import { basename, extname, resolve } from "node:path";
 import {
   EXPORT_SNAPSHOT_VERSION,
   CONFIRMED_MAPPINGS_VERSION,
+  REVIEW_SIGNATURE_VERSION,
   MATCHER_VERSION,
   RECONCILIATION_EXPORT_VERSION,
   RUN_MANIFEST_VERSION,
@@ -15,7 +16,9 @@ import {
   TRUSTED_EXPORT_VERSION,
   WORKFLOW_CONTRACT_VERSION,
   WORKFLOW_PROJECTION_CONTRACT_VERSION,
+  inferSemanticFamily,
   type CandidateEvidenceDetail,
+  type BatchIdentityDecisionResponse,
   type CandidatePair,
   type CandidateSummary,
   type ConflictPage,
@@ -31,6 +34,9 @@ import {
   type ResultItem,
   type ResultsPage,
   type ReviewFilter,
+  type ReviewGroupList,
+  type ReviewGroupPreview,
+  type ReviewGroupSummary,
   type ReviewQueuePage,
   type ReviewQueueProjectionItem,
   type ReviewQueueItem,
@@ -85,10 +91,12 @@ interface RunState {
 }
 
 interface UndoEntry {
-  candidateId: string;
-  decisionId: string;
+  candidateIds: string[];
+  decisionIds: string[];
   createdConflictIds: string[];
-  wasDeferred: boolean;
+  deferredARowIds: string[];
+  decisionOrigin: "human_individual" | "human_batch_rule";
+  reviewGroupId: string | null;
 }
 
 export class WorkflowError extends Error {
@@ -139,6 +147,104 @@ function comparisonConflicts(run: RunState, candidate: CandidatePair, decisionId
       resolution: null,
       resolutionHistory: [],
     }));
+}
+
+function reviewMarginBand(margin: number): "near_tie" | "narrow" | "clear" {
+  return margin < 0.04 ? "near_tie" : margin < 0.1 ? "narrow" : "clear";
+}
+
+function reviewSignature(candidate: CandidatePair, item: ReviewQueueItem): string {
+  const evidence = candidate.evidence
+    .map((field) => `${field.fieldKind}:${field.evidenceClass}:${field.informationClass ?? "unknown"}`)
+    .sort();
+  return [
+    REVIEW_SIGNATURE_VERSION,
+    ...evidence,
+    `margin:${reviewMarginBand(item.runnerUpMargin)}`,
+    `alternatives:${item.candidateCount > 1 ? "multiple" : "single"}`,
+    `collision:${item.collision}`,
+    `strong:${item.strongContradiction}`,
+  ].join("|");
+}
+
+function reviewGroupId(signature: string): string {
+  return `review-group-${createHash("sha256").update(signature).digest("hex").slice(0, 20)}`;
+}
+
+function persistentEvidence(candidate: CandidatePair, evidenceClass: "exact_agreement" | "conflict"): boolean {
+  return candidate.evidence.some((field) => field.fieldKind === "persistent_identifier" && field.evidenceClass === evidenceClass);
+}
+
+function strongPositiveCount(candidate: CandidatePair): number {
+  const strongFamilies = new Set(["persistent_identifier", "name_or_title", "email", "phone", "address"]);
+  return candidate.evidence.filter((field) =>
+    strongFamilies.has(field.fieldKind)
+    && ["exact_agreement", "partial_agreement"].includes(field.evidenceClass)
+    && field.positiveContribution > 0
+    && field.informationClass !== "common"
+  ).length;
+}
+
+function onlyLowInformationSupport(candidate: CandidatePair): boolean {
+  const positives = candidate.evidence.filter((field) => field.positiveContribution > 0);
+  return positives.length > 0 && positives.every((field) =>
+    ["contact_person", "geography", "categorical", "source_local_identifier", "free_text", "unknown"].includes(field.fieldKind)
+    || ["repeated", "common"].includes(field.informationClass ?? "unknown")
+  );
+}
+
+function eligibleForBatch(candidate: CandidatePair, item: ReviewQueueItem, decision: "same_entity" | "different_entity"): boolean {
+  if (item.collision || item.runnerUpMargin < 0.04) return false;
+  if (decision === "same_entity") {
+    return !candidate.strongContradiction && !persistentEvidence(candidate, "conflict") && strongPositiveCount(candidate) >= 2;
+  }
+  return item.candidateCount === 1 && !persistentEvidence(candidate, "exact_agreement") && strongPositiveCount(candidate) < 2 && onlyLowInformationSupport(candidate);
+}
+
+function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: CandidatePair }[]): ReviewGroupSummary {
+  const first = entries[0]!;
+  const signature = reviewSignature(first.candidate, first.item);
+  const patternMap = new Map<string, { semanticFamily: CandidatePair["evidence"][number]["fieldKind"]; evidenceClass: CandidatePair["evidence"][number]["evidenceClass"]; informationClass: "distinctive" | "repeated" | "common" | "not_applicable" | "unknown"; labels: Set<string> }>();
+  for (const field of first.candidate.evidence) {
+    const informationClass = field.informationClass ?? "unknown";
+    const key = `${field.fieldKind}:${field.evidenceClass}:${informationClass}`;
+    const existing = patternMap.get(key) ?? { semanticFamily: field.fieldKind, evidenceClass: field.evidenceClass, informationClass, labels: new Set<string>() };
+    existing.labels.add(field.label);
+    patternMap.set(key, existing);
+  }
+  const eligibleSameCount = entries.filter(({ item, candidate }) => eligibleForBatch(candidate, item, "same_entity")).length;
+  const eligibleDifferentCount = entries.filter(({ item, candidate }) => eligibleForBatch(candidate, item, "different_entity")).length;
+  const suggestedDecision = eligibleSameCount === entries.length
+    ? "same_entity" as const
+    : eligibleDifferentCount === entries.length
+      ? "different_entity" as const
+      : null;
+  const safetyClass = first.item.collision || first.item.runnerUpMargin < 0.04
+    ? "competing_candidates" as const
+    : persistentEvidence(first.candidate, "conflict") || first.candidate.strongContradiction
+      ? "strong_contradiction" as const
+      : onlyLowInformationSupport(first.candidate)
+        ? "low_information_noise" as const
+        : suggestedDecision
+          ? "quick_decision" as const
+          : "individual_review" as const;
+  return {
+    groupId: reviewGroupId(signature),
+    signatureVersion: REVIEW_SIGNATURE_VERSION,
+    signature,
+    safetyClass,
+    caseCount: entries.length,
+    eligibleSameCount,
+    eligibleDifferentCount,
+    suggestedDecision,
+    pattern: [...patternMap.values()]
+      .map((value) => ({ ...value, labels: [...value.labels].sort() }))
+      .sort((left, right) => `${left.semanticFamily}:${left.evidenceClass}:${left.informationClass}`.localeCompare(`${right.semanticFamily}:${right.evidenceClass}:${right.informationClass}`)),
+    marginBand: reviewMarginBand(first.item.runnerUpMargin),
+    alternativeBand: first.item.candidateCount > 1 ? "multiple" : "single",
+    collision: first.item.collision,
+    strongContradiction: first.item.strongContradiction,
+  };
 }
 
 export class WorkflowStore {
@@ -211,7 +317,11 @@ export class WorkflowStore {
     const bColumns = new Set(b.columns.map((column) => column.name));
     const ids = new Set<string>();
     const pairs = new Set<string>();
-    for (const mapping of mappings) {
+    const confirmedMappings = mappings.map((mapping) => ({
+      ...mapping,
+      semanticFamily: mapping.semanticFamily ?? inferSemanticFamily(mapping),
+    }));
+    for (const mapping of confirmedMappings) {
       if (!aColumns.has(mapping.aColumn) || !bColumns.has(mapping.bColumn)) {
         throw new WorkflowError("unknown_mapping_column", "Every mapping must reference an uploaded column.");
       }
@@ -222,7 +332,7 @@ export class WorkflowStore {
       ids.add(mapping.mappingId);
       pairs.add(pair);
     }
-    run.mappings = mappings;
+    run.mappings = confirmedMappings;
     delete run.result;
     run.decisions.clear();
     run.conflicts.clear();
@@ -295,7 +405,7 @@ export class WorkflowStore {
     }
 
     const finalMapping = decision.decision === "remap"
-      ? decision.finalMapping!
+      ? { ...decision.finalMapping!, semanticFamily: decision.finalMapping!.semanticFamily ?? inferSemanticFamily(decision.finalMapping!) }
       : this.mappingFromSuggestion(run, suggestion);
     this.validateConfirmedMapping(run, finalMapping);
     run.mappings.push(finalMapping);
@@ -324,6 +434,7 @@ export class WorkflowStore {
       normalizer,
       useForMatching: suggestion.useForMatching,
       includeInMerge: suggestion.includeInMerge,
+      semanticFamily: suggestion.semanticFamily,
     };
   }
 
@@ -382,21 +493,56 @@ export class WorkflowStore {
       const existingSame = [...run.decisions.values()].some((decision) => decision.aRowId === candidate.aRowId && decision.humanDecision === "same_entity");
       if (existingSame) throw new WorkflowError("identity_already_confirmed", "This A row already has a confirmed identity.", 409);
     }
+    const { decision, createdConflictIds, wasDeferred } = this.recordDecision(
+      run,
+      candidate,
+      humanDecision,
+      "human_individual",
+      null,
+      new Date().toISOString(),
+    );
+    run.undoStack.push({
+      candidateIds: [candidateId],
+      decisionIds: [decision.decisionId],
+      createdConflictIds,
+      deferredARowIds: wasDeferred ? [candidate.aRowId] : [],
+      decisionOrigin: "human_individual",
+      reviewGroupId: null,
+    });
+    if (run.undoStack.length > 20) run.undoStack.shift();
+    run.previewedRuleIds.clear();
+    return this.summaryView(run);
+  }
+
+  private recordDecision(
+    run: RunState,
+    candidate: CandidatePair,
+    humanDecision: "same_entity" | "different_entity",
+    decisionOrigin: "human_individual" | "human_batch_rule",
+    groupId: string | null,
+    decidedAt: string,
+  ): { decision: IdentityDecision; createdConflictIds: string[]; wasDeferred: boolean } {
+    const result = run.result;
+    if (!result) throw new Error("Matcher result is unavailable for this run.");
     const decision: IdentityDecision = {
       decisionId: `decision-${randomUUID()}`,
-      runId,
-      candidateId,
+      runId: run.runId,
+      candidateId: candidate.candidateId,
       aRowId: candidate.aRowId,
       bRowId: candidate.bRowId,
       systemProposal: candidate.band,
       humanDecision,
-      matcherVersion: run.result.matcherVersion,
-      candidateEngineVersion: run.result.candidateEngineVersion,
+      matcherVersion: result.matcherVersion,
+      candidateEngineVersion: result.candidateEngineVersion,
       matchScore: candidate.matchScore,
       evidenceShown: candidate.evidence,
-      decidedAt: new Date().toISOString(),
+      decisionOrigin,
+      reviewSignatureVersion: groupId ? REVIEW_SIGNATURE_VERSION : null,
+      reviewGroupId: groupId,
+      evidenceSnapshotSha256: createHash("sha256").update(JSON.stringify(candidate.evidence)).digest("hex"),
+      decidedAt,
     };
-    run.decisions.set(candidateId, decision);
+    run.decisions.set(candidate.candidateId, decision);
     const createdConflictIds: string[] = [];
     if (humanDecision === "same_entity") {
       for (const conflict of comparisonConflicts(run, candidate, decision.decisionId, "human")) {
@@ -414,10 +560,7 @@ export class WorkflowStore {
       run.stage = "review";
     }
     const wasDeferred = run.deferredARowIds.delete(candidate.aRowId);
-    run.undoStack.push({ candidateId, decisionId: decision.decisionId, createdConflictIds, wasDeferred });
-    if (run.undoStack.length > 20) run.undoStack.shift();
-    run.previewedRuleIds.clear();
-    return this.summaryView(run);
+    return { decision, createdConflictIds, wasDeferred };
   }
 
   setDeferred(runId: string, aRowId: string, deferred: boolean): RunSummary {
@@ -438,8 +581,8 @@ export class WorkflowStore {
     const run = this.requireRun(runId);
     const entry = run.undoStack.at(-1);
     if (!entry) throw new WorkflowError("nothing_to_undo", "There is no recent review decision to undo.", 409);
-    const decision = run.decisions.get(entry.candidateId);
-    if (!decision || decision.decisionId !== entry.decisionId) {
+    const decisions = entry.candidateIds.map((candidateId) => run.decisions.get(candidateId));
+    if (decisions.some((decision, index) => !decision || decision.decisionId !== entry.decisionIds[index])) {
       throw new WorkflowError("undo_state_changed", "The recent decision can no longer be undone safely.", 409);
     }
     const hasDependentResolution = entry.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution);
@@ -450,9 +593,9 @@ export class WorkflowStore {
         409,
       );
     }
-    run.decisions.delete(entry.candidateId);
+    for (const candidateId of entry.candidateIds) run.decisions.delete(candidateId);
     for (const conflictId of entry.createdConflictIds) run.conflicts.delete(conflictId);
-    if (entry.wasDeferred) run.deferredARowIds.add(decision.aRowId);
+    for (const aRowId of entry.deferredARowIds) run.deferredARowIds.add(aRowId);
     run.undoStack.pop();
     run.stage = "review";
     run.previewedRuleIds.clear();
@@ -674,6 +817,98 @@ export class WorkflowStore {
     };
   }
 
+  private unresolvedReviewGroups(run: RunState): Map<string, { item: ReviewQueueItem; candidate: CandidatePair }[]> {
+    const candidates = run.result?.candidates ?? [];
+    const candidateById = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
+    const groups = new Map<string, { item: ReviewQueueItem; candidate: CandidatePair }[]>();
+    for (const item of this.reviewQueue(run, candidates).filter((entry) => entry.state === "needs_review")) {
+      const candidate = candidateById.get(item.topCandidateId);
+      if (!candidate) continue;
+      const signature = reviewSignature(candidate, item);
+      const entries = groups.get(signature) ?? [];
+      entries.push({ item, candidate });
+      groups.set(signature, entries);
+    }
+    return groups;
+  }
+
+  reviewGroups(runId: string): ReviewGroupList {
+    const run = this.requireRun(runId);
+    const summaries = [...this.unresolvedReviewGroups(run).values()]
+      .map(summarizeReviewGroup)
+      .sort((left, right) => {
+        const order = ["quick_decision", "competing_candidates", "strong_contradiction", "low_information_noise", "individual_review"];
+        return order.indexOf(left.safetyClass) - order.indexOf(right.safetyClass)
+          || right.caseCount - left.caseCount
+          || left.groupId.localeCompare(right.groupId);
+      });
+    const count = (safetyClass: ReviewGroupSummary["safetyClass"]) => summaries
+      .filter((group) => group.safetyClass === safetyClass)
+      .reduce((total, group) => total + group.caseCount, 0);
+    const deferred = this.reviewQueue(run, run.result?.candidates ?? []).filter((item) => item.state === "deferred").length;
+    const workload = {
+      signatureVersion: REVIEW_SIGNATURE_VERSION,
+      totalNeedsAttention: summaries.reduce((total, group) => total + group.caseCount, 0),
+      quickDecisions: count("quick_decision"),
+      competingCandidates: count("competing_candidates"),
+      strongContradictions: count("strong_contradiction"),
+      lowInformationNoise: count("low_information_noise"),
+      individualReview: count("individual_review"),
+      deferred,
+      groupCount: summaries.length,
+    };
+    return { contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION, runId, workload, groups: summaries };
+  }
+
+  reviewGroupPreview(runId: string, groupId: string, offset: number, limit: number): ReviewGroupPreview {
+    const run = this.requireRun(runId);
+    const entries = [...this.unresolvedReviewGroups(run).values()].find((values) => summarizeReviewGroup(values).groupId === groupId);
+    if (!entries) throw new WorkflowError("review_group_not_found", "Review group was not found or no longer needs attention.", 404);
+    const group = summarizeReviewGroup(entries);
+    const candidateById = new Map((run.result?.candidates ?? []).map((candidate) => [candidate.candidateId, candidate]));
+    const ordered = [...entries].sort((left, right) => left.item.sourceOrder - right.item.sourceOrder || left.item.aRowId.localeCompare(right.item.aRowId));
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      group,
+      items: ordered.slice(offset, offset + limit).map(({ item }) => this.reviewProjection(run, item, candidateById)),
+      page: pagination(ordered.length, offset, limit),
+    };
+  }
+
+  batchDecide(runId: string, groupId: string, humanDecision: "same_entity" | "different_entity"): BatchIdentityDecisionResponse {
+    const run = this.requireRun(runId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before recording identity decisions.", 409);
+    const entries = [...this.unresolvedReviewGroups(run).values()].find((values) => summarizeReviewGroup(values).groupId === groupId);
+    if (!entries) throw new WorkflowError("review_group_not_found", "Review group was not found or no longer needs attention.", 404);
+    const group = summarizeReviewGroup(entries);
+    const eligible = entries.filter(({ item, candidate }) => eligibleForBatch(candidate, item, humanDecision));
+    if (!eligible.length) throw new WorkflowError("batch_decision_not_safe", "No cases in this group are eligible for that batch decision.", 409);
+    const decidedAt = new Date().toISOString();
+    const candidateIds: string[] = [];
+    const decisionIds: string[] = [];
+    const createdConflictIds: string[] = [];
+    const deferredARowIds: string[] = [];
+    for (const { candidate } of eligible) {
+      const recorded = this.recordDecision(run, candidate, humanDecision, "human_batch_rule", groupId, decidedAt);
+      candidateIds.push(candidate.candidateId);
+      decisionIds.push(recorded.decision.decisionId);
+      createdConflictIds.push(...recorded.createdConflictIds);
+      if (recorded.wasDeferred) deferredARowIds.push(candidate.aRowId);
+    }
+    run.undoStack.push({ candidateIds, decisionIds, createdConflictIds, deferredARowIds, decisionOrigin: "human_batch_rule", reviewGroupId: groupId });
+    if (run.undoStack.length > 20) run.undoStack.shift();
+    run.previewedRuleIds.clear();
+    return {
+      run: this.summaryView(run),
+      groupId,
+      signatureVersion: REVIEW_SIGNATURE_VERSION,
+      decision: humanDecision,
+      appliedCount: eligible.length,
+      excludedCount: group.caseCount - eligible.length,
+    };
+  }
+
   candidateDetail(runId: string, candidateId: string): CandidateEvidenceDetail {
     const run = this.requireRun(runId);
     const candidates = run.result?.candidates ?? [];
@@ -877,18 +1112,23 @@ export class WorkflowStore {
   private view(run: RunState): RunView {
     const result = run.result;
     const candidates = result?.candidates ?? [];
-    const aRows = new Set(candidates.map((candidate) => candidate.aRowId));
     const effectiveLinks = this.effectiveLinks(run);
     const matchedA = new Set<string>();
     const matchedB = new Set<string>();
     for (const candidate of effectiveLinks) {
       matchedA.add(candidate.aRowId); matchedB.add(candidate.bRowId);
     }
-    const reviewA = new Set<string>();
-    for (const aRowId of aRows) {
-      if (matchedA.has(aRowId)) continue;
-      const options = candidates.filter((candidate) => candidate.aRowId === aRowId);
-      if (options.some((candidate) => !run.decisions.has(candidate.candidateId))) reviewA.add(aRowId);
+    const reviewQueue = this.reviewQueue(run, candidates);
+    const unresolvedReview = reviewQueue.filter((item) => item.state === "needs_review" || item.state === "deferred");
+    const reviewA = new Set(unresolvedReview.map((item) => item.aRowId));
+    const candidateById = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
+    const reviewB = new Set<string>();
+    for (const item of unresolvedReview) {
+      for (const candidateId of item.candidateIds) {
+        if (run.decisions.has(candidateId)) continue;
+        const candidate = candidateById.get(candidateId);
+        if (candidate && !matchedB.has(candidate.bRowId)) reviewB.add(candidate.bRowId);
+      }
     }
     const differentA = new Set(
       [...run.decisions.values()]
@@ -909,12 +1149,13 @@ export class WorkflowStore {
       }
     }
     const onlyB = [...onlyBById.values()];
-    const reviewQueue = this.reviewQueue(run, candidates);
+    const primaryOnlyA = onlyA.filter((row) => !matchedA.has(row.rowId) && !reviewA.has(row.rowId));
+    const primaryOnlyB = onlyB.filter((row) => !matchedB.has(row.rowId) && !reviewB.has(row.rowId));
     const reviewed = reviewQueue.filter((item) => item.state === "reviewed_same" || item.state === "reviewed_different").length;
     const deferred = reviewQueue.filter((item) => item.state === "deferred").length;
     const remaining = reviewQueue.filter((item) => item.state === "needs_review").length;
     const undoEntry = run.undoStack.at(-1);
-    const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateId) : undefined;
+    const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateIds[0]!) : undefined;
     const undoBlocked = undoEntry?.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution) ?? false;
     const effectiveCandidateIds = new Set(effectiveLinks.map((candidate) => candidate.candidateId));
     const visibleConflicts = [...run.conflicts.values()].filter((conflict) => effectiveCandidateIds.has(conflict.candidateId));
@@ -951,7 +1192,7 @@ export class WorkflowStore {
         matcherConfigVersion: result.matcherConfigVersion,
         matcherConfig: result.matcherConfig,
       } : null,
-      summary: result ? { matched: matchedA.size, needsReview: reviewA.size, onlyA: onlyA.length, onlyB: onlyB.length } : null,
+      summary: result ? { matched: matchedA.size, needsReview: reviewA.size, onlyA: primaryOnlyA.length, onlyB: primaryOnlyB.length } : null,
       candidates,
       decisions: [...run.decisions.values()],
       conflicts: visibleConflicts,
@@ -969,6 +1210,9 @@ export class WorkflowStore {
         blockedReason: undoBlocked
           ? "A dependent field resolution exists. Revert it before undoing this identity decision."
           : null,
+        decisionOrigin: undoEntry!.decisionOrigin,
+        affectedCount: undoEntry!.candidateIds.length,
+        reviewGroupId: undoEntry!.reviewGroupId,
       } : null,
       onlyA,
       onlyB,
@@ -988,6 +1232,8 @@ export class WorkflowStore {
     for (const [aRowId, unsorted] of groups) {
       const options = [...unsorted].sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
       const rowDecisions = decisions.filter((decision) => decision.aRowId === aRowId);
+      const untouchedAutomatic = options.some((candidate) => candidate.rank === 1 && candidate.band === "auto_match") && rowDecisions.length === 0;
+      if (untouchedAutomatic) continue;
       if (!options.some((candidate) => candidate.band === "needs_review") && rowDecisions.length === 0) continue;
       const sameDecision = rowDecisions.find((decision) => decision.humanDecision === "same_entity");
       const allDifferent = options.every((candidate) => run.decisions.get(candidate.candidateId)?.humanDecision === "different_entity");
@@ -1344,8 +1590,11 @@ export function buildExportSnapshot(view: RunView, mappingProposal?: SemanticMap
     candidateGeneration: {
       candidateEngineVersion: view.matcherProvenance.candidateEngineVersion,
       blockingNormalizationVersion: view.matcherProvenance.blockingNormalizationVersion,
-      candidateConfigVersion: null,
-      candidateConfigAvailability: "not_retained_by_product_run",
+      candidateConfigVersion: view.matcherProvenance.candidateEngineVersion,
+      candidateConfigAvailability: "retained_in_evidence_plan",
+      evidencePlanVersion: view.matcherProvenance.evidencePlanVersion ?? "evidence-plan-v1.0.0",
+      evidencePlanSha256: sha256(JSON.stringify(canonicalize(view.matcherProvenance.evidencePlan ?? {}))),
+      evidencePlan: view.matcherProvenance.evidencePlan ?? {},
     },
     matcher: {
       featurePipelineVersion: view.matcherProvenance.featurePipelineVersion,
@@ -1361,6 +1610,8 @@ export function buildExportSnapshot(view: RunView, mappingProposal?: SemanticMap
       pendingCount: view.reviewQueue.filter((item) => item.state === "needs_review").length,
       deferredCount: view.reviewQueue.filter((item) => item.state === "deferred").length,
       collisionRelatedCount: view.reviewQueue.filter((item) => item.collision).length,
+      humanBatchPairCount: view.decisions.filter((decision) => decision.decisionOrigin === "human_batch_rule").length,
+      reviewSignatureVersion: REVIEW_SIGNATURE_VERSION,
     },
     survivorship: {
       policySchemaVersion: SURVIVORSHIP_POLICY_SCHEMA_VERSION,

@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   CandidateEvidenceDetailSchema,
+  BatchIdentityDecisionInputSchema,
+  BatchIdentityDecisionResponseSchema,
   ConflictPageSchema,
   ManualMappingSchema,
   MappingSuggestionDecisionSchema,
@@ -12,6 +14,8 @@ import {
   ResultsPageSchema,
   ReviewFilterSchema,
   ReviewQueuePageSchema,
+  ReviewGroupListSchema,
+  ReviewGroupPreviewSchema,
   ReviewSortSchema,
   RunManifestSchema,
   RuleApplicationResponseSchema,
@@ -136,6 +140,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const filter = ReviewFilterSchema.parse(query.filter ?? "unresolved");
     const sort = ReviewSortSchema.parse(query.sort ?? "ambiguity");
     return ReviewQueuePageSchema.parse(store.reviewPage(runId, offset, limit, filter, sort, query.q ?? ""));
+  });
+
+  app.get("/api/runs/:runId/review-groups", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    return ReviewGroupListSchema.parse(store.reviewGroups(runId));
+  });
+
+  app.get("/api/runs/:runId/review-groups/:groupId", async (request) => {
+    const { runId, groupId } = routeParams(request.params);
+    if (!runId || !groupId) throw new WorkflowError("invalid_request", "Run ID and review group are required.");
+    const { offset, limit } = pageQuery(request.query);
+    return ReviewGroupPreviewSchema.parse(store.reviewGroupPreview(runId, groupId, offset, limit));
+  });
+
+  app.post("/api/runs/:runId/review-groups/:groupId/decisions", async (request) => {
+    const { runId, groupId } = routeParams(request.params);
+    if (!runId || !groupId) throw new WorkflowError("invalid_request", "Run ID and review group are required.");
+    const input = BatchIdentityDecisionInputSchema.parse(request.body);
+    const result = store.batchDecide(runId, groupId, input.decision);
+    app.log.info({ runId, stage: "review", groupId, decision: input.decision, appliedCount: result.appliedCount, excludedCount: result.excludedCount }, "batch identity decision recorded");
+    return BatchIdentityDecisionResponseSchema.parse(result);
   });
 
   app.get("/api/runs/:runId/candidates/:candidateId", async (request) => {

@@ -6,8 +6,8 @@ import { ResultsWorkspace } from "./ResultsWorkspace.js";
 
 const run: RunSummary = {
   contractVersion: "1.0.0", projectionVersion: "1.0.0", runId: "run-1", stage: "results",
-  datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v2", semanticMappingProvenance: null,
-  matcherVersion: "explainable-matcher-v0.2.0", matcherProvenance: null,
+  datasets: {}, mappings: [], mappingVersion: "confirmed-mappings-v3", semanticMappingProvenance: null,
+  matcherVersion: "explainable-matcher-v0.3.0", matcherProvenance: null,
   summary: { matched: 1, needsReview: 1, onlyA: 0, onlyB: 0 }, survivorshipPolicy: null,
   trustedExportReadiness: { ready: false, unresolvedIdentityCount: 1, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["Identity review remains."] },
   reviewProgress: { total: 1, reviewed: 0, remaining: 1, deferred: 0 }, reviewUndo: null,
@@ -44,6 +44,7 @@ describe("bounded results workspace", () => {
     render(<ResultsWorkspace run={{ ...run, reviewProgress: { total: 3, reviewed: 1, remaining: 1, deferred: 1 } }} onReview={vi.fn()} onResolution={vi.fn()} onOpenReview={onOpenReview} onExport={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "2 uncertain matches" })).toBeInTheDocument();
     expect(screen.getByText("Need your review").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Matched automatically / confirmed").parentElement).toHaveTextContent("1");
     fireEvent.click(screen.getByRole("button", { name: "Review 2 uncertain matches" }));
     expect(onOpenReview).toHaveBeenCalledOnce();
   });

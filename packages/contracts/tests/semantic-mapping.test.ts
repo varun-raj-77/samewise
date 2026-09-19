@@ -11,7 +11,7 @@ import {
 
 describe("SW-004 semantic mapping contract", () => {
   it("keeps the canonical JSON Schema version and controlled hint enum synchronized", async () => {
-    const schema = JSON.parse(await readFile(new URL("../schemas/semantic-mapping/2.0.0.json", import.meta.url), "utf8")) as {
+    const schema = JSON.parse(await readFile(new URL("../schemas/semantic-mapping/3.0.0.json", import.meta.url), "utf8")) as {
       "x-contract-version": string;
       properties: { mappings: { items: { properties: { normalizationHints: { items: { enum: string[] } } } } } };
     };
@@ -23,7 +23,7 @@ describe("SW-004 semantic mapping contract", () => {
 
   it("rejects free-form fields, arbitrary hints, invalid confidence, and non-finite confidence", () => {
     const base = {
-      mappings: [{ leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, confidence: 0.9, reason: "Same semantic field.", normalizationHints: ["casefold"] }],
+      mappings: [{ leftColumn: "name", rightColumn: "organization", relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false, semanticFamily: "name_or_title", confidence: 0.9, reason: "Same semantic field.", normalizationHints: ["casefold"] }],
       unmappedLeft: [], unmappedRight: [],
     };
     expect(SemanticMappingModelOutputSchema.safeParse(base).success).toBe(true);

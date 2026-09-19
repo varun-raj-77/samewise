@@ -8,7 +8,7 @@ function candidate(evidenceClass: CandidatePair["evidence"][number]["evidenceCla
     candidateId: "c1", aRowId: "A1", bRowId: "B1", aRecord: { name: "Acme" }, bRecord: { organization: "Acme Co" },
     rank: 1, matchScore: 0.4, runnerUpMargin: 0.01, band: "needs_review", collision: false, strongContradiction: false,
     blockingEvidence: [{ blockerId: "name", keyHash: "0123456789abcdef" }], positiveEvidence: 0, conflictEvidence: 0, totalWeight: 1,
-    evidence: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "organization", aValue: "", bValue: "Acme Co", normalizedA: "", normalizedB: "acme co", fieldKind: "name", featurePipelineVersion: "feature-pipeline-v0.1.0", features: [], outcome: "missing_one", evidenceClass, weight: 1, positiveContribution: 0, conflictContribution: 0, contribution: 0, explanationCode: "missing", explanation: "One mapped value is missing." }],
+    evidence: [{ mappingId: "name", label: "Name", aColumn: "name", bColumn: "organization", aValue: "", bValue: "Acme Co", normalizedA: "", normalizedB: "acme co", fieldKind: "name_or_title", featurePipelineVersion: "feature-pipeline-v0.2.0", features: [], outcome: "missing_one", evidenceClass, weight: 1, positiveContribution: 0, conflictContribution: 0, contribution: 0, explanationCode: "missing", explanation: "One mapped value is missing." }],
   };
 }
 
