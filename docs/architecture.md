@@ -1,202 +1,51 @@
 # Architecture
 
-Samewise begins with three executable surfaces and one shared contract package. The split protects process boundaries without committing to infrastructure that has not been justified by measurements.
+Samewise is a browser workflow over a process-local Fastify API and a short-lived Python matcher subprocess. The boundaries are deliberate: source bytes stay immutable, row matching remains deterministic and independently evaluable, and optional AI is limited to schema interpretation. [ADR 0012](decisions/0012-dataset-adaptive-semantic-evidence-and-review-groups.md) describes the current semantic and review-group design.
 
-## Responsibilities
-
-### `apps/web`
-
-The React/Vite application presents five user jobs: Upload files, Match setup,
-Review matches, Merge values, and Export. File profile and complete result browsing
-are subordinate views; matcher evaluation is under Advanced → Matching quality.
-The browser validates compact API projections and semantic-mapping responses at
-runtime and depends on the shared contract package rather than API implementation
-details. Mapping suggestions have visible pending, accepted, rejected, or edited
-state; only human-confirmed mappings reach matching. Identity review and field
-resolution remain separate screens and actions. The review workspace keeps a
-`RunSummary`, one bounded `ReviewQueuePage`, and the selected
-`CandidateEvidenceDetail`; selection, candidate switching, filters, focus, and
-panel expansion stay in local React state. Its detail cache is capped at ten
-entries, and its fixed-height queue window renders only the visible range plus
-overscan. A separate merge-values workspace consumes bounded conflict pages and
-the per-field aggregates in `RunSummary`; it owns manual actions, policy
-configuration, read-only preview, explicit bulk application, provenance, and
-export readiness, and exposes no identity controls.
-
-Evaluation is a separate navigation area. It consumes validated immutable snapshots
-and paged error evidence through dedicated APIs; it does not import fixture truth or
-place benchmark payloads in reconciliation state. Human Review Evidence remains a
-separate source type with a visible nonrepresentative-sampling caveat.
-
-### `apps/api`
-
-The Fastify application orchestrates product workflows, owns process-local run metadata, records identity decisions, A-side defer state, a short process-session undo stack, versioned survivorship policies, field resolutions/history, and creates reconciliation, gated trusted, and provenance-manifest exports. The matcher response remains unchanged and authoritative in memory. HTTP list surfaces derive explicit `RunSummary`, `ResultsPage`, `ReviewQueuePage`, and `ConflictPage` projections; complete candidate evidence is returned only by run-owned candidate lookup. Server construction remains separate from process startup so tests use Fastify injection without binding a TCP port.
-
-List projections use offset paging with a 50-item default and 100-item server
-maximum. Results and conflicts have fixed stable-key ordering; Review applies its
-explicit filter/sort/search before paging and uses stable source-order tie breaks.
-Mutation responses are compact summaries. Export and human-evaluation evidence use
-the authoritative internal `RunView`, not whatever page a client loaded.
-
-Dedicated evaluation routes validate and cache checked-in catalog metadata and load
-error pages separately. They are not a truth service for ordinary uploaded runs.
-The API can create and match normal runs when evaluation artifacts are unavailable.
-
-Fastify is also the sole OpenAI integration boundary. It builds `metadata-first-v2`
-input from its authoritative profiles using only column name, inferred type, null
-rate, and distinct rate. It omits samples, filenames, hashes, paths, row data, IDs,
-canonical entities, schema truth, identity truth, and corruption provenance. The
-API uses a versioned developer prompt and strict structured output for column
-correspondence, independent matching/merge recommendations, and source-specific
-metadata advice, then independently validates referenced columns, enums,
-confidence, allowlisted hints, duplicates, and mapping/unmapped consistency.
-Provider failures do not mutate proposals or confirmed mappings, and the manual
-v2 setup remains usable.
-
-Uploaded source bytes are saved once under generated names in ignored `.samewise-data/<run-id>/` directories and fingerprinted with SHA-256. Original filenames are metadata only and never become filesystem paths. Source bytes are not rewritten by mapping, matching, review, resolution, or export. This is local development artifact handling, not an object-storage design.
-
-### Export snapshot boundary
-
-One synchronous export request derives an `export-snapshot-v1.0.0` descriptor from
-the authoritative current `RunView`, renders the reconciliation CSV and (only when
-ready) trusted CSV, and hashes those exact UTF-8 bytes before rendering
-`run-manifest-v1.0.0`. The manifest is not self-hashed, avoiding circular content.
-It embeds no generation timestamp, raw datasets, filesystem paths, environment
-values, prompt payloads, or evaluation-only hidden truth. Existing decision and
-resolution timestamps are retained because they are authoritative run state.
-
-CSV generation uses deterministic headers and category/identifier ordering. All
-cells share one escaping and formula-defense path. Export filenames derive only
-from the server-generated run ID. The artifacts are regenerated rather than stored;
-unchanged process-local state therefore produces byte-identical content, while a
-later decision or resolution intentionally produces a new snapshot hash.
-
-### `services/matcher`
-
-The Python package owns CSV profiling, truth-blind multi-pass candidate generation,
-`feature-pipeline-v0.1.0`, inspectable weighted evidence, and deterministic
-`explainable-matcher-v0.2.0` score/band generation. Product requests score generated
-candidates only. The old baseline and all-pairs path remain explicit comparison and
-small-fixture oracle paths. The package also retains the machine-readable health
-command and deterministic fixture tooling. It does not run an HTTP server.
-
-Node invokes `samewise-matcher process` as a short-lived subprocess and sends one versioned JSON request over stdin. Python validates the request with Pydantic and emits one validated JSON profile or matcher result over stdout. Filesystem paths cross only this internal Node/Python boundary and are not returned to the browser.
-
-The candidate engine receives visible records and only confirmed v2 mappings whose
-`useForMatching` flag is true. The Node subprocess boundary adapts those mappings
-to the matcher's unchanged v1 identity-mapping request. It also receives versioned
-candidate config, but not OpenAI provenance, pending
-or rejected suggestions, reasons, confidence, normalization hints, canonical IDs,
-identity truth, corruption provenance, schema truth, or hard-negative labels. It
-never asks a model whether rows are the same entity.
-
-Candidate generation normalizes conservative blocking evidence, creates independent
-inverted indices, unions their cross-source buckets, deduplicates pairs, and keeps
-all blocker/key-hash provenance. Oversized keys are suppressed as complete buckets
-with measured affected relationship counts. No per-record cap or partial bucket
-truncation exists. Evaluation loads truth only after generation and computes
-candidate recall, pair reduction, blocker contribution, zero-candidate records,
-and missed-pair diagnostics.
-
-Adversarial SW-005F evaluation falsified v0.1 on weak identifiers. Version 0.2
-preserves the original passes and adds exact compact normalized-name composites
-within location and address-number context. The change was selected from repeated
-miss patterns, not individual truth IDs; bucket limits are unchanged. Version 0.1
-configuration and reports remain available for direct comparison.
-
-The scorer consumes the same visible rows plus the adapted matching mappings. It emits
-field-kind-specific normalized features, explicit agreement/conflict/missing classes,
-weights, positive and conflict contributions, and deterministic explanation codes.
-Its denominator is the total configured identity weight, so missing values cannot
-increase a score by removing weight. Strong phone/email/domain contradictions and
-preferred-B collisions route candidates away from auto-match. Comparison mappings,
-AI proposal confidence, hidden truth, corruption provenance, and survivorship state
-are excluded from feature computation.
-
-### Fixture and evaluation boundary
-
-Organization fixture generation lives in the Python package, not in the API or web application. A seed and validated configuration produce immutable canonical entities, independently corrupted source views, and stable artifact ordering without wall-clock input.
-
-Visible matcher inputs are CSV files beneath `fixtures/corrupted`. They contain independent A/B source row identifiers and differing source schemas. Hidden artifacts beneath `fixtures/canonical`, `fixtures/ground-truth`, and `fixtures/adversarial` contain canonical IDs, identity mappings, corruption provenance, schema truth, and hard-negative definitions. Product matching code must consume only the visible inputs; evaluation code may join hidden truth after matching. Versioned manifests and factual summaries live under `evaluation`.
-
-Corruption is explicit and replayable across name, phone, email, address, postal, business-value, and timestamp categories. Hard negatives are designed as different canonical entities with similar evidence. Duplicate rows map many source row IDs to one canonical ID, so the truth format does not impose a one-to-one relationship.
-
-Matcher evaluation generates candidates and scores from visible data before loading
-truth. A fixed tuning seed selects thresholds; a separately seeded holdout can run
-only with a frozen config naming a different tuning fixture. The report reconciles
-candidate misses, below-review-threshold true links, post-score alternative losses,
-and the candidate-recall ceiling, and compares the legacy baseline on the identical
-candidate set.
-
-### `packages/contracts`
-
-This package owns canonical, versioned JSON Schemas for process-boundary messages. It also exposes Zod validators for TypeScript consumers. Python maintains an equivalent Pydantic model rather than pretending TypeScript types are Python runtime contracts.
-
-Schema synchronization is intentionally manual for now: contract tests assert the canonical schema's constraints, and shared valid and invalid JSON examples must receive the same result from the schema expectations, Zod, and Pydantic. A contract change must update the JSON Schema, both runtime representations, shared compatibility examples, and tests together. Code generation can be reconsidered when contract volume makes this process unreliable.
-
-The workflow contract is currently an internal, pre-release boundary: the package
-is private at version `0.0.0`, no external compatibility promise exists, and the
-repository's versioning rule requires synchronized representations rather than a
-new schema path for every internal iteration. SW-006 updated the canonical schema,
-Zod, Pydantic, examples/fixtures, and tests together. The current `workflow/1.0.0`
-path is therefore intentionally retained until an external compatibility policy is
-adopted; it must not be described as a stable public API. New product runs emit
-`confirmed-mappings-v2`, in which correspondence, `useForMatching`, and
-`includeInMerge` are independent. Historical v1 role-based mappings remain valid
-in historical examples/manifests and are normalized through an explicit adapter
-when a current reader needs the new representation.
-
-## Dependency and process boundaries
-
-```text
-Browser (apps/web) --validated HTTP--> Node API (apps/api)
-          |                              |
-          +---- packages/contracts <-----+
-
-Browser --request suggestions--> Fastify --metadata-only structured request--> OpenAI
-Browser <--validated proposal---- Fastify <--strict structured output----------+
-Human accept/remap --> confirmed mapping v2 --matching subset/v1 adapter--> Python matcher
-
-Node orchestration --validated JSON/stdin subprocess--> Python matcher
-                                                        |
-                                              canonical JSON Schema
+```mermaid
+flowchart TB
+  U[User in React / Vite web] -->|bounded validated HTTP| A[Fastify API]
+  A -->|column metadata only| O[OpenAI structured mapping proposal]
+  O -->|validated advisory proposal| A
+  A -->|confirmed mapping v3 + source paths + versioned config| P[Python matcher subprocess]
+  subgraph Python matcher
+    P --> PR[CSV profiling]
+    P --> EP[Semantic evidence plan]
+    EP --> CG[Indexed candidate routes]
+    CG --> SC[Field features / weighted scoring / abstention]
+  end
+  SC -->|validated result JSON| A
+  A --> R[(Authoritative process-local run state)]
+  A --> F[(Immutable local uploaded files)]
+  R --> GR[Grouped and individual human review]
+  GR --> MP[Merge plan preview and explicit apply]
+  MP --> EX[Reconciliation report / gated trusted CSV / manifest]
+  R --> BP[Bounded Results, Review, conflict pages]
+  BP --> U
 ```
 
-The web app depends on the TypeScript contract package, not on API source. The API
-also depends on that package. The matcher has its own Pydantic representation and
-verifies applicable messages against the same language-neutral schema. The
-subprocess boundary remains deliberately synchronous; no Python HTTP service,
-queue, or worker has been introduced. SW-012's 10K Fastify benchmark measures the
-real product path and browser projections separately from authoritative retention.
+## Components and contracts
 
-## Why matching is separate from Node orchestration
+- **`apps/web`** presents Upload, Match setup, Review matches, Merge values, and Export. It consumes validated compact summaries and paged projections. It fetches complete candidate evidence on selection and keeps only a bounded detail cache.
+- **`apps/api`** owns run state, immutable upload handling, mapping validation, review decisions, merge policies, readiness, and deterministic export generation. It retains the complete matcher result authoritatively in memory. List pages have a 50-item default and 100-item server maximum.
+- **`services/matcher`** profiles CSVs, builds evidence plans and indexed candidate routes, computes versioned field evidence and bands, and contains evaluation tooling. It is invoked by Node through validated JSON on stdin/stdout; there is no Python HTTP server.
+- **`packages/contracts`** holds the canonical JSON Schemas and Zod validation; Python has corresponding Pydantic models and shared compatibility tests. The internal workflow schema path is pre-release, not a public compatibility promise.
+- **`fixtures` and `evaluation`** separate visible synthetic CSV inputs from hidden canonical truth, corruption provenance, and reports. Truth is loaded by evaluation after the matcher runs, never by product matching.
 
-Python has a mature ecosystem for data processing, statistical evaluation, and matching research. Keeping matcher behavior in a dedicated Python package allows it to evolve and be evaluated independently while Node remains responsible for HTTP and product orchestration. The boundary also forces inputs and outputs to be explicit, versioned, and runtime-validated.
+Current product constants live in `packages/contracts/src/workflow.ts`: `confirmed-mappings-v3`, `candidate-engine-v0.4.0`, `feature-pipeline-v0.2.0`, `explainable-matcher-v0.3.0`, `matcher-config-v0.3.0`, `evidence-plan-v1.0.0`, and `review-signature-v1.0.0`. Historical reports retain their measured versions.
 
-## SW-003 development persistence
+## Run lifecycle
 
-Run metadata, mappings, matcher results, decisions, conflicts, and resolutions are held in API process memory. Immutable upload bytes live in the ignored local artifact directory so Python can read them. Paging bounds HTTP transfer but does not reduce or persist authoritative matcher state: SW-012 observed a 202,253,512-byte Node heap-used increase across the 10K match request and makes no isolated retained-size claim. IDs and boundary concepts are stable enough to move behind persistent repositories later, but no database abstraction or fake enterprise persistence is present. The persistence approach for large results remains deliberately undecided until measurements justify it.
+1. **Upload and profile.** Fastify writes each CSV once under a server-generated name in the ignored `.samewise-data/<run-id>/` directory, records a SHA-256 fingerprint, and invokes Python profiling. The source bytes are never rewritten by later actions.
+2. **Confirm mappings.** A person connects A/B columns and independently sets `useForMatching` and `includeInMerge`. Optional OpenAI suggestions use column name, inferred type, null rate, and distinct rate only. The API validates structured output and referenced columns; the proposal has no authority until confirmed. Provider failure leaves manual setup available.
+3. **Plan evidence and candidates.** The matcher uses confirmed semantic families: persistent identifiers, source-local identifiers, entity names, contact people, contact channels, addresses, geography, categorical/numeric/date/free text, and unknown. Explicit unknown fields stay conservative. Persistent IDs and domains use exact normalized comparison; source-local IDs are excluded from cross-source identity routes by default. The bounded evidence plan retains comparator and candidate configuration. Independent inverted-index routes union candidate pairs; oversized buckets are suppressed as whole units with provenance.
+4. **Score and abstain.** Candidate pairs receive field-level normalized values, features, evidence classes, configured weights, positive and contradiction contributions, and deterministic explanation codes. Missing values do not shrink the denominator. Contradictions, narrow margins, alternatives, and collisions can prevent an automatic link. Scores are evidence, not calibrated probabilities. Matching never reads AI confidence, hidden fixture truth, or merge policy.
+5. **Review identity.** The API derives bounded review pages and deterministic signatures from authoritative state. A signature combines sorted semantic/evidence/information classes with margin, alternatives, collision, and contradiction state. Group previews expose bounded representative cases and eligibility; a batch Same/Different action requires human confirmation and records a separate provenance-rich decision for every eligible pair. Other cases remain individual. Defer/restore and guarded undo operate on review state.
+6. **Merge values.** Identity links can create field conflicts for mappings kept in the result, but cannot select a value. Closed deterministic field strategies, including Use A, Use B, Keep Both, non-null, trusted source, and explicitly mapped recency, are previewed before explicit application. The merge-plan preview token protects against applying a changed plan. Manual resolutions take precedence until explicitly changed or cleared.
+7. **Export.** The reconciliation report remains available with unresolved state. Trusted merged CSV requires no pending/deferred identity and no required unresolved field conflicts. A manifest captures source fingerprints, mappings, candidate/matcher/evidence-plan provenance, decisions, merge policy, and hashes of exact CSV bytes. Ordinary runs retain the matcher-produced evidence plan, including candidate configuration; older runs without one report that absence. Unchanged authoritative state reproduces byte-identical exports. Artifacts are generated on request and are not persisted or signed.
 
-SW-004 semantic proposals and their provider/model/prompt/schema/request/response provenance are also process-local. The stored validated proposal is the response used for review; Samewise does not claim that a future call can reproduce it. Advisory normalization hints are restricted to a contract allowlist and are never dynamically executed.
+## Delivery, failure, and retry boundaries
 
-## Separate schema-mapping evaluation
+The browser receives a compact `RunSummary`, bounded Results/Review/conflict pages, and selected candidate detail. The full matcher result remains in API memory; [SW-012](sw-012-bounded-evidence.md) measures wire reduction, not retained-memory reduction. The API rejects malformed contracts and inaccessible candidate IDs. AI failures do not commit mappings. A failed matcher request does not imply a human decision or merge action. Export readiness is checked from current authoritative state for each request.
 
-Schema-mapping evaluation compares proposed column pairs with hidden SW-002 schema truth only after proposal generation. Exact correct, incorrect, missed expected, and extra proposed counts are independent from row-matcher evidence. Precision uses all proposed pairs as its denominator; recall uses all expected truth pairs. Normal CI uses mocked proposals. A live call is opt-in and never receives hidden truth.
-
-## Identity and resolution state
-
-`IdentityDecision` captures the candidate, system proposal, human decision, matcher
-version, evidence shown, and timestamp. A same-entity decision may create
-`FieldConflict` records for mappings whose `includeInMerge` flag is true; that flag
-is independent of `useForMatching`. Identity cannot create a `FieldResolution`.
-Resolution is a later manual action or explicit application of a previewed
-closed-enum rule. It records source, raw snapshots, reason, rule/policy version,
-relevant configured timestamps, and time. Prior current resolutions move into
-compact history on explicit replace/clear. A mapped timestamp remains eligible as
-a recency helper even when it is excluded from merged output.
-
-Policy validation and evaluation stay in Node because the matcher does not consume
-survivorship state. Saving policy is non-mutating; preview calculates every outcome
-before apply commits resolvable records. Manual resolutions are skipped. The
-readiness projection gates trusted CSV when review items or effective field
-conflicts remain unresolved. Reconciliation CSV remains available and truthful.
+Runs, decisions, proposals, and complete evidence are process-local; upload files are local ephemeral artifacts. An API restart loses active run state. There is no durable database, authentication, queue, global assignment, or multi-record golden-entity store. The [deployment notes](deployment.md) describe the constrained Vercel/Railway public demo. [Evaluation](sw-009-evaluation.md) keeps synthetic ground truth and nonrepresentative human review labels distinct.

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Samewise social preview</title>
+  <desc id="desc">Graphite background, cobalt accent, and a diagram connecting two source datasets through evidence, review, and a reconciled result.</desc>
+  <rect width="1280" height="640" fill="#111827"/>
+  <rect x="48" y="48" width="1184" height="544" rx="28" fill="#192334" stroke="#35445d" stroke-width="2"/>
+  <path d="M72 109H1208" stroke="#344158" stroke-width="2"/>
+  <circle cx="94" cy="79" r="7" fill="#476aaf"/>
+  <circle cx="118" cy="79" r="7" fill="#476aaf"/>
+  <circle cx="142" cy="79" r="7" fill="#476aaf"/>
+  <text x="112" y="218" fill="#f4f7fc" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">Samewise</text>
+  <text x="114" y="273" fill="#b9c7da" font-family="Arial, Helvetica, sans-serif" font-size="29">Human-in-the-loop data reconciliation</text>
+  <text x="114" y="332" fill="#90a7c6" font-family="Arial, Helvetica, sans-serif" font-size="21">Match with evidence. Review uncertainty. Merge values deliberately.</text>
+  <rect x="114" y="410" width="202" height="88" rx="14" fill="#253855" stroke="#5d83ca" stroke-width="2"/>
+  <text x="157" y="465" fill="#eef4ff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="600">Dataset A</text>
+  <rect x="375" y="410" width="202" height="88" rx="14" fill="#253855" stroke="#5d83ca" stroke-width="2"/>
+  <text x="419" y="465" fill="#eef4ff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="600">Dataset B</text>
+  <text x="338" y="465" fill="#74a4ff" font-family="Arial, Helvetica, sans-serif" font-size="33" font-weight="600">+</text>
+  <path d="M565 454h72" stroke="#74a4ff" stroke-width="4"/>
+  <path d="m633 447 12 7-12 7" fill="none" stroke="#74a4ff" stroke-width="4"/>
+  <rect x="650" y="410" width="205" height="88" rx="14" fill="#315188" stroke="#85aefa" stroke-width="2"/>
+  <text x="687" y="465" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="600">Evidence</text>
+  <path d="M855 454h58" stroke="#74a4ff" stroke-width="4"/>
+  <path d="m906 447 12 7-12 7" fill="none" stroke="#74a4ff" stroke-width="4"/>
+  <rect x="927" y="410" width="220" height="88" rx="14" fill="#203d37" stroke="#75b5a1" stroke-width="2"/>
+  <text x="956" y="465" fill="#ecfff7" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600">Trusted result</text>
+</svg>

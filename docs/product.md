@@ -1,111 +1,25 @@
 # Product
 
-## Problem
+## Purpose and fit
 
-Organizations often have two files that describe the same customers, vendors, or other entities, but inconsistent spelling, formatting, identifiers, and missing values prevent their rows from lining up. Manual reconciliation is slow, hard to audit, and easy to conflate with decisions about which data should be retained.
+Samewise helps a person reconcile two overlapping CSV datasets when entity identity is uncertain and value conflicts need an auditable later decision. Its useful niche is a one-time migration or consolidation with ambiguous matches. Clean keys may be better handled by SQL or Power Query; recurring governance, durable entity stores, and enterprise connectors call for a fuller MDM or commercial platform. [SW-013](../evaluation/competitors/sw-013/summary.md) documents the competitive boundary.
 
-## 10-second explanation
+## The five user jobs
 
-Drop in two messy files. Samewise determines which records refer to the same entity, asks you about uncertain cases, and produces a trusted reconciled result.
+1. **Upload.** Add two CSV files. Samewise profiles them and keeps the original bytes immutable.
+2. **Match setup.** Confirm corresponding fields and their semantic families. A field's `useForMatching` flag controls identity evidence independently from `includeInMerge`, which controls later value comparison. Optional metadata-only AI suggestions are advisory and validated; manual setup always works.
+3. **Review matches.** The matcher automatically links only cases passing its explicit evidence rules, leaves weak cases unmatched, and sends uncertainty to human review. Review shows actual field-level agreement and contradiction, alternatives, rank and collision context. Repeated evidence patterns can be previewed in deterministic groups; only eligible cases can receive a human-confirmed batch decision. Individual Same/Different, defer/restore, and guarded undo remain available.
+4. **Merge values.** Only effective identity links can create value conflicts. Configure field-level closed rules, inspect a read-only impact preview, and explicitly apply the merge plan. Manual resolutions are retained until changed or cleared. Remaining exceptions can be handled individually. Keep Both preserves both source values without asserting a false canonical winner.
+5. **Export.** The reconciliation report and manifest can expose pending work. Trusted merged output is available only after unresolved identity and required value conflicts are cleared. The manifest binds current decisions and source fingerprints to exact CSV hashes; an ordinary run retains its matcher-produced semantic evidence plan and candidate configuration.
 
-## Core workflow
+The user-facing distinction is simple: **“Are these the same entity?” is one decision; “which value should be kept?” is another.** An automatic match never silently chooses a source value.
 
-The primary product is organized around five user jobs:
+## Trust model
 
-1. Upload files.
-2. Set up matching.
-3. Review matches.
-4. Choose merge rules.
-5. Export.
+Algorithms generate candidates and score field evidence. AI only helps interpret schema metadata; it does not see wholesale source rows or decide row identity. Human confirmation is required for mappings and uncertain identity. Match scores are not probabilities. The system can abstain when evidence is weak, and the low-information synthetic gate specifically exercises that behavior. Provenance records what happened, not whether the source's business value was objectively true.
 
-The sources remain immutable and identity remains separate from choosing surviving
-values. A mapped field may participate in both phases: `useForMatching` controls
-identity evidence and `includeInMerge` controls post-identity value comparison.
-Profiles, complete result inspection, and Matching quality are secondary surfaces,
-not peer workflow steps.
+Evaluation uses versioned, truth-blind synthetic fixtures and explicit denominators. Hidden truth is read only after matching; human decisions collected from the ambiguity-enriched review queue are a separate, nonrepresentative evidence type. See [review generalization](review-generalization-report.md), [evaluation](sw-009-evaluation.md), and [export provenance](sw-010-export-provenance.md).
 
-The local-development vertical slice implements CSV upload, profiling, optional
-AI-assisted semantic mapping with explicit human confirmation, a first-class manual
-fallback, truth-blind multi-pass candidate generation, a versioned explainable
-multi-field scorer, ranked identity review, separate field resolution, and CSV export. The
-model sees minimized schema statistics and never performs row identity decisions.
-Candidate retention and scorer behavior have separate versioned synthetic evaluation
-harnesses. Product match scores and AI mapping confidence are distinct systems and
-neither is a calibrated probability.
+## Non-goals and current limits
 
-The SW-007 review product groups retained alternatives by stable A-side row ID.
-Reviewers can inspect and switch among B candidates without creating state, then
-record SAME, DIFFERENT, or DEFER. A SAME/Different action advances only after the
-server accepts it. SAME creates comparison-field conflicts but no field resolution;
-DIFFERENT leaves other alternatives available; DEFER preserves unresolved identity.
-The queue distinguishes system proposals from human confirmations and reports
-reviewed, remaining, deferred, and filtered counts from the live run.
-
-The merge-values product starts only after an effective identity link. Raw
-A/B comparison values remain visible and unresolved until a manual Use A, Use B,
-or Keep Both action, or the explicit application of a previewed deterministic rule.
-Policies support conservative non-null selection, explicitly mapped recency, and
-per-field trusted sources. Rule-created values retain their policy version and never
-masquerade as manual choices.
-
-The reconciliation report remains available with unresolved identity or fields.
-Ready-to-export merged output is a separate gated CSV: all review items and relevant field
-conflicts must be resolved. A-only and B-only rows retain source-only provenance;
-KEEP BOTH retains dedicated source columns instead of inventing a canonical value.
-
-SW-010 makes the result portable without pretending unresolved work is complete.
-The Export screen separates the reconciliation report, gated trusted merged output,
-and a machine-readable run provenance manifest. The manifest binds exact CSV hashes
-to immutable source fingerprints and the mapping, candidate, matcher, identity, and
-survivorship state used to produce them. Re-export from unchanged authoritative
-state is deterministic. Ordinary product manifests state that no Evaluation
-snapshot is attached; they never import hidden synthetic truth.
-
-SW-012 keeps that authoritative evidence intact while removing the giant eager
-browser dependency. Results, Review, and conflicts load deterministic 50-item
-pages; selecting a candidate retrieves its complete retained source records,
-features, blocker provenance, scores, rank, collision context, and decision state.
-On the real 10K path, the largest initial page was 88,351 bytes rather than the
-56,892,493-byte matcher result. This improves constrained demo delivery but does
-not make process-local state durable or reduce the retained evidence object.
-
-## Evaluation foundation
-
-Ground truth is created before matcher development so future changes can be compared against known identity relationships, including source-only entities, hard negatives, and duplicate source rows. The product-visible CSVs never contain canonical identifiers, corruption labels, or partner hints. Canonical entities, source-to-canonical mappings, schema mapping truth, and provenance are evaluation-only artifacts.
-
-Synthetic fixtures make edge cases controllable and reproducible, but they do not establish production matching quality or prove that real customer data is represented. Future matcher evidence will need representative, appropriately governed evaluation data in addition to these synthetic benchmarks.
-
-SW-006 uses a separately seeded tuning fixture to select conservative thresholds,
-then freezes the matcher config before opening holdout truth. Evaluation reports
-candidate misses, below-review-threshold true links, post-score retention misses,
-auto-match precision,
-review rate, top-1 ranking, hard-negative behavior, and empirical score bands with
-explicit denominators. Downstream recovery is asserted not to exceed the candidate
-recall ceiling.
-
-SW-009 makes this evidence inspectable in a dedicated product area. Versioned,
-content-addressed snapshots distinguish synthetic ground truth from nonrepresentative
-human review labels. Compatible matcher snapshots show percentage-point deltas;
-incompatible fixtures or evaluator semantics show no delta. Metrics lead to paged
-candidate-miss, ranking, retention, false-auto-match, and hard-negative examples.
-
-## What Samewise is not
-
-- It is not a fuzzy spreadsheet join with an AI label.
-- It is not an autonomous AI system that authoritatively matches rows.
-- It is not a tool that mutates source datasets.
-- It is not a system that silently combines identity and field-selection decisions.
-- It is not yet a database, durable upload service, queue, or production matching
-  engine.
-
-## Identity versus survivorship
-
-Suppose file A contains `Acme Incorporated` with phone `555-0100`, while file B contains `ACME Inc.` with phone `555-0199`.
-
-The identity question is: do these two records describe the same organization? Evidence may support “yes,” “no,” or human review.
-
-Only after a “same entity” decision does survivorship ask: which phone value should appear in the reconciled result? The answer may depend on source authority, freshness, or a human decision. A strong identity match does not itself choose the winning phone number.
-
-Deterministic synthetic rule tests can prove that “newer A selects A” under an
-explicit policy. They cannot prove that the newer business value is true, and
-Samewise does not report that as survivorship accuracy.
+Samewise is not a general spreadsheet join, autonomous AI record matcher, durable master-data platform, or global assignment engine. It is CSV-focused and stores live run state in one API process. A restart discards active decisions; the public demo is a constrained deployment, not an enterprise service. Synthetic success does not establish real-upload accuracy.

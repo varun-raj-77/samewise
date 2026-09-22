@@ -1,72 +1,111 @@
 # Samewise
 
-Samewise takes two messy CSV datasets, determines which records refer to the same real-world entity, asks a human about uncertain candidates, and produces an explicit reconciliation export.
+**Reconcile two overlapping datasets without blindly merging records.**
 
-## Why not Power Query?
+Samewise finds likely matches, asks people to resolve uncertainty, then separately helps them choose which values to keep. The result is a reconciled CSV with an audit report and a reproducible provenance manifest.
 
-If an exact join, deterministic normalized join, or straightforward fuzzy-text
-merge solves the problem, Samewise adds little. Power Query supports multi-column
-joins, outer/anti joins, fuzzy merge, thresholds, multiple returned matches,
-similarity scores, transformation tables, fuzzy grouping, and repeatable applied
-steps. It should be the default for clean keys and many low-ambiguity jobs.
+**[Live demo](https://trysamewise.vercel.app)** · **[Architecture](docs/architecture.md)** · **[Evaluation](docs/review-generalization-report.md)** · **[Run locally](#run-locally)**
 
-Samewise becomes useful only when a high-risk reconciliation needs ranked
-alternatives, field-specific agreement and contradiction, explicit unresolved and
-collision state, a purpose-built human review flow, separate survivorship decisions,
-or deterministic evidence/provenance artifacts. This boundary is based on an
-executed Samewise scenario suite and current Power Query documentation; Power Query
-was not executed in SW-013. See
-[the adversarial validation](evaluation/competitors/sw-013/summary.md).
+![Samewise uncertain match review showing a competing candidate, field-level agreements, and side-by-side source records](docs/assets/readme/review-case.png)
 
-## Why not a full MDM platform?
+*An uncertain match shows source records and real matcher evidence. Competing candidates remain visible; the reviewer decides identity before any value is merged.*
 
-Samewise is a narrow two-file reconciliation workbench, not a master-data system.
-It has no durable entity store, crosswalk service, connector estate, governance
-program, streaming operation, global assignment, or enterprise deployment layer.
-Reltio, Informatica, and similar platforms address broader operational master-data
-needs and should be preferred when those needs exist.
+## What you do
 
-DataMatch Enterprise overlaps Samewise much more directly and documents profiling,
-cleansing, composite matching, human review, survivorship, golden records, export,
-REST API, containerized deployment, entity graphs, and scheduling. Samewise has no
-proven broad advantage over it. The remaining hypothesis is a smaller review and
-audit experience for high-risk, one-time migrations and consolidations; that needs
-real-user testing before further product investment.
+| Step | In the product |
+| --- | --- |
+| **Upload** | Add two CSV files; Samewise profiles them and keeps the source bytes unchanged. |
+| **Match setup** | Confirm corresponding fields, their semantic meaning, and independently choose **Use to match** and **Keep in result**. |
+| **Review matches** | Inspect agreements, contradictions, alternatives, and collisions; decide uncertain identities individually or preview a safe group. |
+| **Merge values** | Set field rules, preview their effect, explicitly apply them, then handle remaining exceptions. |
+| **Export** | Download reconciled data when ready, plus an always-available reconciliation report and a provenance manifest. |
 
-The guided product presents five user jobs on top of the frozen matcher, review,
-field-resolution, evaluation, and export capabilities:
+```mermaid
+flowchart LR
+  A[Upload A and B] --> B[Confirm mappings]
+  B --> C[Plan evidence and generate candidates]
+  C --> D[Score and explain]
+  D --> E[Automatic / review / no match]
+  E --> F[Human identity decisions]
+  F --> G[Preview and apply merge rules]
+  G --> H[CSV + audit + manifest]
+```
 
-1. **Upload files** without modifying either source.
-2. **Set up matching** in a compact correspondence table. Each confirmed mapping
-   independently records whether it helps identity (`useForMatching`) and whether
-   it is retained for value reconciliation (`includeInMerge`). Metadata-only AI
-   recommendations remain inactive until a human confirms them, and manual setup
-   remains available when AI fails.
-3. **Review matches** through an aggregate match summary and a bounded uncertain-case
-   queue. Human-readable agreement and contradiction leads; score, blocker,
-   candidate-rank, collision, and version evidence remains available on demand.
-4. **Choose merge rules** field-first, preview exact impact, explicitly apply a
-   closed deterministic policy, then review only paged exceptions.
-5. **Export** reconciled data only when readiness passes, with audit report and
-   provenance manifest available as secondary files.
+### A short product tour
 
-File profiles are secondary details, complete result browsing sits beneath Review
-matches, and the unchanged synthetic benchmark is under **Advanced → Matching
-quality** rather than appearing as a reconciliation step. See
-[the guided-redesign note](docs/guided-reconciliation-redesign.md).
+![Match setup with corresponding fields, semantic families, and independent matching and merge controls](docs/assets/readme/match-setup.png)
 
-Identity and survivorship are separate state transitions. Confirming identity never chooses a field value.
+*A field can help establish identity, appear in the final result, do both, or do neither. Semantic choices guide deterministic evidence planning.*
 
-## Prerequisites
+![Merge values workspace with field rules and preview impact](docs/assets/readme/merge-values.png)
 
-- Node.js 24 LTS
-- pnpm 11 (Corepack is recommended)
-- Python 3.13
-- uv
+*Field rules are previewed before explicit application; manual resolutions remain authoritative until changed or cleared.*
 
-Runtime expectations are recorded in `.nvmrc`, `.python-version`, `package.json`, and the lockfiles.
+![Ready-to-export screen showing reconciled data and secondary audit and provenance artifacts](docs/assets/readme/export-ready.png)
 
-## Get started
+*Trusted reconciled data is available only when readiness passes; the audit report and hashed manifest document the result.*
+
+## Why this is harder than a join
+
+Two rows can share a phone number yet describe different entities. One organization can appear under different names, and an identifier may be stable only inside its source. Samewise preserves these distinctions instead of treating every field as fuzzy text. The two questions stay separate:
+
+> **Are these the same entity?** Then, **which value should be kept?**
+
+An automatic link still does not choose a winning value. Weak evidence can lead to review or no match; a score is an inspectable evidence measure, not a calibrated probability.
+
+## Engineering highlights
+
+- **Dataset-adaptive evidence.** Confirmed mappings use bounded semantic families. Persistent IDs, source-local IDs, names, contacts, addresses, geography, dates, and unknown fields receive different, conservative treatment. A versioned evidence plan records the selected comparators and candidate configuration. See [ADR 0012](docs/decisions/0012-dataset-adaptive-semantic-evidence-and-review-groups.md).
+- **Candidate generation before scoring.** Inverted indices and multiple semantic routes propose plausible pairs without comparing every A row with every B row. Candidate recall is measured separately because a missed true pair cannot be recovered by a better scorer.
+- **Explainable decisions and abstention.** The versioned matcher records field agreements, contradictions, weights, blocker provenance, ranks, alternatives, and collision context. It reserves uncertain cases for a human and does not treat scores as probabilities.
+- **Review at the right scale.** Bounded pages and on-demand details expose full authoritative evidence. Deterministic signatures group repeated patterns; batch Same/Different actions require a preview and record a decision for each eligible pair. Defer, restore, and guarded undo preserve review state.
+- **Identity before values.** `useForMatching` and `includeInMerge` are independent. A closed set of merge rules supports preview and explicit apply, preserves manual exceptions, and can keep both source values without inventing a canonical truth.
+- **Traceable outputs.** Immutable source fingerprints, confirmed mappings, matcher and evidence-plan versions, human decisions, merge policies, and exact CSV hashes are represented in the run manifest. Unresolved work remains visible in the reconciliation report; trusted output is gated.
+
+**AI interprets schema metadata; algorithms match rows; people resolve uncertainty; evaluation tests the behavior.** OpenAI receives minimized column names and profile statistics through the API, never wholesale source rows or hidden evaluation truth. Its structured suggestions are validated and require confirmation. Manual mapping works without an API key.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  W[React + TypeScript web] -->|validated HTTP| A[Fastify + TypeScript API]
+  A -->|metadata-only, optional| O[OpenAI mapping suggestions]
+  A -->|validated JSON / subprocess| P[Python matcher]
+  P --> M[Profile → evidence plan → candidates → score]
+  M --> A
+  A --> S[(Process-local authoritative run state)]
+  A --> F[(Immutable uploaded CSV bytes)]
+  A --> X[Reconciled CSV + audit report + manifest]
+```
+
+The API owns review, merge, readiness, and exports. The Python process owns profiling, candidate generation, matching, and evaluation tooling. JSON Schema, Zod, and Pydantic validate the cross-language contracts. The browser receives bounded projections while complete evidence remains authoritative in API memory. [Read the architecture and lifecycle](docs/architecture.md).
+
+## Evidence, with boundaries
+
+The current [review-generalization closeout](docs/review-generalization-report.md) reports these **deterministic synthetic fixture** observations under the v0.3 matcher and v0.4 candidate engine:
+
+| Fixture | Observed result | What it means |
+| --- | --- | --- |
+| Public-style 8K × 8K regression | 11,379 candidate pairs from 64,000,000 possible; 100% candidate recall; 822 review cases after semantic planning versus 1,312 before | A controlled workflow regression, not customer accuracy or a public-service capacity claim. |
+| Frozen 1,200-entity holdout | 98.521047% candidate recall; 169 automatic links with 100% measured automatic precision | Exact holdout result for the current semantic configuration; the conservative change routes more cases to review. |
+| Six small domain fixtures | Separate gates for organizations, people, products, facilities, sparse legacy, and low-information data | The low-information fixture makes zero automatic matches and abstains. These fixtures do not establish transfer to real uploads. |
+
+The [SW-012 browser-delivery measurement](docs/sw-012-bounded-evidence.md) observed an 88,351-byte 50-case review page versus a 56,892,493-byte full matcher result on its documented 10K synthetic fixture. This measures transfer size, not retained server memory. The [SW-011 performance report](docs/sw-011-performance.md) covers a candidate-only 50K fixture; full 50K scoring was not measured. The public end-to-end walkthrough is **product-flow evidence**, not accuracy evidence. [Evaluation definitions and historical reports](docs/README.md#evaluation-and-historical-evidence) keep fixtures, versions, and denominators distinct.
+
+## Tech stack
+
+| Surface | Current implementation |
+| --- | --- |
+| Web | React 19, TypeScript, Vite; Vitest and Testing Library |
+| API | Node.js 24, TypeScript, Fastify; Vitest |
+| Matcher | Python 3.13, Pydantic; pytest and Ruff |
+| Contracts | Versioned JSON Schema, Zod, and Pydantic boundary models |
+| Optional AI | OpenAI structured semantic mapping through the server |
+| Public demo | Vercel frontend, Railway API and Python matcher |
+
+## Run locally
+
+Use Node.js 24, pnpm 11, Python 3.13, and uv:
 
 ```text
 pnpm install
@@ -74,260 +113,25 @@ uv sync --project services/matcher --locked
 pnpm dev
 ```
 
-The web app runs at `http://localhost:5173` and proxies `/api` to the Fastify API at `http://localhost:3000`. The API invokes the Python matcher as a subprocess. Set `SAMEWISE_PYTHON` to an explicit Python executable when `python` is not on `PATH`.
+Open `http://localhost:5173`; the API runs at `http://localhost:3000` and Vite proxies `/api`. Upload the visible synthetic files at `fixtures/corrupted/organizations/organizations-dev-v1/dataset_a.csv` and `dataset_b.csv`. Evaluation-only truth files must not enter product operation. `OPENAI_API_KEY` is optional and belongs only in the API server environment; never expose it through a `VITE_` variable. Set `SAMEWISE_PYTHON` if Python is not on `PATH`.
 
-AI mapping is optional. Set `OPENAI_API_KEY` only in the API server environment and optionally set `OPENAI_MODEL` (development default: `gpt-5-mini`). Never use a `VITE_` variable for the key. Without a key—or after a provider, timeout, or validation failure—the mapping screen remains fully usable manually.
-
-For the development demo, upload only these visible fixture inputs:
+## Verification
 
 ```text
-fixtures/corrupted/organizations/organizations-dev-v1/dataset_a.csv
-fixtures/corrupted/organizations/organizations-dev-v1/dataset_b.csv
-```
-
-Do not use the fixture's canonical, ground-truth, provenance, schema-truth, or hard-negative artifacts in product operation. They remain evaluation-only.
-
-Uploaded bytes are written once beneath the ignored `.samewise-data/<run-id>/` directory under generated filenames. SHA-256 fingerprints are stored in the run profile. Mapping, result, decision, and resolution metadata is process-local and is lost when the API restarts.
-
-## API workflow
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/runs` | Create a process-local run |
-| `POST` | `/api/runs/:runId/datasets/:side` | Upload raw CSV bytes for side `A` or `B` |
-| `GET` | `/api/runs/:runId` | Read compact current run summary |
-| `GET` | `/api/runs/:runId/results` | Read a bounded deterministic Results page |
-| `GET` | `/api/runs/:runId/review` | Read a filtered/sorted bounded Review page |
-| `GET` | `/api/runs/:runId/candidates/:candidateId` | Read complete run-owned candidate evidence on demand |
-| `GET` | `/api/runs/:runId/conflicts` | Read a bounded deterministic conflict page |
-| `PUT` | `/api/runs/:runId/mappings` | Save validated manual mappings |
-| `POST` | `/api/runs/:runId/mapping-suggestions` | Generate a validated metadata-only proposal from server-owned profiles |
-| `PATCH` | `/api/runs/:runId/mapping-suggestions/:suggestionId` | Accept, reject, or remap one proposal without overwriting its origin |
-| `POST` | `/api/runs/:runId/match` | Invoke candidate generation and the explainable matcher |
-| `POST` | `/api/runs/:runId/candidates/:candidateId/decisions` | Record Same/Different identity |
-| `PATCH` | `/api/runs/:runId/review-items/:aRowId` | Defer or return one unresolved A-side review item |
-| `POST` | `/api/runs/:runId/review-undo` | Undo the most recent eligible human identity decision |
-| `POST` | `/api/runs/:runId/conflicts/:conflictId/resolutions` | Record or explicitly replace Use A/Use B/Keep Both |
-| `DELETE` | `/api/runs/:runId/conflicts/:conflictId/resolution` | Clear current resolution and retain history |
-| `PUT` | `/api/runs/:runId/survivorship-policy` | Configure a validated versioned policy without applying it |
-| `POST` | `/api/runs/:runId/survivorship-preview` | Preview one configured field rule and bulk counts |
-| `POST` | `/api/runs/:runId/survivorship-apply` | Explicitly apply a rule without overwriting manual resolutions |
-| `GET` | `/api/runs/:runId/export` | Download the always-available reconciliation report |
-| `GET` | `/api/runs/:runId/trusted-export` | Download trusted merged output only when readiness passes |
-| `GET` | `/api/runs/:runId/manifest` | Download the deterministic run provenance manifest and CSV hashes |
-
-Uploads use a CSV content type plus an `X-File-Name` header. The development limit is 2 MiB per file.
-
-## Candidate generation and explainable scoring
-
-All-pairs comparison grows as **O(N×M)**: 100,000 rows on each side imply 10
-billion comparisons. Product matching now uses `candidate-engine-v0.3.0`, which
-builds hash/inverted indices and unions five independent passes: exact normalized
-phone/email/domain plus mapping-specific generic identity equality, meaningful name
-token, name character prefix, location plus name, and address number plus name. The
-v2 contextual passes include conservative
-exact compact-name composites that recover spacing/suffix variants without relaxing
-bucket limits. Empty keys are never indexed. Whole blocking
-buckets above the versioned 20-row-per-side or 100-relationship limits are
-suppressed and measured; accepted buckets are never partially truncated.
-
-Generation sees only visible rows, confirmed mappings, and explicit config. Hidden
-identity truth and corruption provenance are loaded later by evaluation. The naive
-all-pairs path remains an explicit small-test oracle.
-
-The retained falsification report at `evaluation/reports/sw-005f/README.md` records
-13,801 candidates from 73,960,000 theoretical pairs on the original 10K fixture
-(5,359.031954x reduction), retaining 7,164/7,164 known true pairs. On a separate
-1,500-entity weak-identifier fixture, v0.2 retained 1,035/1,043 true pairs with no
-surviving exact phone/email/domain. This is
-**candidate recall**: a true pair survived blocking. It is not final record-matching
-recall, precision, accuracy, or evidence that the scorer made the right decision.
-Synthetic domains are unusually strong, and runtime is hardware-dependent.
-
-SW-011 stage measurements on the documented 7.89 GB Windows development host
-reproduced the 10K candidate result and retained 7,164/7,164 known pairs. The
-optimized 10K matcher took 18.378 seconds through JSON serialization, whose complete
-result was 56.9 MB. A 50K canonical-entity fixture completed candidate generation in
-28.396 seconds with 366,207 candidates and 35,837/35,837 candidate recall; its
-candidate-only traced Python-allocation peak was 1.10 GB, so full scoring and 100K
-were not attempted on that host. These are fixture- and machine-specific results,
-not capacity claims. See [docs/sw-011-performance.md](docs/sw-011-performance.md).
-
-SW-012 reran that exact 56,892,493-byte matcher-result baseline and moved browser
-delivery to versioned bounded projections. On the same 10K fixture, the match
-summary was 8,386 bytes, a realistic 50-case Review page was 88,351 bytes, and a
-complete selected-candidate explanation was 7,468 bytes. Evidence remains retained
-authoritatively and is not recomputed. This is a wire-payload improvement, not a
-server-memory or durability claim. See
-[docs/sw-012-bounded-evidence.md](docs/sw-012-bounded-evidence.md).
-
-After candidate generation, only confirmed mappings with `useForMatching: true`
-enter the explicit
-feature pipeline. Name, phone, email, domain, address, city, region, postal, and
-generic text evidence have versioned Samewise-owned feature definitions. Each field
-stores its normalized values, bounded feature values, evidence class, configured
-weight, positive contribution, conflict contribution, and deterministic explanation
-code. Mappings selected only for merged output never enter identity scoring.
-
-The bounded match score is
-`max(0, weighted positive evidence - weighted conflict evidence) / total configured identity weight`.
-Missing values contribute zero and do not shrink the denominator. Strong non-empty
-phone, email, or domain contradictions prevent auto-match but do not act as
-authoritative identity truth.
-
-Frozen `matcher-config-v0.2.0` decision bands are:
-
-- **Auto match:** top score `>= 0.50`, margin `>= 0.04`, at least two agreeing fields,
-  no strong contradiction, and no preferred-B collision.
-- **Needs review:** top score `>= 0.25` without satisfying every auto-match rule.
-- **Unmatched / Only A:** top score `< 0.25` or no candidate.
-- Up to three alternatives at score `>= max(0.25, top score - 0.30)` are retained.
-
-On the untouched 1,200-entity synthetic holdout, candidate-engine-v0.2.0 retained
-866/879 true links. The matcher auto-matched 253/253 correctly, routed 598/858
-matchable A rows to review, ranked a true candidate first for 839/846 eligible rows,
-and auto-matched none of six hard-negative candidate pairs. These are fixture facts,
-not calibrated probabilities or evidence of real-data quality. The full denominator
-definitions and failure decomposition are in `evaluation/reports/sw-006/README.md`.
-
-## Evaluation as product evidence
-
-Samewise separates fully labeled synthetic benchmarks from human decisions gathered
-on the ambiguity-enriched review queue. Candidate recall is pair-level true links
-retained by blocking divided by all true links; it is a ceiling on downstream
-recovery, not matcher recall. Auto-match precision is true automatic links divided
-by all automatic links and is undefined when there are none. Review rate is row
-level: review-routed matchable A rows divided by A rows having at least one truth
-link. End-to-end recovery returns to pair level: true links retained for automatic
-or human decision divided by all true links.
-
-Duplicate source rows can create more true pairs than matchable A rows, so pair and
-row counts are never mixed. Score-band rates are empirical fixture observations,
-not calibrated probabilities. Human SAME/DIFFERENT decisions retain the exact
-matcher/candidate versions and evidence shown, but are described only as reviewed-
-subset evidence because the review queue is not a random sample.
-
-Direct version deltas require the same fixture/source identity, dataset fingerprints,
-candidate engine/configuration, and compatible evaluator semantics. Threshold
-what-if is retrospective analysis and cannot deploy a matcher configuration. See
-[docs/sw-009-evaluation.md](docs/sw-009-evaluation.md) for exact denominators,
-reproduced SW-006 values, comparison rules, gates, and limitations.
-
-## Verify
-
-```text
-uv sync --project services/matcher --locked
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm --filter @samewise/web build
 pnpm verify
+pnpm --filter @samewise/web build
 ```
 
-`uv` remains the Python dependency manager. Root verification prefers `uv` when
-it is available on `PATH`; after the normal sync above it can also use the
-project-local `services/matcher/.venv` directly on Windows or POSIX. If neither
-is available, verification stops with the required setup command instead of
-creating a temporary command shim.
+`verify` runs TypeScript lint, type checks, workspace tests, Python lint, and Python tests. Normal tests mock OpenAI and need no network or API key. The [API reference](docs/api.md) and [deployment notes](docs/deployment.md) cover operational details.
 
-Normal tests mock the OpenAI boundary and require no network or API key. To run one opt-in live development evaluation against only the visible organization fixtures:
+## Where Samewise fits
 
-```powershell
-$env:SAMEWISE_LIVE_OPENAI='1'
-$env:OPENAI_API_KEY='your-uncommitted-key'
-pnpm --filter @samewise/api test -- live-semantic-mapping
-```
+Use SQL or Power Query when clean keys or a straightforward deterministic or fuzzy join suffice. Samewise focuses on one-time, high-risk two-file reconciliation where alternatives, contradictions, human identity review, later value choices, and auditability matter. A mature MDM or commercial reconciliation platform is appropriate for durable entity stores, connectors, governance, and recurring enterprise operations. [SW-013 adversarial validation](evaluation/competitors/sw-013/summary.md) documents this boundary; it did not execute competing products.
 
-The live call is generated from visible profiles first. Only afterward does evaluation code compare proposed pairs with hidden schema truth and report exact correct, incorrect, missed expected, and extra proposed counts. Precision is exact-correct divided by all proposed pairs; recall is exact-correct divided by all expected pairs. No live accuracy result is claimed unless that command actually runs.
+## Current limits
 
-Run the matcher boundary directly:
+Samewise is CSV-focused. Run state and full matcher evidence live in one API process; a restart loses active decisions, and uploaded files are local ephemeral artifacts. There is no authentication, durable database, global assignment, or enterprise deployment layer. Evidence scores are uncalibrated. Synthetic evaluation cannot establish real-data quality. Export artifacts are regenerated from current state rather than persisted or signed. These constraints also apply to the public demo.
 
-```text
-uv run --project services/matcher samewise-matcher health
-```
+## Repository and deeper documentation
 
-Generate a configured fixture and benchmark candidate retention:
-
-```text
-uv run --project services/matcher samewise-matcher fixtures generate-config --config evaluation/benchmark-configs/organizations-candidates-1k.json --output-root .samewise-data/generated-1k
-uv run --project services/matcher samewise-matcher candidates benchmark --root .samewise-data/generated-1k --fixture organizations-candidates-1k-v1 --mappings evaluation/configs/organizations-confirmed-mappings-v1.json --config evaluation/configs/candidate-engine-v0.3.0.json --output-dir .samewise-data/benchmarks/organizations-candidates-1k-v1
-```
-
-## Current limitations
-
-- CSV only; no XLSX.
-- Process-local product state; no durable run or decision persistence.
-- Authoritative matcher evidence remains in process memory even though browser
-  projections are bounded; SW-012 does not claim lower retained-state memory.
-- Refresh and route navigation recover `?run=<run-id>&screen=<stage>` only while
-  that API process is still alive.
-- Local immutable artifacts; no object storage.
-- Synthetic candidate quality is not evidence of real-data recall. Full 50K scoring,
-  100K, and larger behavior remain unmeasured; candidate-only 50K evidence is
-  documented separately.
-- The baseline scorer still ranks candidates in process memory and is not the
-  default product matcher; it remains runnable only for comparison.
-- Match scores are uncalibrated evidence scores.
-- Synthetic tune/holdout results do not establish real-data quality or threshold
-  transferability.
-- AI schema mapping is process-local, requires human review, and is not a substitute for deterministic row matching.
-- No authentication, database, queue, worker, or production observability platform.
-- Survivorship policy, current resolutions, and compact history are process-local.
-- Prefer newest accepts explicit mapped ISO date/timestamp strings; it never infers
-  business time from upload time or arbitrary locale date text.
-- Multiple effective links are exported separately rather than collapsed into a
-  multi-record golden entity.
-- Export artifacts are generated on request from current process-local state; they
-  are not persisted, signed, or permanently frozen after download.
-- Ordinary product runs do not retain a standalone candidate-configuration object,
-  so the manifest records that limitation instead of inventing a config version.
-
-## Survivorship semantics
-
-Identity and survivorship are separate. SAME alone creates no selected value.
-Supported field strategies are Use A, Use B, Keep Both, Prefer non-null, Prefer
-newest, and Prefer trusted source. Missing for non-null rules means only an empty or
-whitespace-only parsed string; literals such as `NULL` and `N/A` remain source data.
-Trusted-source rules are per mapped comparison field and have no implicit fallback.
-Newest requires an explicit mapped date field and leaves missing, malformed, or tied
-timestamps unresolved.
-
-KEEP BOTH is not a delimiter-concatenated canonical value. Trusted CSV leaves the
-canonical field empty and emits dedicated `<field>__A`, `<field>__B`, and resolution
-metadata columns. See [docs/sw-008-survivorship.md](docs/sw-008-survivorship.md).
-
-Synthetic tests establish deterministic rule correctness. They are not a claim of
-real-world survivorship accuracy.
-
-## Export and provenance semantics
-
-Samewise exposes three distinct artifacts. `reconciliation-export-v3.0.0` is an
-audit report and remains available while identity or field work is unresolved. It
-records system matches, human SAME/DIFFERENT decisions, deferred/pending identity,
-source-only records, conflict/resolution IDs, and manual versus deterministic-rule
-resolution origin. `trusted-merged-export-v2.0.0` is emitted only when the SW-008
-readiness gate passes. `run-manifest-v1.0.0` describes the authoritative current
-run snapshot and hashes the exact UTF-8 CSV bytes.
-
-Exports have deterministic headers and row ordering, CRLF CSV records, standard
-comma/quote/multiline escaping, and spreadsheet formula-injection defense for `=`,
-`+`, `-`, and `@`; plain negative numeric values remain numeric text. Null or absent
-source values are empty CSV cells. Re-exporting unchanged authoritative state is
-byte-identical. No wall-clock export timestamp is embedded.
-
-KEEP BOTH leaves the canonical value empty and retains `<field>__A`, `<field>__B`,
-and `<field>__resolution` plus provenance columns. A survivorship selection is an
-explicit policy or human choice, not objective truth. Ordinary manifests never
-attach synthetic canonical IDs, hidden identity labels, or corruption provenance;
-those remain in versioned Evaluation artifacts. See
-[docs/sw-010-export-provenance.md](docs/sw-010-export-provenance.md).
-
-## Repository map
-
-- `apps/web`: guided React workflow
-- `apps/api`: Fastify orchestration, process-local state, immutable artifact handling, and export
-- `services/matcher`: Python profiling, candidate generation/evaluation, baseline comparison, and fixture tooling
-- `packages/contracts`: canonical JSON Schema plus TypeScript runtime validation
-- `fixtures`: visible synthetic inputs and separately stored evaluation-only truth
-- `evaluation`: versioned fixture/candidate configs, deterministic snapshots, and factual candidate-recall reports
-- `docs`: product, architecture, and decisions
+`apps/web` is the guided UI; `apps/api` owns orchestration and export; `services/matcher` holds Python profiling, matching, and evaluation; `packages/contracts` defines the boundary; `fixtures` and `evaluation` keep visible inputs separate from hidden truth. Start with the [documentation index](docs/README.md), [product guide](docs/product.md), [architecture](docs/architecture.md), [API reference](docs/api.md), and [demo storyboard](docs/demo.md).
