@@ -177,8 +177,15 @@ describe("bounded review workspace", () => {
       const payload = url.includes(`/review-groups/${group.groupId}`) ? preview : url.endsWith("/review-groups") ? groups : url.includes("/review?") ? reviewPage() : detail();
       return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } }));
     }));
-    const onBatchDecision = vi.fn(async () => run({ reviewProgress: { total: 30, reviewed: 30, remaining: 0, deferred: 0 } }));
-    render(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } })} busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    const completed = run({ reviewProgress: { total: 30, reviewed: 30, remaining: 0, deferred: 0 } });
+    let updateRun!: (value: RunSummary) => void;
+    const onBatchDecision = vi.fn(async () => { updateRun(completed); return completed; });
+    function Harness() {
+      const [value, setValue] = useState(run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } }));
+      updateRun = setValue;
+      return <ReviewWorkspace run={value} busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />;
+    }
+    render(<Harness />);
 
     expect(await screen.findByRole("heading", { name: "Matching review" })).toBeInTheDocument();
     expect(await screen.findByText("Quick decisions")).toBeInTheDocument();
@@ -189,5 +196,41 @@ describe("bounded review workspace", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(apply);
     await waitFor(() => expect(onBatchDecision).toHaveBeenCalledWith(group.groupId, "same_entity"));
+    expect(await screen.findByRole("heading", { name: "Identity review complete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue to Merge values" })).toBeInTheDocument();
+    expect(screen.queryByText("Preview before applying")).not.toBeInTheDocument();
+  });
+
+  it("hands a zero-case completed review to Merge values without a dead grouped preview", async () => {
+    const emptyPage = { ...reviewPage(), items: [], page: { ...reviewPage().page, total: 0, returned: 0 }, progress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } };
+    const groups = { contractVersion: "1.0.0", runId: "run-review", workload: { signatureVersion: "review-signature-v1.0.0", totalNeedsAttention: 0, quickDecisions: 0, competingCandidates: 0, strongContradictions: 0, lowInformationNoise: 0, individualReview: 0, deferred: 0, groupCount: 0 }, groups: [] };
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(new Response(JSON.stringify(String(input).endsWith("/review-groups") ? groups : emptyPage), { status: 200 }))));
+    const onGoResolution = vi.fn();
+    render(<ReviewWorkspace run={run({ reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } })} busy={false} onDecision={noop} onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={onGoResolution} />);
+    expect(screen.getByRole("heading", { name: "Identity review complete" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Merge values" }));
+    expect(onGoResolution).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Back to grouped review" }));
+    expect(await screen.findByRole("heading", { name: "Identity review complete" })).toBeInTheDocument();
+    expect(screen.queryByText("Preview before applying")).not.toBeInTheDocument();
+  });
+
+  it.each(["same_entity", "different_entity"] as const)("shows completion after final %s and gates Merge again after Undo", async (decision) => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    const starting = run();
+    const completed = run({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, reviewUndo: { decisionId: "d1", candidateId: "c11", aRowId: "A1", bRowId: "B1", humanDecision: decision, canUndo: true, blockedReason: null, decisionOrigin: "human_individual", affectedCount: 1, reviewGroupId: null } });
+    const onGoResolution = vi.fn();
+    function Harness() {
+      const [value, setValue] = useState(starting);
+      return <ReviewWorkspace run={value} busy={false} onDecision={async () => { setValue(completed); return completed; }} onBatchDecision={noopBatch} onDefer={noop} onUndo={async () => { setValue(starting); return starting; }} onGoResolution={onGoResolution} />;
+    }
+    render(<Harness />);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+    fireEvent.click(screen.getByRole("button", { name: decision === "same_entity" ? "Same entity" : "Different entities" }));
+    expect(await screen.findByRole("heading", { name: "Identity review complete" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Merge values" }));
+    expect(onGoResolution).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Continue to Merge values" })).not.toBeInTheDocument());
   });
 });

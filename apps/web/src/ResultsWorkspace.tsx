@@ -59,7 +59,7 @@ export function ResultsWorkspace({ run, onReview, onResolution, onOpenReview, on
       {page && page.items.length === 0 && <p className="empty">No result rows are available.</p>}
       {page && <div className="actions" aria-label="Result pagination"><button type="button" className="secondary" disabled={page.page.previousOffset === null} onClick={() => setOffset(page.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={page.page.nextOffset === null} onClick={() => setOffset(page.page.nextOffset ?? offset)}>Next</button></div>}
     </details>
-    <div className="actions"><button className="secondary" onClick={onResolution}>Choose merge rules ({run.conflictSummary.unresolved} differences)</button><button className="secondary" onClick={onOpenReview} disabled={run.reviewProgress.total === 0}>Review matches</button><button className="primary" onClick={onExport}>Continue to export</button></div>
+    <div className="actions">{unresolvedReviewCount > 0 ? <span role="status">Merge values and trusted Export unlock after identity review.</span> : run.conflictSummary.unresolved > 0 ? <><button className="primary" onClick={onResolution}>Continue to Merge values</button><button className="secondary" onClick={onOpenReview} disabled={run.reviewProgress.total === 0}>Inspect reviewed matches</button></> : <><button className="primary" onClick={onExport}>Continue to Export</button><button className="secondary" onClick={onResolution}>Inspect merge values</button></>}</div>
   </section>;
 }
 

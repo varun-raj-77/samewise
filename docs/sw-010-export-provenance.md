@@ -29,10 +29,15 @@ logic itself required no replacement.
   CSV artifacts.
 
 The manifest schema is in
-`packages/contracts/schemas/run-manifest/1.0.0.json`. Candidate configuration is not
-retained by an ordinary process-local product run today; the manifest represents it
-as unavailable rather than borrowing benchmark configuration. Likewise, no
-Evaluation snapshot is attached to an ordinary run.
+`packages/contracts/schemas/run-manifest/1.0.0.json`. Ordinary product runs now
+retain the matcher-produced bounded evidence plan. The run view passes the plan
+through to the manifest without recomputing it; the SHA-256 covers its canonical
+JSON serialization. The plan contains the candidate strategy/configuration,
+mapping IDs, semantic families, comparators, and bounded classifications. Confirmed
+mapping details and matcher configuration are adjacent manifest fields. Legacy or
+test runs with no retained plan report `not_retained` and export `{}` truthfully;
+older manifests remain readable. No evaluation snapshot is attached to an ordinary
+run.
 
 ## Traceability and truthfulness
 
@@ -46,6 +51,13 @@ Survivorship records why a value was selected; it does not claim the value is
 objectively correct. System identity links remain distinguishable from human SAME.
 Human DIFFERENT rows retain their original system proposal evidence in process
 state and decision identifiers in the report.
+
+`configuredFieldPolicies` means the policy currently configured for the run. It
+does not rewrite existing field resolutions. Each applied resolution retains the
+strategy, rule ID, policy version, origin, and reason that produced it. Human
+identity decision counts are pair-level decisions, including each batch-applied
+pair once; batch provenance is a subset, not an additional count. Manual value
+decisions are reported separately from deterministic rule outcomes.
 
 ## Determinism, CSV, and security
 

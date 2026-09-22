@@ -11,6 +11,7 @@ import {
   MappingSuggestionResponseSchema,
   HumanReviewEvidenceSchema,
   ResolutionPreviewSchema,
+  MergePlanPreviewSchema,
   ResultsPageSchema,
   ReviewFilterSchema,
   ReviewQueuePageSchema,
@@ -174,7 +175,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
     const { offset, limit } = pageQuery(request.query);
-    return ConflictPageSchema.parse(store.conflictPage(runId, offset, limit));
+    const requestedStatus = (request.query as { status?: string }).status;
+    const status = requestedStatus === "unresolved" || requestedStatus === "resolved" ? requestedStatus : "all";
+    return ConflictPageSchema.parse(store.conflictPage(runId, offset, limit, status));
   });
 
   app.get("/api/runs/:runId/evaluation-evidence", async (request) => {
@@ -307,6 +310,22 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const result = store.applySurvivorshipRule(runId, ruleId);
     app.log.info({ runId, stage: "resolution", ruleId, policyVersion: result.policyVersion, appliedCount: result.appliedCount }, "survivorship rule explicitly applied");
     return RuleApplicationResponseSchema.parse({ ...result, run: RunSummarySchema.parse(result.run) });
+  });
+
+  app.post("/api/runs/:runId/merge-plan-preview", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    return MergePlanPreviewSchema.parse(store.previewMergePlan(runId, SurvivorshipPolicyInputSchema.parse(request.body)));
+  });
+
+  app.post("/api/runs/:runId/merge-plan-apply", async (request) => {
+    const { runId } = routeParams(request.params);
+    const body = objectBody(request.body);
+    if (!runId || typeof body.previewToken !== "string") throw new WorkflowError("invalid_request", "A merge-plan preview token is required.");
+    const input = SurvivorshipPolicyInputSchema.parse({ fieldPolicies: body.fieldPolicies });
+    const result = store.applyMergePlan(runId, input, body.previewToken);
+    app.log.info({ runId, stage: "resolution", policyVersion: result.preview.policyVersion, appliedCount: result.appliedCount }, "merge plan explicitly applied");
+    return { ...result, run: RunSummarySchema.parse(result.run) };
   });
 
   app.get("/api/runs/:runId/export", async (request, reply) => {

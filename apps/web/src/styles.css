@@ -251,3 +251,4 @@ h2 { color: var(--text-primary); font-size: 20px; letter-spacing: -.02em; }
   .source-pair-panel > header, .source-pair-panel > footer { align-items: flex-start; flex-direction: column; }
   .source-pair-panel > footer .primary { width: 100%; justify-content: center; }
 }
+.run-navigation li.next{color:var(--text-primary);font-weight:660}.run-navigation li.next span{border-color:var(--accent-primary);color:var(--accent-primary)}

@@ -59,6 +59,15 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
+  it("opens Merge values from a completed zero-case review without creating another run", async () => {
+    const empty = { ...reviewPage(), items: [], page: { ...reviewPage().page, total: 0, returned: 0 }, progress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(empty), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 }, summary: { matched: 1, needsReview: 0, onlyA: 0, onlyB: 0 }, trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] } })} initialScreen="review" />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Merge values" }));
+    expect(await screen.findByRole("heading", { name: "No conflicting values need resolution" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.every(([url]) => String(url).includes("run-1"))).toBe(true);
+  });
   it("navigates between reconciliation and the dedicated Matching quality product", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App initialRun={runView()} initialScreen="results" />);
@@ -280,7 +289,7 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByRole("heading", { name: "Ready to export" })).toBeInTheDocument();
     expect(screen.getByText("Reconciled data").parentElement).toHaveTextContent("Ready");
     expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeEnabled();
-    expect(screen.getByText(/1 matched entity · 2 differences handled · 1 manual decision · 0 unfinished decisions/)).toBeInTheDocument();
+    expect(screen.getByText(/1 matched entity · 1 human identity decision · 1 difference handled by rules · 1 manual value decision · 0 unfinished decisions/)).toBeInTheDocument();
     expect(screen.getByText("Some fields intentionally preserve both source values.")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });

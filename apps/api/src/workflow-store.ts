@@ -42,6 +42,7 @@ import {
   type ReviewQueueItem,
   type ReviewSort,
   type ResolutionPreview,
+  type MergePlanPreview,
   type RunManifest,
   type RunView,
   type RunSummary,
@@ -88,6 +89,9 @@ interface RunState {
   mappingProposal?: SemanticMappingProposal;
   survivorshipPolicy?: SurvivorshipPolicy;
   previewedRuleIds: Set<string>;
+  mergePlanPreviewToken?: string;
+  mergePlanRevision: number;
+  rulesApplied: boolean;
 }
 
 interface UndoEntry {
@@ -267,6 +271,8 @@ export class WorkflowStore {
       deferredARowIds: new Set(),
       undoStack: [],
       previewedRuleIds: new Set(),
+      mergePlanRevision: 0,
+      rulesApplied: false,
     };
     this.runs.set(run.runId, run);
     return this.summaryView(run);
@@ -338,6 +344,7 @@ export class WorkflowStore {
     run.conflicts.clear();
     delete run.survivorshipPolicy;
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     run.deferredARowIds.clear();
     run.undoStack.length = 0;
     run.stage = "mapping";
@@ -473,6 +480,8 @@ export class WorkflowStore {
     run.deferredARowIds.clear();
     run.undoStack.length = 0;
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
+    run.rulesApplied = false;
     for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "auto_match")) {
       for (const conflict of comparisonConflicts(run, candidate, null, "system_matcher")) run.conflicts.set(conflict.conflictId, conflict);
     }
@@ -511,6 +520,7 @@ export class WorkflowStore {
     });
     if (run.undoStack.length > 20) run.undoStack.shift();
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return this.summaryView(run);
   }
 
@@ -574,6 +584,7 @@ export class WorkflowStore {
     else run.deferredARowIds.delete(aRowId);
     run.stage = "review";
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return this.summaryView(run);
   }
 
@@ -599,6 +610,7 @@ export class WorkflowStore {
     run.undoStack.pop();
     run.stage = "review";
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return this.summaryView(run);
   }
 
@@ -615,6 +627,7 @@ export class WorkflowStore {
     conflict.status = "resolved";
     run.stage = "resolution";
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return this.summaryView(run);
   }
 
@@ -628,6 +641,7 @@ export class WorkflowStore {
     conflict.status = "unresolved";
     run.stage = "resolution";
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return this.summaryView(run);
   }
 
@@ -638,6 +652,7 @@ export class WorkflowStore {
       const policy = buildSurvivorshipPolicy(input, run.mappings);
       run.survivorshipPolicy = policy;
       run.previewedRuleIds.clear();
+      run.mergePlanRevision += 1;
     } catch (error) {
       if (error instanceof SurvivorshipPolicyError) throw new WorkflowError("invalid_survivorship_policy", error.message);
       throw error;
@@ -693,6 +708,8 @@ export class WorkflowStore {
     }
     run.stage = "resolution";
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
+    run.rulesApplied = true;
     return {
       run: this.summaryView(run),
       policyVersion: policy.policyVersion,
@@ -701,6 +718,89 @@ export class WorkflowStore {
       unresolvedCount: preview.unresolvedCount,
       skippedCount: preview.items.length - mutations.length - preview.unresolvedCount,
     };
+  }
+
+  private mergePlanStateToken(run: RunState, input: SurvivorshipPolicyInput): string {
+    return sha256(JSON.stringify(canonicalize({
+      input,
+      revision: run.mergePlanRevision,
+      mappings: run.mappings,
+      decisions: [...run.decisions.values()],
+      deferred: [...run.deferredARowIds].sort(),
+      currentPolicy: run.survivorshipPolicy ?? null,
+      conflicts: [...run.conflicts.values()].map((conflict) => ({
+        conflictId: conflict.conflictId,
+        mappingId: conflict.mappingId,
+        candidateId: conflict.candidateId,
+        aValue: conflict.aValue,
+        bValue: conflict.bValue,
+        resolution: conflict.resolution,
+      })).sort((a, b) => a.conflictId.localeCompare(b.conflictId)),
+    })));
+  }
+
+  previewMergePlan(runId: string, input: SurvivorshipPolicyInput): MergePlanPreview {
+    const run = this.requireRun(runId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before previewing merge values.", 409);
+    if (this.view(run).trustedExportReadiness.unresolvedIdentityCount > 0) throw new WorkflowError("identity_unresolved", "Finish identity review before previewing merge values.", 409);
+    let policy: SurvivorshipPolicy;
+    try { policy = buildSurvivorshipPolicy(input, run.mappings); }
+    catch (error) {
+      if (error instanceof SurvivorshipPolicyError) throw new WorkflowError("invalid_survivorship_policy", error.message);
+      throw error;
+    }
+    const linked = new Set(this.effectiveLinks(run).map((candidate) => candidate.candidateId));
+    const candidates = new Map(run.result.candidates.map((candidate) => [candidate.candidateId, candidate]));
+    const fields = policy.fieldPolicies.map((rule) => {
+      const mapping = run.mappings.find((item) => item.mappingId === rule.semanticField)!;
+      const conflicts = [...run.conflicts.values()].filter((conflict) => conflict.mappingId === rule.semanticField && linked.has(conflict.candidateId));
+      const results = conflicts.map((conflict) => previewRuleForConflict(conflict, candidates.get(conflict.candidateId)!, rule, run.mappings));
+      return {
+        semanticField: rule.semanticField, label: mapping.label, differences: conflicts.length,
+        willHandle: results.filter((item) => item.outcome === "would_resolve").length,
+        willRemain: results.filter((item) => item.outcome === "unresolved").length,
+        manualPreserved: results.filter((item) => item.outcome === "skipped_manual").length,
+        alreadyHandled: results.filter((item) => item.outcome === "skipped_existing").length,
+        preservedBoth: rule.strategy === "keep_both" ? results.filter((item) => item.outcome === "would_resolve").length : 0,
+      };
+    });
+    const configured = new Set(policy.fieldPolicies.map((rule) => rule.semanticField));
+    const withoutRule = [...run.conflicts.values()].filter((conflict) => linked.has(conflict.candidateId) && !configured.has(conflict.mappingId) && !conflict.resolution).length;
+    const preview: MergePlanPreview = {
+      contractVersion: "1.0.0", runId, previewToken: this.mergePlanStateToken(run, input),
+      policyVersion: policy.policyVersion, configuredFields: fields.length,
+      totalDifferences: [...run.conflicts.values()].filter((conflict) => linked.has(conflict.candidateId)).length,
+      willHandle: fields.reduce((sum, field) => sum + field.willHandle, 0),
+      willRemain: withoutRule + fields.reduce((sum, field) => sum + field.willRemain, 0),
+      manualPreserved: fields.reduce((sum, field) => sum + field.manualPreserved, 0),
+      preservedBoth: fields.reduce((sum, field) => sum + field.preservedBoth, 0),
+      fields,
+    };
+    run.mergePlanPreviewToken = preview.previewToken;
+    return preview;
+  }
+
+  applyMergePlan(runId: string, input: SurvivorshipPolicyInput, previewToken: string): { run: RunSummary; appliedCount: number; preview: MergePlanPreview } {
+    const run = this.requireRun(runId);
+    if (run.mergePlanPreviewToken !== previewToken) throw new WorkflowError("merge_plan_preview_required", "Preview this merge plan before applying it.", 409);
+    if (this.mergePlanStateToken(run, input) !== previewToken) throw new WorkflowError("merge_plan_stale", "Merge values changed after preview. Preview the plan again.", 409);
+    const preview = this.previewMergePlan(runId, input);
+    const policy = buildSurvivorshipPolicy(input, run.mappings);
+    const candidates = new Map(run.result!.candidates.map((candidate) => [candidate.candidateId, candidate]));
+    const linked = new Set(this.effectiveLinks(run).map((candidate) => candidate.candidateId));
+    const mutations = policy.fieldPolicies.flatMap((rule) => [...run.conflicts.values()]
+      .filter((conflict) => conflict.mappingId === rule.semanticField && linked.has(conflict.candidateId))
+      .map((conflict) => ({ conflict, item: previewRuleForConflict(conflict, candidates.get(conflict.candidateId)!, rule, run.mappings), rule }))
+      .filter(({ item }) => item.outcome === "would_resolve")
+      .map(({ conflict, item, rule }) => ({ conflict, resolution: resolutionFromPreview(item, conflict, rule, policy.policyVersion) })));
+    for (const { conflict, resolution } of mutations) { conflict.resolution = resolution; conflict.status = "resolved"; }
+    run.survivorshipPolicy = policy;
+    run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
+    delete run.mergePlanPreviewToken;
+    run.rulesApplied = true;
+    run.stage = "resolution";
+    return { run: this.summaryView(run), appliedCount: mutations.length, preview };
   }
 
   get(runId: string): RunSummary { return this.summaryView(this.requireRun(runId)); }
@@ -899,6 +999,7 @@ export class WorkflowStore {
     run.undoStack.push({ candidateIds, decisionIds, createdConflictIds, deferredARowIds, decisionOrigin: "human_batch_rule", reviewGroupId: groupId });
     if (run.undoStack.length > 20) run.undoStack.shift();
     run.previewedRuleIds.clear();
+    run.mergePlanRevision += 1;
     return {
       run: this.summaryView(run),
       groupId,
@@ -940,12 +1041,12 @@ export class WorkflowStore {
     };
   }
 
-  conflictPage(runId: string, offset: number, limit: number): ConflictPage {
+  conflictPage(runId: string, offset: number, limit: number, status: "all" | "unresolved" | "resolved" = "all"): ConflictPage {
     const run = this.requireRun(runId);
     const candidateById = new Map((run.result?.candidates ?? []).map((candidate) => [candidate.candidateId, candidate]));
     const effectiveCandidateIds = new Set(this.effectiveLinks(run).map((candidate) => candidate.candidateId));
     const items = [...run.conflicts.values()]
-      .filter((conflict) => effectiveCandidateIds.has(conflict.candidateId))
+      .filter((conflict) => effectiveCandidateIds.has(conflict.candidateId) && (status === "all" || (status === "unresolved" ? !conflict.resolution : Boolean(conflict.resolution))))
       .sort((left, right) => left.conflictId.localeCompare(right.conflictId))
       .map((conflict) => {
         const candidate = candidateById.get(conflict.candidateId)!;
@@ -1073,6 +1174,7 @@ export class WorkflowStore {
       const conflicts = view.conflicts.filter((conflict) => conflict.mappingId === mapping.mappingId);
       const fieldResolved = conflicts.filter((conflict) => conflict.resolution !== null).length;
       const policy = view.survivorshipPolicy?.fieldPolicies.find((item) => item.semanticField === mapping.mappingId);
+      const unresolvedConflicts = conflicts.filter((conflict) => conflict.resolution === null);
       return {
         mappingId: mapping.mappingId,
         label: mapping.label,
@@ -1080,6 +1182,7 @@ export class WorkflowStore {
         resolved: fieldResolved,
         unresolved: conflicts.length - fieldResolved,
         currentPolicy: policy?.strategy ?? null,
+        suggestedRule: unresolvedConflicts.length > 0 && unresolvedConflicts.every((conflict) => (conflict.aValue.trim().length === 0) !== (conflict.bValue.trim().length === 0)) ? "prefer_non_null" as const : null,
       };
     });
     return {
@@ -1104,6 +1207,8 @@ export class WorkflowStore {
         unresolved: view.conflicts.length - resolved,
         manualDecisions,
         preservedBoth,
+        rulesApplied: run.rulesApplied,
+        humanIdentityDecisions: view.decisions.length,
         fields,
       },
     };
@@ -1191,6 +1296,8 @@ export class WorkflowStore {
         featurePipelineVersion: result.featurePipelineVersion,
         matcherConfigVersion: result.matcherConfigVersion,
         matcherConfig: result.matcherConfig,
+        evidencePlanVersion: result.evidencePlanVersion,
+        evidencePlan: result.evidencePlan,
       } : null,
       summary: result ? { matched: matchedA.size, needsReview: reviewA.size, onlyA: primaryOnlyA.length, onlyB: primaryOnlyB.length } : null,
       candidates,
@@ -1517,6 +1624,15 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
+function hasRetainedEvidencePlan(value: Record<string, unknown> | undefined): boolean {
+  if (!value || value.version !== "evidence-plan-v1.0.0" || !Array.isArray(value.mappings)) return false;
+  const strategy = value.candidateStrategy;
+  return Boolean(strategy && typeof strategy === "object" && !Array.isArray(strategy)
+    && (strategy as Record<string, unknown>).mode === "candidate_engine"
+    && (strategy as Record<string, unknown>).config
+    && typeof (strategy as Record<string, unknown>).config === "object");
+}
+
 function timestampRange(values: string[]): { first: string | null; last: string | null } {
   const sorted = [...values].sort(compareIds);
   return { first: sorted[0] ?? null, last: sorted.at(-1) ?? null };
@@ -1591,7 +1707,7 @@ export function buildExportSnapshot(view: RunView, mappingProposal?: SemanticMap
       candidateEngineVersion: view.matcherProvenance.candidateEngineVersion,
       blockingNormalizationVersion: view.matcherProvenance.blockingNormalizationVersion,
       candidateConfigVersion: view.matcherProvenance.candidateEngineVersion,
-      candidateConfigAvailability: "retained_in_evidence_plan",
+      candidateConfigAvailability: hasRetainedEvidencePlan(view.matcherProvenance.evidencePlan) ? "retained_in_evidence_plan" : "not_retained",
       evidencePlanVersion: view.matcherProvenance.evidencePlanVersion ?? "evidence-plan-v1.0.0",
       evidencePlanSha256: sha256(JSON.stringify(canonicalize(view.matcherProvenance.evidencePlan ?? {}))),
       evidencePlan: view.matcherProvenance.evidencePlan ?? {},

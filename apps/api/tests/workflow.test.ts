@@ -376,7 +376,7 @@ describe("SW-003 API workflow", () => {
     expect(manifest.sourceDatasets.A).toMatchObject({ originalFilename: "a.csv", sha256: createHash("sha256").update(aBytes).digest("hex"), rowCount: 1 });
     expect(manifest.sourceDatasets.B).toMatchObject({ originalFilename: "b.csv", sha256: createHash("sha256").update(bBytes).digest("hex"), rowCount: 2 });
     expect(manifest.semanticMapping).toMatchObject({ mappingVersion: "confirmed-mappings-v3", ai: null });
-    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.4.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: "candidate-engine-v0.4.0", candidateConfigAvailability: "retained_in_evidence_plan" });
+    expect(manifest.candidateGeneration).toMatchObject({ candidateEngineVersion: "candidate-engine-v0.4.0", blockingNormalizationVersion: "blocking-normalization-v0.1.0", candidateConfigVersion: "candidate-engine-v0.4.0", candidateConfigAvailability: "not_retained", evidencePlan: {} });
     expect(manifest.matcher).toMatchObject({ matcherVersion: MATCHER_VERSION, matcherConfigVersion: "matcher-config-v0.3.0" });
     expect(manifest.identity).toMatchObject({ systemEstablishedLinkCount: 0, humanSameCount: 0, humanDifferentCount: 0, pendingCount: 1, deferredCount: 0 });
     expect(manifest.evaluation).toMatchObject({ applicable: false, snapshotId: null });
@@ -663,7 +663,8 @@ describe("SW-003 API workflow", () => {
       });
     }
     const manifest = RunManifestSchema.parse(JSON.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).body));
-    expect(manifest.identity).toMatchObject({ humanBatchPairCount: 3, reviewSignatureVersion: "review-signature-v1.0.0" });
+    expect(manifest.identity).toMatchObject({ humanSameCount: 3, humanBatchPairCount: 3, reviewSignatureVersion: "review-signature-v1.0.0" });
+    expect(applied.run.conflictSummary.humanIdentityDecisions).toBe(3);
 
     const individualRun = await setup();
     let individualSummary: RunSummary["summary"] = null;
@@ -748,5 +749,60 @@ describe("SW-003 API workflow", () => {
     expect(unsupported.statusCode).toBe(415);
     const empty = await app.inject({ method: "POST", url: `/api/runs/${created.runId}/datasets/A`, headers: { "content-type": "text/csv", "x-file-name": "a.csv" }, payload: Buffer.alloc(0) });
     expect(empty.statusCode).toBe(400);
+  });
+
+  it("retains the authoritative bounded evidence plan and hashes its canonical payload", async () => {
+    matcherResultOverride = { ...baseMatcherResult(), evidencePlanVersion: "evidence-plan-v1.0.0", evidencePlan: { version: "evidence-plan-v1.0.0", mappings: [{ mappingId: "name", semanticFamily: "name_or_title", comparator: "normalized_name_similarity" }], candidateStrategy: { mode: "candidate_engine", config: { version: "candidate-engine-v0.4.0" } } } };
+    const { runId } = await setup();
+    const manifest = RunManifestSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).json());
+    expect(manifest.candidateGeneration.candidateConfigAvailability).toBe("retained_in_evidence_plan");
+    expect(manifest.candidateGeneration.evidencePlan).toEqual(matcherResultOverride.evidencePlan);
+    const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value;
+    expect(manifest.candidateGeneration.evidencePlanSha256).toBe(createHash("sha256").update(JSON.stringify(canonical(manifest.candidateGeneration.evidencePlan))).digest("hex"));
+  });
+
+  it("previews multiple merge fields without mutation, rejects stale plans, and preserves manual provenance", async () => {
+    const { runId } = await setup();
+    const mappings = [
+      { mappingId: "name", label: "Organization name", aColumn: "name", bColumn: "organization", useForMatching: true, includeInMerge: true, normalizer: "text" },
+      { mappingId: "status", label: "Status", aColumn: "status", bColumn: "status", useForMatching: false, includeInMerge: true, normalizer: "text" },
+    ];
+    expect((await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } })).statusCode).toBe(200);
+    const fieldPolicies = [{ semanticField: "name", strategy: "keep_both" }, { semanticField: "status", strategy: "prefer_trusted_source", trustedSource: "B" }];
+    const unpreviewed = await app.inject({ method: "POST", url: `/api/runs/${runId}/merge-plan-apply`, payload: { fieldPolicies, previewToken: "a".repeat(64) } });
+    expect(unpreviewed.statusCode).toBe(409);
+    expect(unpreviewed.json().error.code).toBe("merge_plan_preview_required");
+    const before = await conflictPage(runId);
+    const previewResponse = await app.inject({ method: "POST", url: `/api/runs/${runId}/merge-plan-preview`, payload: { fieldPolicies } });
+    expect(previewResponse.statusCode).toBe(200);
+    const preview = previewResponse.json();
+    expect(preview).toMatchObject({ configuredFields: 2, totalDifferences: 2, willHandle: 2, willRemain: 0, manualPreserved: 0, preservedBoth: 1 });
+    expect(preview.fields).toHaveLength(2);
+    expect(await conflictPage(runId)).toEqual(before);
+    const statusConflict = before.items.find((item) => item.mappingId === "status")!;
+    await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${statusConflict.conflictId}/resolutions`, payload: { action: "use_a" } });
+    const stale = await app.inject({ method: "POST", url: `/api/runs/${runId}/merge-plan-apply`, payload: { fieldPolicies, previewToken: preview.previewToken } });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().error.code).toBe("merge_plan_stale");
+    const fresh = (await app.inject({ method: "POST", url: `/api/runs/${runId}/merge-plan-preview`, payload: { fieldPolicies } })).json();
+    expect(fresh).toMatchObject({ willHandle: 1, manualPreserved: 1, willRemain: 0 });
+    const applied = await app.inject({ method: "POST", url: `/api/runs/${runId}/merge-plan-apply`, payload: { fieldPolicies, previewToken: fresh.previewToken } });
+    expect(applied.statusCode).toBe(200);
+    expect(applied.json().appliedCount).toBe(1);
+    const after = await conflictPage(runId);
+    expect(after.items.find((item) => item.mappingId === "status")?.resolution).toMatchObject({ strategy: "use_a", policyVersion: null });
+    expect(after.items.find((item) => item.mappingId === "name")?.resolution).toMatchObject({ strategy: "keep_both", policyVersion: applied.json().preview.policyVersion });
+    const changedPolicy = await app.inject({ method: "PUT", url: `/api/runs/${runId}/survivorship-policy`, payload: { fieldPolicies: [{ semanticField: "name", strategy: "prefer_trusted_source", trustedSource: "A" }] } });
+    expect(changedPolicy.statusCode).toBe(200);
+    const changedManifest = RunManifestSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/manifest` })).json());
+    expect(changedManifest.survivorship.configuredFieldPolicies[0]).toMatchObject({ semanticField: "name", strategy: "prefer_trusted_source", trustedSource: "A" });
+    expect(changedManifest.survivorship.policyVersion).not.toBe(applied.json().preview.policyVersion);
+    expect((await conflictPage(runId)).items.find((item) => item.mappingId === "name")?.resolution).toMatchObject({ strategy: "keep_both", policyVersion: applied.json().preview.policyVersion });
+    const trusted = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(trusted.statusCode).toBe(200);
+    expect(trusted.body).toContain(applied.json().preview.policyVersion);
+    expect((await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` })).body).toBe(trusted.body);
   });
 });

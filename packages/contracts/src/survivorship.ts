@@ -102,6 +102,32 @@ export const ResolutionPreviewSchema = z.object({
 }).strict();
 export type ResolutionPreview = z.infer<typeof ResolutionPreviewSchema>;
 
+export const MergePlanFieldPreviewSchema = z.object({
+  semanticField: z.string().min(1),
+  label: z.string().min(1),
+  differences: z.number().int().nonnegative(),
+  willHandle: z.number().int().nonnegative(),
+  willRemain: z.number().int().nonnegative(),
+  manualPreserved: z.number().int().nonnegative(),
+  alreadyHandled: z.number().int().nonnegative(),
+  preservedBoth: z.number().int().nonnegative(),
+}).strict();
+
+export const MergePlanPreviewSchema = z.object({
+  contractVersion: z.literal(SURVIVORSHIP_CONTRACT_VERSION),
+  runId: z.string().min(1),
+  previewToken: z.string().regex(/^[a-f0-9]{64}$/),
+  policyVersion: z.string().min(1),
+  configuredFields: z.number().int().nonnegative(),
+  totalDifferences: z.number().int().nonnegative(),
+  willHandle: z.number().int().nonnegative(),
+  willRemain: z.number().int().nonnegative(),
+  manualPreserved: z.number().int().nonnegative(),
+  preservedBoth: z.number().int().nonnegative(),
+  fields: z.array(MergePlanFieldPreviewSchema),
+}).strict();
+export type MergePlanPreview = z.infer<typeof MergePlanPreviewSchema>;
+
 export const TrustedExportReadinessSchema = z.object({
   ready: z.boolean(),
   unresolvedIdentityCount: z.number().int().nonnegative(),

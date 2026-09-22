@@ -64,7 +64,7 @@ export const RunManifestSchema = z.object({
     candidateEngineVersion: z.string().min(1),
     blockingNormalizationVersion: z.string().min(1),
     candidateConfigVersion: z.string().min(1).nullable(),
-    candidateConfigAvailability: z.literal("retained_in_evidence_plan"),
+    candidateConfigAvailability: z.enum(["retained_in_evidence_plan", "not_retained"]),
     evidencePlanVersion: z.string().min(1),
     evidencePlanSha256: Sha256Schema,
     evidencePlan: z.record(z.string(), z.unknown()),

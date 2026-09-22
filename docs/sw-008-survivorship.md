@@ -47,6 +47,17 @@ mutates only preview-resolvable conflicts. Existing manual and rule resolutions 
 preserved; the user must clear or explicitly replace one before a new rule can own
 it. Repeated application is idempotent with respect to effective state.
 
+The Merge values UI configures rules beside each field and sends the complete
+field-policy input to the server. Preview validates all fields and returns exact
+per-field and total impact without changing policy or resolutions. Its token
+binds the input, current policies, identity decisions, conflict resolutions,
+and a monotonically increasing run revision. Apply requires the server-issued
+token, checks current state, builds every resolution first, then commits the
+policy and resolutions in one in-memory operation. Changed state requires a
+new preview. Existing manual and rule resolutions remain untouched. Only
+unresolved differences after an applied plan appear in Individual exceptions;
+handled decisions remain inspectable and explicitly changeable or clearable.
+
 ## Exports
 
 The reconciliation report is formula-safe and always available. It includes

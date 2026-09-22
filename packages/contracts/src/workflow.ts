@@ -497,6 +497,8 @@ export const ConflictSummarySchema = z.object({
   unresolved: z.number().int().nonnegative(),
   manualDecisions: z.number().int().nonnegative().optional(),
   preservedBoth: z.number().int().nonnegative().optional(),
+  rulesApplied: z.boolean().optional(),
+  humanIdentityDecisions: z.number().int().nonnegative().optional(),
   fields: z.array(z.object({
     mappingId: z.string().min(1),
     label: z.string().min(1),
@@ -504,6 +506,7 @@ export const ConflictSummarySchema = z.object({
     resolved: z.number().int().nonnegative(),
     unresolved: z.number().int().nonnegative(),
     currentPolicy: z.string().min(1).nullable(),
+    suggestedRule: z.literal("prefer_non_null").nullable().optional(),
   }).strict()).max(200).optional(),
 }).strict();
 

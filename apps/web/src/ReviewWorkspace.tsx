@@ -225,11 +225,13 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [alternatives, busy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page]);
 
-  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={busy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { setSelectedCandidateId(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} />;
+  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={busy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { setSelectedCandidateId(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
 
   return <section className="review-product" aria-labelledby="review-workspace-title">
     <header className="review-product-header"><div><p className="eyebrow">Step 3 · Review matches</p><h1 id="review-workspace-title">Could these be the same entity?</h1><p>Compare the source records, then make the identity decision. Values are merged later.</p><button type="button" className="secondary" onClick={() => setViewMode("groups")}>Back to grouped review</button></div><div className="review-progress" aria-label="Overall review progress"><span><strong>{run.reviewProgress.reviewed}</strong> Reviewed</span><span><strong>{run.reviewProgress.remaining}</strong> Remaining</span><span><strong>{run.reviewProgress.deferred}</strong> Deferred</span><div aria-hidden="true"><i style={{ width: `${run.reviewProgress.total ? (run.reviewProgress.reviewed / run.reviewProgress.total) * 100 : 0}%` }} /></div></div></header>
     {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last review: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.aRowId} ↔ {run.reviewUndo.bRowId}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void undoRecent()} disabled={busy}>Undo <kbd>U</kbd></button> : <span role="status">Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
+    {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 && <div className="review-complete" role="status"><h2>Identity review complete</h2><p>All uncertain matches have been decided.</p><button type="button" className="primary" onClick={onGoResolution}>Continue to Merge values</button></div>}
+    {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred > 0 && <div className="review-complete" role="status"><h2>{run.reviewProgress.deferred} deferred decisions remain</h2><button type="button" className="primary" onClick={viewDeferredCases}>Review deferred</button></div>}
     <p className="sr-only" aria-live="polite" role="status">{announcement}</p>
     <div className="review-layout">
       <aside className="review-queue" aria-labelledby="review-queue-title">
@@ -250,7 +252,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
           <details className="raw-records"><summary>All raw source fields</summary><div><RawRecord title={`Dataset A · ${selectedCandidate.aRowId}`} record={selectedCandidate.aRecord} /><RawRecord title={`Dataset B · ${selectedCandidate.bRowId}`} record={selectedCandidate.bRecord} /></div></details>
           <footer className="review-actions" aria-label="Identity review actions"><div><span>Matcher {run.matcherVersion}</span><button type="button" className="shortcut-help" aria-label="Keyboard shortcuts: S same, D different, E defer, U undo, J and K navigate, 1 through 3 select candidates">Shortcuts <kbd>S</kbd> <kbd>D</kbd> <kbd>E</kbd> <kbd>U</kbd> <kbd>J/K</kbd> <kbd>1–3</kbd></button></div>{deferred ? <button type="button" className="secondary" onClick={() => void deferCurrent(false)} disabled={busy}>Return to review</button> : <button type="button" className="secondary" onClick={() => void deferCurrent(true)} disabled={busy || selectedState !== "needs_review"}>Defer / skip <kbd>E</kbd></button>}<button type="button" className="different" aria-label="Different entities" onClick={() => void decide("different_entity")} disabled={busy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match"}>Different entities <kbd>D</kbd></button><button type="button" className="same" aria-label="Same entity" onClick={() => void decide("same_entity")} disabled={busy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match"}>Same entity <kbd>S</kbd></button></footer>
           {detail.conflicts.length > 0 && <div className="post-identity-conflicts"><span><strong>{detail.conflicts.length} field conflict{detail.conflicts.length === 1 ? "" : "s"}</strong> available after identity was established. Zero values were selected automatically.</span><button type="button" onClick={onGoResolution}>Resolve values separately</button></div>}
-        </> : !detailLoading && !detailError && (deferredEmptyState ? <div className="review-complete"><h2>{run.reviewProgress.deferred} review case{run.reviewProgress.deferred === 1 ? " is" : "s are"} deferred</h2><p>Deferred cases are still part of this reconciliation. Use the queue action to view them.</p></div> : <div className="review-complete"><h2>No active review case</h2><p>Change the queue filter or page to inspect another item.</p></div>)}
+        </> : !detailLoading && !detailError && (run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 ? null : deferredEmptyState ? <div className="review-complete"><h2>{run.reviewProgress.deferred} review case{run.reviewProgress.deferred === 1 ? " is" : "s are"} deferred</h2><p>Deferred cases are still part of this reconciliation. Use the queue action to view them.</p></div> : <div className="review-complete"><h2>No active review case</h2><p>Change the queue filter or page to inspect another item.</p></div>)}
       </section>
     </div>
   </section>;
@@ -296,7 +298,7 @@ function patternSentence(group: ReviewGroupSummary): string {
   ].filter(Boolean).join("; ") || "Limited evidence is available.";
 }
 
-function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, batchConfirmed, busy, onSelectGroup, onBatchConfirmed, onApplyBatch, onOpenIndividual, onOpenAll, onUndo }: {
+function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, batchConfirmed, busy, onSelectGroup, onBatchConfirmed, onApplyBatch, onOpenIndividual, onOpenAll, onUndo, onGoResolution }: {
   run: RunSummary;
   groups: ReviewGroupList | null;
   preview: ReviewGroupPreview | null;
@@ -310,6 +312,7 @@ function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, bat
   onOpenIndividual: (candidateId: string) => void;
   onOpenAll: () => void;
   onUndo: () => Promise<void>;
+  onGoResolution: () => void;
 }) {
   const workload = groups?.workload;
   return <section className="review-product review-groups-landing" aria-labelledby="review-groups-title">
@@ -317,7 +320,7 @@ function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, bat
     {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last action: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.affectedCount} case{run.reviewUndo.affectedCount === 1 ? "" : "s"}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void onUndo()} disabled={busy}>Undo batch</button> : <span>Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
     {error && <div className="warning" role="alert">{error}</div>}
     {workload ? <div className="review-workload-summary" aria-label="Review workload summary"><article><strong>{workload.quickDecisions}</strong><span>Quick decisions</span></article><article><strong>{workload.competingCandidates}</strong><span>Competing candidates</span></article><article><strong>{workload.individualReview + workload.strongContradictions + workload.lowInformationNoise}</strong><span>Individual review</span></article><article><strong>{workload.deferred}</strong><span>Deferred</span></article></div> : <p role="status">Analyzing deterministic review patterns…</p>}
-    <div className="review-group-layout">
+    {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 ? <div className="review-complete" role="status"><h2>Identity review complete</h2><p>All uncertain matches have been decided.</p><button type="button" className="primary" onClick={onGoResolution}>Continue to Merge values</button><button type="button" className="secondary" onClick={onOpenAll}>Inspect reviewed matches</button></div> : <div className="review-group-layout">
       <section className="review-group-list" aria-label="Review groups">
         {groups?.groups.map((group) => <article key={group.groupId} className={`review-group-card group-${group.safetyClass}`}>
           <header><span>{group.safetyClass.replaceAll("_", " ")}</span><strong>{group.caseCount} similar case{group.caseCount === 1 ? "" : "s"}</strong></header>
@@ -325,7 +328,7 @@ function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, bat
           <dl><div><dt>Candidate context</dt><dd>{group.collision ? "Competing match" : group.alternativeBand === "multiple" ? "Alternatives exist" : "No retained alternative"}</dd></div><div><dt>Suggested action</dt><dd>{group.suggestedDecision ? group.suggestedDecision === "same_entity" ? "Same entity" : "Different entities" : "Review individually"}</dd></div></dl>
           <button type="button" className="secondary" onClick={() => onSelectGroup(group.groupId)}>Preview cases</button>
         </article>)}
-        {groups && groups.groups.length === 0 && <div className="review-complete"><h2>No active identity decisions remain</h2><p>Deferred cases remain visible in individual review. Otherwise, continue to Merge values.</p></div>}
+        {groups && groups.groups.length === 0 && run.reviewProgress.deferred > 0 && <div className="review-complete"><h2>{run.reviewProgress.deferred} deferred decisions remain</h2><p>Review deferred cases in the individual queue.</p><button type="button" className="primary" onClick={onOpenAll}>Review deferred</button></div>}
         <button type="button" className="secondary" onClick={onOpenAll}>Open individual review and specialist filters</button>
       </section>
       <aside className="review-group-preview" aria-label="Selected group preview">
@@ -337,6 +340,6 @@ function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, bat
           {preview.group.suggestedDecision ? <div className="batch-confirm"><strong>Apply {preview.group.suggestedDecision === "same_entity" ? "Same entity" : "Different entities"} to eligible cases</strong><p>{preview.group.suggestedDecision === "same_entity" ? preview.group.eligibleSameCount : preview.group.eligibleDifferentCount} eligible · {preview.group.caseCount - (preview.group.suggestedDecision === "same_entity" ? preview.group.eligibleSameCount : preview.group.eligibleDifferentCount)} excluded for individual review.</p><label><input type="checkbox" checked={batchConfirmed} onChange={(event) => onBatchConfirmed(event.target.checked)} /> I reviewed this evidence pattern and understand that one human decision will be recorded for each eligible pair.</label><button type="button" className="primary" disabled={!batchConfirmed || busy} onClick={() => void onApplyBatch(preview.group)}>Apply to eligible cases</button></div> : <div className="batch-confirm blocked"><strong>No batch action suggested</strong><p>Collision, near-tie, strong contradiction, or insufficient evidence safeguards require individual review.</p></div>}
         </>}
       </aside>
-    </div>
+    </div>}
   </section>;
 }
