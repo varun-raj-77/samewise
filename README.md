@@ -86,8 +86,8 @@ The current [review-generalization closeout](docs/review-generalization-report.m
 
 | Fixture | Observed result | What it means |
 | --- | --- | --- |
-| Public-style 8K × 8K regression | 11,379 candidate pairs from 64,000,000 possible; 100% candidate recall; 822 review cases after semantic planning versus 1,312 before | A controlled workflow regression, not customer accuracy or a public-service capacity claim. |
-| Frozen 1,200-entity holdout | 98.521047% candidate recall; 169 automatic links with 100% measured automatic precision | Exact holdout result for the current semantic configuration; the conservative change routes more cases to review. |
+| Public-style 8K × 8K regression | 11,379 candidate pairs from 64,000,000 possible; 7,000 / 7,000 known overlapping pairs retained during candidate generation; review workload reduced from 1,312 cases to 822 | A controlled workflow regression, not customer accuracy or a public-service capacity claim. |
+| Frozen 1,200-entity holdout | 866 / 879 known links retained as candidates; 169 / 169 automatic links correct | Exact holdout result for the current semantic configuration; the conservative change routes more cases to review. |
 | Six small domain fixtures | Separate gates for organizations, people, products, facilities, sparse legacy, and low-information data | The low-information fixture makes zero automatic matches and abstains. These fixtures do not establish transfer to real uploads. |
 
 The [SW-012 browser-delivery measurement](docs/sw-012-bounded-evidence.md) observed an 88,351-byte 50-case review page versus a 56,892,493-byte full matcher result on its documented 10K synthetic fixture. This measures transfer size, not retained server memory. The [SW-011 performance report](docs/sw-011-performance.md) covers a candidate-only 50K fixture; full 50K scoring was not measured. The public end-to-end walkthrough is **product-flow evidence**, not accuracy evidence. [Evaluation definitions and historical reports](docs/README.md#evaluation-and-historical-evidence) keep fixtures, versions, and denominators distinct.

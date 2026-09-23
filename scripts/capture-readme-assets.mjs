@@ -37,15 +37,10 @@ const runId = created.runId;
 await upload(runId, "A", join(fixture, "dataset_a.csv"));
 await upload(runId, "B", join(fixture, "dataset_b.csv"));
 const specifications = [
-  ["Status", "account_status", "status", "categorical", "text", false],
   ["Organization", "vendor_name", "organization", "name_or_title", "text", true],
   ["Phone", "phone", "telephone", "phone", "phone", true],
   ["Email", "contact_email", "email_address", "email", "email", true],
   ["Street", "street", "address_line_1", "address", "text", true],
-  ["City", "city", "locality", "geography", "text", true],
-  ["State", "state", "region", "geography", "text", true],
-  ["Website", "website", "domain", "domain", "text", true],
-  ["Balance", "balance", "outstanding_balance", "numeric", "number", false],
 ];
 const mappings = specifications.map(([label, aColumn, bColumn, semanticFamily, normalizer, useForMatching], index) => ({
   mappingId: `readme-mapping-${index}`, label, aColumn, bColumn, semanticFamily,
@@ -57,7 +52,7 @@ await request(`/runs/${runId}/mappings`, {
 });
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 async function open(screen, heading) {
@@ -68,9 +63,6 @@ async function shot(name) {
   await page.screenshot({ path: join(output, name), fullPage: false, animations: "disabled" });
 }
 try {
-  await open("mapping", "Set up matching.");
-  await shot("match-setup.png");
-
   const matched = await request(`/runs/${runId}/match`, { method: "POST" });
   assert(matched.summary, "Matching did not produce a summary.");
   await open("review", /Matching review|Could these be the same entity/);
@@ -81,16 +73,42 @@ try {
   await page.locator(".review-group-preview .group-samples article").first().waitFor();
   await page.locator(".review-group-preview").getByRole("button", { name: "Inspect full evidence" }).first().click();
   await page.getByRole("heading", { name: "Could these be the same entity?" }).waitFor();
+  const reviewSearch = page.getByRole("searchbox", { name: "Search review queue" });
+  await reviewSearch.fill("A000020");
+  await page.getByTestId("review-queue-row").filter({ hasText: "A000020" }).click();
+  await reviewSearch.fill("");
+  await page.getByRole("heading", { name: /Could A000020 and .* be the same entity/ }).waitFor();
   await page.locator(".case-heading").waitFor();
+  assert(await page.locator(".evidence-hierarchy .negative").isVisible(), "Hero case should visibly explain contradictory or competing evidence.");
+  assert(await page.locator(".collision-warning").isVisible(), "Hero case should retain competing-candidate context.");
+  await page.getByRole("button", { name: "Different entities" }).waitFor();
+  await page.getByRole("button", { name: "Same entity", exact: true }).waitFor();
+  for (const name of ["Different entities", "Same entity"]) {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    assert(box && box.y >= 0 && box.y + box.height <= 1100, `${name} action is outside the hero viewport.`);
+  }
   await shot("review-case.png");
 
-  // A review-state illustration: use the matcher-proposed top candidate for
-  // each visible uncertain row only when the UI's group safety gate allows it.
-  // A separate clean fixture is used below for merge and export readiness.
+  // A modest deterministic presentation fixture provides representative merge
+  // and export state without loading evaluation truth or using a scale fixture.
   const clean = await request("/runs", { method: "POST" });
   const cleanId = clean.runId;
-  const a = "id,name,phone,status\nA1,Northstar Labs,5550100,Active\nA2,Blue Harbor,5550200,Active\n";
-  const b = "id,organization,telephone,status\nB1,Northstar Labs,5550100,Current\nB2,Blue Harbor,5550200,Current\n";
+  const aRows = ["id,name,phone,status,balance,city"];
+  const bRows = ["id,organization,telephone,status,balance,city"];
+  for (let index = 1; index <= 24; index += 1) {
+    const code = String(index).padStart(2, "0");
+    aRows.push(`A${code},Harbor Works ${code},55501${code},${index % 2 === 0 ? "Active" : "Pending"},${1000 + index * 25},${index % 3 === 0 ? "Albany" : "Buffalo"}`);
+  }
+  for (let index = 1; index <= 20; index += 1) {
+    const code = String(index).padStart(2, "0");
+    bRows.push(`B${code},Harbor Works ${code},55501${code},${index % 2 === 0 ? "Current" : "Pending"},${1000 + index * 25 + (index % 3 === 0 ? 10 : 0)},${index % 4 === 0 ? "Rochester" : index % 3 === 0 ? "Albany" : "Buffalo"}`);
+  }
+  for (let index = 21; index <= 24; index += 1) {
+    const code = String(index).padStart(2, "0");
+    bRows.push(`B${code},Summit Supply ${code},55509${code},Current,${2000 + index * 20},Syracuse`);
+  }
+  const a = aRows.join("\n") + "\n";
+  const b = bRows.join("\n") + "\n";
   for (const [side, csv] of [["A", a], ["B", b]]) {
     await request(`/runs/${cleanId}/datasets/${side}`, {
       method: "POST", headers: { "Content-Type": "text/csv", "X-File-Name": `readme-clean-${side}.csv` }, body: csv,
@@ -100,6 +118,8 @@ try {
     ["Name", "name", "organization", "name_or_title", "text", true],
     ["Phone", "phone", "telephone", "phone", "phone", true],
     ["Status", "status", "status", "categorical", "text", false],
+    ["Balance", "balance", "balance", "numeric", "number", false],
+    ["City", "city", "city", "geography", "text", false],
   ].map(([label, aColumn, bColumn, semanticFamily, normalizer, useForMatching], index) => ({
     mappingId: `readme-clean-${index}`, label, aColumn, bColumn, semanticFamily,
     normalizer, useForMatching, includeInMerge: true,
@@ -109,9 +129,13 @@ try {
   });
   const cleanMatch = await request(`/runs/${cleanId}/match`, { method: "POST" });
   assert(cleanMatch.reviewProgress.remaining === 0, "Clean presentation fixture unexpectedly needs identity review.");
+  assert.equal(cleanMatch.summary.matched, 20, "Presentation fixture should produce 20 automatic matches.");
+  assert(cleanMatch.conflictSummary.total >= 20, "Presentation fixture should produce several field differences.");
   await page.goto(`http://localhost:5173/?run=${cleanId}&screen=resolution`, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Choose which values to keep." }).waitFor();
   await page.getByRole("combobox", { name: "Rule for Status" }).selectOption("prefer_trusted_source");
+  await page.getByRole("combobox", { name: "Rule for Balance" }).selectOption("prefer_trusted_source");
+  await page.getByRole("combobox", { name: "Rule for City" }).selectOption("prefer_trusted_source");
   await page.getByRole("button", { name: "Preview merge plan" }).click();
   await page.getByRole("heading", { name: "Merge plan preview" }).waitFor();
   await shot("merge-values.png");
@@ -122,7 +146,19 @@ try {
   await page.getByText("Audit & technical files").click();
   await shot("export-ready.png");
   assert.deepEqual(errors, [], `Browser errors: ${errors.join("; ")}`);
-  process.stdout.write(JSON.stringify({ output, reviewRun: runId, cleanRun: cleanId, images: ["match-setup.png", "review-case.png", "merge-values.png", "export-ready.png"] }) + "\n");
+  process.stdout.write(JSON.stringify({
+    output,
+    heroRun: runId,
+    presentationRun: cleanId,
+    presentationState: {
+      rowsA: 24,
+      rowsB: 24,
+      overlappingEntities: 20,
+      automaticMatches: cleanMatch.summary.matched,
+      fieldDifferences: cleanMatch.conflictSummary.total,
+    },
+    images: ["review-case.png", "merge-values.png", "export-ready.png"],
+  }) + "\n");
 } finally {
   await browser.close();
 }
