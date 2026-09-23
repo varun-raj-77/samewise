@@ -19,6 +19,11 @@ import { EvaluationWorkspace } from "./EvaluationWorkspace.js";
 import "./survivorship-workspace.css";
 
 type Screen = "upload" | "profile" | "mapping" | "results" | "review" | "resolution" | "export" | "evaluation";
+const SAMPLE_A_URL = "/samples/samewise_sample_vendors_a.csv";
+const SAMPLE_B_URL = "/samples/samewise_sample_vendors_b.csv";
+const SAMPLE_A_FILENAME = "samewise_sample_vendors_a.csv";
+const SAMPLE_B_FILENAME = "samewise_sample_vendors_b.csv";
+const SAMPLE_LOAD_ERROR = "Sample data couldn't be loaded. You can try again, download the sample files, or choose your own CSVs.";
 const STEPS: { id: Screen; label: string; screens: Screen[] }[] = [
   { id: "upload", label: "Upload", screens: ["upload", "profile"] },
   { id: "mapping", label: "Match setup", screens: ["mapping"] },
@@ -62,9 +67,16 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [busy, setBusy] = useState(!initialRun);
   const [error, setError] = useState<string | null>(null);
   const [confirmNewRun, setConfirmNewRun] = useState(false);
+  const [confirmSampleReplacement, setConfirmSampleReplacement] = useState(false);
+  const [usingSampleData, setUsingSampleData] = useState(false);
+  const uploadInFlight = useRef(false);
+  const sampleInFlight = useRef(false);
   const newRunButton = useRef<HTMLButtonElement>(null);
   const newRunDialog = useRef<HTMLDialogElement>(null);
   const cancelNewRunButton = useRef<HTMLButtonElement>(null);
+  const sampleButton = useRef<HTMLButtonElement>(null);
+  const sampleDialog = useRef<HTMLDialogElement>(null);
+  const cancelSampleButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (initialRun) return;
@@ -100,6 +112,15 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     cancelNewRunButton.current?.focus();
   }, [confirmNewRun]);
 
+  useEffect(() => {
+    if (!confirmSampleReplacement || !sampleDialog.current) return;
+    if (!sampleDialog.current.open) {
+      if (typeof sampleDialog.current.showModal === "function") sampleDialog.current.showModal();
+      else sampleDialog.current.setAttribute("open", "");
+    }
+    cancelSampleButton.current?.focus();
+  }, [confirmSampleReplacement]);
+
   async function action(work: () => Promise<RunSummary>, next?: Screen) {
     setBusy(true); setError(null);
     try {
@@ -109,13 +130,73 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     } finally { setBusy(false); }
   }
 
+  async function uploadPair(aFile: File, bFile: File, samplePair = false) {
+    if (!run || uploadInFlight.current) return;
+    if (run.datasets.A || run.datasets.B) { setError("Source files are already saved for this run. Start a new reconciliation to use different files."); return; }
+    if (![aFile, bFile].every((file) => file.name.toLowerCase().endsWith(".csv"))) { setError("Both source files must be CSV files."); return; }
+    uploadInFlight.current = true;
+    setBusy(true); setError(null);
+    let latestAuthoritativeRun = run;
+    try {
+      const first = await parseRun(await fetch(`/api/runs/${run.runId}/datasets/A`, { method: "POST", headers: { "Content-Type": "text/csv", "X-File-Name": encodeURIComponent(aFile.name) }, body: aFile }));
+      latestAuthoritativeRun = first;
+      setRun(first);
+      const completed = await parseRun(await fetch(`/api/runs/${first.runId}/datasets/B`, { method: "POST", headers: { "Content-Type": "text/csv", "X-File-Name": encodeURIComponent(bFile.name) }, body: bFile }));
+      setRun(completed); setUsingSampleData(samplePair); setScreen("profile");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Samewise could not complete that request.";
+      try {
+        const synchronized = await parseRun(await fetch(`/api/runs/${run.runId}`));
+        latestAuthoritativeRun = synchronized;
+        setRun(synchronized);
+      } catch {
+        setRun(latestAuthoritativeRun);
+      }
+      setUsingSampleData(false);
+      setError(latestAuthoritativeRun.datasets.A || latestAuthoritativeRun.datasets.B
+        ? `The source pair could not be completed. ${message} A source may already be saved in this run. Start a new reconciliation and retry.`
+        : message);
+      setScreen("upload");
+    } finally {
+      uploadInFlight.current = false;
+      setBusy(false);
+    }
+  }
+
   async function upload() {
-    if (!run || !fileA || !fileB) { setError("Choose one CSV file for Dataset A and one for Dataset B."); return; }
-    if (![fileA, fileB].every((file) => file.name.toLowerCase().endsWith(".csv"))) { setError("Both source files must be CSV files."); return; }
-    await action(async () => {
-      const first = await parseRun(await fetch(`/api/runs/${run.runId}/datasets/A`, { method: "POST", headers: { "Content-Type": "text/csv", "X-File-Name": encodeURIComponent(fileA.name) }, body: fileA }));
-      return parseRun(await fetch(`/api/runs/${first.runId}/datasets/B`, { method: "POST", headers: { "Content-Type": "text/csv", "X-File-Name": encodeURIComponent(fileB.name) }, body: fileB }));
-    }, "profile");
+    if (!fileA || !fileB) { setError("Choose one CSV file for Dataset A and one for Dataset B."); return; }
+    await uploadPair(fileA, fileB, false);
+  }
+
+  function requestSampleData() {
+    if (sampleInFlight.current || busy) return;
+    if (fileA || fileB) setConfirmSampleReplacement(true);
+    else void useSampleData();
+  }
+
+  function cancelSampleReplacement() {
+    setConfirmSampleReplacement(false);
+    queueMicrotask(() => sampleButton.current?.focus());
+  }
+
+  async function useSampleData() {
+    if (!run || run.datasets.A || run.datasets.B || sampleInFlight.current || uploadInFlight.current) return;
+    setConfirmSampleReplacement(false);
+    sampleInFlight.current = true;
+    setBusy(true); setError(null);
+    try {
+      const [responseA, responseB] = await Promise.all([fetch(SAMPLE_A_URL), fetch(SAMPLE_B_URL)]);
+      const [bytesA, bytesB] = await Promise.all([readSampleCsv(responseA), readSampleCsv(responseB)]);
+      const sampleA = new File([bytesA], SAMPLE_A_FILENAME, { type: "text/csv" });
+      const sampleB = new File([bytesB], SAMPLE_B_FILENAME, { type: "text/csv" });
+      setFileA(sampleA); setFileB(sampleB); setUsingSampleData(false);
+      await uploadPair(sampleA, sampleB, true);
+    } catch {
+      setError(SAMPLE_LOAD_ERROR);
+    } finally {
+      sampleInFlight.current = false;
+      if (!uploadInFlight.current) setBusy(false);
+    }
   }
 
   function requestNewReconciliation() {
@@ -134,6 +215,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       const freshRun = await parseRun(await fetch("/api/runs", { method: "POST" }));
       setRun(freshRun); setFileA(null); setFileB(null); setDraftMappings([]);
       setMappingProposal(null); setSuggestionNotice(null); setSelectedCandidateId(null);
+      setUsingSampleData(false); setConfirmSampleReplacement(false);
+      sampleInFlight.current = false; uploadInFlight.current = false;
       setScreen("upload");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "A new reconciliation could not be created.");
@@ -238,8 +321,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     <main className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
       <section className={screen === "review" ? "content review-content" : "content"}>
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
-        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p><button className="primary" onClick={requestNewReconciliation}>New reconciliation</button></section> : <section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker key={`${run?.runId ?? "new"}-A`} side="A" file={fileA} onChange={setFileA} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker key={`${run?.runId ?? "new"}-B`} side="B" file={fileB} onChange={setFileB} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section>}</section>}
-        {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">File details</p><h1 id="profile-title">Your files are ready.</h1><p className="lede">Review the bounded file profile, then set up how corresponding fields should be used.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Set up matching</button></section>}
+        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p><button className="primary" onClick={requestNewReconciliation}>New reconciliation</button></section> : <><section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker key={`${run?.runId ?? "new"}-A`} side="A" file={fileA} onChange={(file) => { setFileA(file); setUsingSampleData(false); }} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker key={`${run?.runId ?? "new"}-B`} side="B" file={fileB} onChange={(file) => { setFileB(file); setUsingSampleData(false); }} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section><section className="sample-data-callout" aria-labelledby="sample-data-title"><div><h2 id="sample-data-title">No data handy?</h2><p>Try Samewise with two small synthetic vendor datasets containing missing values, formatting differences, and a few uncertain matches.</p></div><div className="sample-data-actions"><button ref={sampleButton} className="secondary" onClick={requestSampleData} disabled={busy} aria-label="Try sample data">Try sample data</button><span>Want to inspect them first?</span><a href={SAMPLE_A_URL} download={SAMPLE_A_FILENAME} aria-label="Download sample Dataset A CSV">Download Dataset A</a><a href={SAMPLE_B_URL} download={SAMPLE_B_FILENAME} aria-label="Download sample Dataset B CSV">Download Dataset B</a></div></section></>}</section>}
+        {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">File details</p><h1 id="profile-title">Your files are ready.</h1>{usingSampleData && <div className="sample-data-notice" role="status">Using synthetic sample data.</div>}<p className="lede">Review the bounded file profile, then set up how corresponding fields should be used.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Set up matching</button></section>}
         {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title">
           <p className="eyebrow">Step 2 · Match setup</p>
           <h1 id="mapping-title">Set up matching.</h1>
@@ -276,7 +359,25 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       <p id="new-run-description">Your current run will remain unchanged.</p>
       <div className="dialog-actions"><button ref={cancelNewRunButton} className="secondary" onClick={cancelNewReconciliation}>Cancel</button><button className="primary" onClick={() => void startNewReconciliation()} disabled={busy}>Start new reconciliation</button></div>
     </dialog>}
+    {confirmSampleReplacement && <dialog ref={sampleDialog} className="new-run-dialog" aria-modal="true" aria-labelledby="sample-replacement-title" aria-describedby="sample-replacement-description" onCancel={(event) => { event.preventDefault(); cancelSampleReplacement(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelSampleReplacement(); } }}>
+      <h2 id="sample-replacement-title">Replace your selected files with the sample datasets?</h2>
+      <p id="sample-replacement-description">Your selected files have not been uploaded and will remain unchanged.</p>
+      <div className="dialog-actions"><button ref={cancelSampleButton} className="secondary" onClick={cancelSampleReplacement}>Cancel</button><button className="primary" onClick={() => void useSampleData()} disabled={busy}>Use sample data</button></div>
+    </dialog>}
   </div>;
+}
+
+async function readSampleCsv(response: Response): Promise<ArrayBuffer> {
+  if (!response.ok) throw new Error(SAMPLE_LOAD_ERROR);
+  const buffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length === 0 || bytes.length > 2 * 1024 * 1024) throw new Error(SAMPLE_LOAD_ERROR);
+  let text: string;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { throw new Error(SAMPLE_LOAD_ERROR); }
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length < 2 || !lines[0]?.includes(",")) throw new Error(SAMPLE_LOAD_ERROR);
+  return buffer;
 }
 
 function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolution }: {

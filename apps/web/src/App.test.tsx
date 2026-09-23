@@ -59,6 +59,134 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
+  it("offers same-origin sample downloads only for an empty run", () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const { unmount } = render(<App initialRun={empty} initialScreen="upload" />);
+    expect(screen.getByRole("button", { name: "Try sample data" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download sample Dataset A CSV" })).toHaveAttribute("href", "/samples/samewise_sample_vendors_a.csv");
+    expect(screen.getByRole("link", { name: "Download sample Dataset B CSV" })).toHaveAttribute("href", "/samples/samewise_sample_vendors_b.csv");
+    unmount();
+    render(<App initialRun={runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null })} initialScreen="upload" />);
+    expect(screen.queryByRole("button", { name: "Try sample data" })).not.toBeInTheDocument();
+  });
+
+  it("loads both sample assets before uploading normal File objects through the shared pair path", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const afterA = runView({ stage: "upload", datasets: { A: { ...profile("A"), originalFilename: "samewise_sample_vendors_a.csv" } }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const complete = runView({ stage: "profile", datasets: { A: afterA.datasets.A, B: { ...profile("B"), originalFilename: "samewise_sample_vendors_b.csv" } }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const order: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input); order.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("_a.csv")) return new Response("source_record_id,company_name\nA-1,Example A\n", { status: 200 });
+      if (url.endsWith("_b.csv")) return new Response("source_record_id,company_name\nB-1,Example B\n", { status: 200 });
+      if (url.endsWith("/datasets/A")) return new Response(JSON.stringify(afterA), { status: 201, headers: { "Content-Type": "application/json" } });
+      if (url.endsWith("/datasets/B")) return new Response(JSON.stringify(complete), { status: 201, headers: { "Content-Type": "application/json" } });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.click(screen.getByRole("button", { name: "Try sample data" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Using synthetic sample data");
+    expect(order.slice(0, 2)).toEqual(["GET /samples/samewise_sample_vendors_a.csv", "GET /samples/samewise_sample_vendors_b.csv"]);
+    const uploadCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/datasets/"));
+    expect(uploadCalls).toHaveLength(2);
+    expect(uploadCalls[0]?.[1]?.body).toBeInstanceOf(File);
+    expect((uploadCalls[0]?.[1]?.body as File).name).toBe("samewise_sample_vendors_a.csv");
+    expect(uploadCalls[1]?.[1]?.body).toBeInstanceOf(File);
+    expect((uploadCalls[1]?.[1]?.body as File).name).toBe("samewise_sample_vendors_b.csv");
+  });
+
+  it("does not mutate selections or upload when either sample asset fails", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => String(input).endsWith("_a.csv")
+      ? new Response("source_record_id,company_name\nA-1,Example A\n", { status: 200 })
+      : new Response("missing", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.click(screen.getByRole("button", { name: "Try sample data" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sample data couldn't be loaded");
+    expect(screen.queryByText("samewise_sample_vendors_a.csv")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/datasets/"))).toBe(false);
+    expect(screen.getByRole("button", { name: "Upload & profile" })).toBeEnabled();
+  });
+
+  it("requires confirmation before replacing a manual selection and Cancel preserves it", () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "mine.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Try sample data" }));
+    expect(screen.getByRole("dialog", { name: "Replace your selected files with the sample datasets?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("mine.csv")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the sample pair after confirmed replacement", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const afterA = runView({ stage: "upload", datasets: { A: { ...profile("A"), originalFilename: "samewise_sample_vendors_a.csv" } }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const complete = runView({ stage: "profile", datasets: { A: afterA.datasets.A, B: { ...profile("B"), originalFilename: "samewise_sample_vendors_b.csv" } }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("_a.csv")) return new Response("id,name\nA-1,Sample A\n");
+      if (url.endsWith("_b.csv")) return new Response("id,name\nB-1,Sample B\n");
+      return new Response(JSON.stringify(url.endsWith("/datasets/A") ? afterA : complete), { status: 201, headers: { "Content-Type": "application/json" } });
+    }));
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "mine.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Try sample data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use sample data" }));
+    expect(await screen.findByText("Using synthetic sample data.")).toBeInTheDocument();
+    expect(screen.getByText("samewise_sample_vendors_a.csv")).toBeInTheDocument();
+    expect(screen.getByText("samewise_sample_vendors_b.csv")).toBeInTheDocument();
+  });
+
+  it("keeps normal upload recovery truthful when the API is unavailable", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "The API is unavailable." } }), { status: 503, headers: { "Content-Type": "application/json" } })));
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "a.csv", { type: "text/csv" })] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "b.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The API is unavailable");
+    expect(screen.getByRole("button", { name: "Upload & profile" })).toBeEnabled();
+    expect(screen.getByText("a.csv")).toBeInTheDocument();
+    expect(screen.getByText("b.csv")).toBeInTheDocument();
+  });
+
+  it("guards sample loading synchronously against a double click", () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    const button = screen.getByRole("button", { name: "Try sample data" });
+    fireEvent.click(button); fireEvent.click(button);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("synchronizes an authoritative Dataset A upload when Dataset B fails", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const afterA = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/datasets/A")) return new Response(JSON.stringify(afterA), { status: 201, headers: { "Content-Type": "application/json" } });
+      if (url.endsWith("/datasets/B")) return new Response(JSON.stringify({ error: { message: "Dataset B could not be profiled." } }), { status: 400, headers: { "Content-Type": "application/json" } });
+      if (url.endsWith("/api/runs/run-1")) return new Response(JSON.stringify(afterA), { status: 200, headers: { "Content-Type": "application/json" } });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "a.csv", { type: "text/csv" })] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "b.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(await screen.findByRole("heading", { name: "Source files are locked for this run" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Start a new reconciliation and retry");
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/runs/run-1/datasets/A", "/api/runs/run-1/datasets/B", "/api/runs/run-1",
+    ]);
+  });
+
   it("opens Merge values from a completed zero-case review without creating another run", async () => {
     const empty = { ...reviewPage(), items: [], page: { ...reviewPage().page, total: 0, returned: 0 }, progress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(empty), { status: 200 }));

@@ -6,6 +6,8 @@ Samewise finds likely matches, asks people to resolve uncertainty, then separate
 
 **[Live demo](https://trysamewise.vercel.app)** · **[Architecture](docs/architecture.md)** · **[Evaluation](docs/review-generalization-report.md)** · **[Run locally](#run-locally)**
 
+No CSVs handy? The Upload screen includes a small synthetic vendor reconciliation you can run immediately or download and inspect first.
+
 ![Samewise uncertain match review showing a competing candidate, field-level agreements, and side-by-side source records](docs/assets/readme/review-case.png)
 
 *An uncertain match shows source records and real matcher evidence. Competing candidates remain visible; the reviewer decides identity before any value is merged.*

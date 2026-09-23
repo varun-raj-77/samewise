@@ -1,0 +1,29 @@
+source_record_id,stable_id,company_name,address,city,region,postal,email,phone,contact_name,updated_at
+B-2001,VEND-1001,Alder Creek Office Supplies,101 Lantern Wy,Alder Bay,NY,10001,orders@aldercreek.example.com,(202) 555-0101,Mara Chen,2026-08-12
+B-2002,VEND-1002,Blue Finch Packaging,22 Harbor Glass Rd,Northstar,CA,90001,hello@bluefinch.example.com,2025550102,Jonathan Bell,2026-08-13
+B-2003,VEND-1003,Cedar and Loom Textiles,735 Willow Market St,Lumen Falls,IL,60601,sales@cedarloom.example.com,202 555 0103,Priya Shah,2026-08-14
+B-2004,VEND-1004,Driftwood Safety Partners LLC,48 Meridian Ave,Eastmere,TX,73301,team@driftwoodsafety.example.com,202-555-0104,Owen Hart,2026-08-15
+B-2005,VEND-1005,Emberline Industrial Company,910 Copper Trl,Riverglass,WA,98001,service@emberline.example.com,2025550105,Lena Ortiz,2026-08-16
+B-2006,VEND-1006,Fable Ridge Logistics Inc,64 Compass Ct,Stonehaven,CO,80014,dispatch@fableridge.example.com,202-555-0106,Caleb Moss,2026-08-17
+B-2007,VEND-1007,Golden Kite Foods,317 Sunbeam Dr,Marigold,FL,33101,orders@goldenkite.example.com,(202) 555-0107,Nina Park,2026-08-18
+B-2008,VEND-1008,Harborlight Laboratory Systems,82 Cobalt Ln,Beacon Hills,MA,02108,care@harborlight.example.com,2025550108,Eli Ford,2026-08-19
+B-2009,VEND-1009,Indigo Mesa Print Co,509 Paper Mill Rd,Juniper Wells,AZ,85001,studio@indigomesa.example.com,202-555-0109,Rosa Kim,2026-08-20
+B-2010,VEND-1010,Juniper Vale Catering LLC,140 Meadow Fork,Silvergrove,OR,97035,events@junipervale.example.com,202 555 0110,Theo Lane,2026-08-21
+B-2011,VEND-1011,Kindred Bolt Mfg,763 Foundry St,Ironwood,MI,48201,parts@kindredbolt.example.com,2025550111,Asha Reed,2026-08-22
+B-2012,VEND-1012,Lumen Arc Facilities,29 Prism Blvd,Clearwater Ridge,PA,19103,desk@lumenarc.example.com,202-555-0112,Miles Young,2026-08-23
+B-2013,VEND-1013,Moonrise Paper Goods Co,601 Crescent Pkwy,Maple Harbor,OH,44101,trade@moonrisepaper.example.com,(202) 555-0113,Sofia Dunn,2026-08-24
+B-2014,VEND-1014,Northwind Fixtures,415 Rivet Row,Oak Crossing,GA,30301,quotes@northwindfixture.example.com,2025550114,Isaac Cole,2026-08-25
+B-2015,VEND-1015,Opal Bridge Medical Supplies,88 Wellness Ter,Pinefield,NC,27601,support@opalbridge.example.com,202-555-0115,Maya Flores,2026-08-26
+B-2016,VEND-1016,Prairie Star Uniform Company,254 Canvas Ave,Red Prairie,MN,55101,orders@prairiestar.example.com,202 555 0116,Noah Grant,2026-08-27
+B-2017,VEND-1017,Quartz Harbor Electronics LLC,730 Signal St,Cloudport,NJ,07101,components@quartzharbor.example.com,2025550117,Zoe Walsh,2026-08-28
+B-2018,VEND-1018,Red Fern Janitorial,19 Evergreen Loop,Briar Glen,VA,23219,clean@redfern.example.com,(202) 555-0118,Luca Price,2026-08-29
+B-2019,VEND-1019,Silver Birch Cold Storage Inc,860 Frostline Rd,Wintermere,WI,53202,warehouse@silverbirch.example.com,202-555-0119,Ivy Baker,2026-08-30
+B-2020,VEND-1020,Tidal Grove Interiors,345 Current Pl,Seabrook Point,MD,21201,design@tidalgrove.example.com,2025550120,Evan Ross,2026-08-31
+B-2021,VEND-1021,Umber Peak Tooling Company,92 Summit Forge,Copper Heights,UT,84101,tools@umberpeak.example.com,202-555-0121,Cleo James,2026-09-01
+B-2022,VEND-1022,Velvet Oak Hospitality Group,511 Hearthstone Wy,Amber Lake,TN,37201,guest@velvetoak.example.com,202 555 0122,Samir Patel,2026-09-02
+B-2023,,Willow Crown Produce Co,207 Orchard Gt,Greenwater,MO,63101,,(202) 555-0123,Tessa Moore,2026-09-03
+B-2024,,Orchard Signal Creative Studio,44 Studio Row,Glassfield,IN,46201,billing@orchardsignal.example.com,202-555-0194,Emory Stone,2026-09-04
+B-2025,VEND-B125,Brass River Couriers,12 Parcel Bend,Slate Harbor,NY,10003,route@brassriver.example.com,202-555-0131,Dara Neal,2026-09-05
+B-2026,VEND-B126,Cascade Bloom Florals,604 Petal Lane,Rosehaven,CA,90003,flowers@cascadebloom.example.com,202-555-0132,Jules Kent,2026-09-06
+B-2027,VEND-B127,Dovetail Ember Furnishings,77 Joinery Road,Ashford Glen,IL,60603,home@dovetailember.example.com,202-555-0133,Robin Dale,2026-09-07
+B-2028,VEND-B128,Evergreen Orbit Recycling,933 Renewal Way,Loop City,TX,73303,reuse@evergreenorbit.example.com,202-555-0134,Parker Wynn,2026-09-08

@@ -1,0 +1,29 @@
+source_record_id,stable_id,company_name,address,city,region,postal,email,phone,contact_name,updated_at
+A-1001,VEND-1001,Alder Creek Office Supply,101 Lantern Way,Alder Bay,NY,10001,orders@aldercreek.example.com,202-555-0101,Mara Chen,2026-08-02
+A-1002,VEND-1002,Blue Finch Packaging LLC,22 Harbor Glass Road,Northstar,CA,90001,hello@bluefinch.example.com,202-555-0102,Jon Bell,2026-08-03
+A-1003,VEND-1003,Cedar & Loom Textiles,735 Willow Market Street,Lumen Falls,IL,60601,sales@cedarloom.example.com,202-555-0103,Priya Shah,2026-08-04
+A-1004,VEND-1004,Driftwood Safety Partners,48 Meridian Avenue,Eastmere,TX,73301,team@driftwoodsafety.example.com,202-555-0104,Owen Hart,2026-08-05
+A-1005,VEND-1005,Emberline Industrial Co,910 Copper Trail,Riverglass,WA,98001,service@emberline.example.com,202-555-0105,Lena Ortiz,2026-08-06
+A-1006,VEND-1006,Fable Ridge Logistics,64 Compass Court,Stonehaven,CO,80014,dispatch@fableridge.example.com,202-555-0106,Caleb Moss,2026-08-07
+A-1007,VEND-1007,Golden Kite Foods Inc,317 Sunbeam Drive,Marigold,FL,33101,orders@goldenkite.example.com,202-555-0107,Nina Park,2026-08-08
+A-1008,VEND-1008,Harborlight Lab Systems,82 Cobalt Lane,Beacon Hills,MA,02108,care@harborlight.example.com,202-555-0108,Eli Ford,2026-08-09
+A-1009,VEND-1009,Indigo Mesa Printing,509 Paper Mill Road,Juniper Wells,AZ,85001,studio@indigomesa.example.com,202-555-0109,Rosa Kim,2026-08-10
+A-1010,VEND-1010,Juniper Vale Catering,140 Meadow Fork,Silvergrove,OR,97035,events@junipervale.example.com,202-555-0110,Theo Lane,2026-08-11
+A-1011,VEND-1011,Kindred Bolt Manufacturing,763 Foundry Street,Ironwood,MI,48201,parts@kindredbolt.example.com,202-555-0111,Asha Reed,2026-08-12
+A-1012,VEND-1012,Lumen Arc Facilities Group,29 Prism Boulevard,Clearwater Ridge,PA,19103,desk@lumenarc.example.com,202-555-0112,Miles Young,2026-08-13
+A-1013,VEND-1013,Moonrise Paper Goods,601 Crescent Parkway,Maple Harbor,OH,44101,trade@moonrisepaper.example.com,202-555-0113,Sofia Dunn,2026-08-14
+A-1014,VEND-1014,Northwind Fixture Works,415 Rivet Row,Oak Crossing,GA,30301,quotes@northwindfixture.example.com,202-555-0114,Isaac Cole,2026-08-15
+A-1015,VEND-1015,Opal Bridge Medical Supply,88 Wellness Terrace,Pinefield,NC,27601,support@opalbridge.example.com,202-555-0115,Maya Flores,2026-08-16
+A-1016,VEND-1016,Prairie Star Uniforms,254 Canvas Avenue,Red Prairie,MN,55101,orders@prairiestar.example.com,202-555-0116,Noah Grant,2026-08-17
+A-1017,VEND-1017,Quartz Harbor Electronics,730 Signal Street,Cloudport,NJ,07101,components@quartzharbor.example.com,202-555-0117,Zoe Walsh,2026-08-18
+A-1018,VEND-1018,Red Fern Janitorial Services,19 Evergreen Loop,Briar Glen,VA,23219,clean@redfern.example.com,202-555-0118,Luca Price,2026-08-19
+A-1019,VEND-1019,Silver Birch Cold Storage,860 Frostline Road,Wintermere,WI,53202,warehouse@silverbirch.example.com,202-555-0119,Ivy Baker,2026-08-20
+A-1020,VEND-1020,Tidal Grove Office Interiors,345 Current Place,Seabrook Point,MD,21201,design@tidalgrove.example.com,202-555-0120,Evan Ross,2026-08-21
+A-1021,VEND-1021,Umber Peak Tooling,92 Summit Forge,Copper Heights,UT,84101,tools@umberpeak.example.com,202-555-0121,Cleo James,2026-08-22
+A-1022,VEND-1022,Velvet Oak Hospitality,511 Hearthstone Way,Amber Lake,TN,37201,guest@velvetoak.example.com,202-555-0122,Samir Patel,2026-08-23
+A-1023,,Willow Crown Produce,207 Orchard Gate,Greenwater,MO,63101,market@willowcrown.example.com,202-555-0123,Tessa Moore,2026-08-24
+A-1024,VEND-1024,Orchard Signal Creative,44 Studio Row,Glassfield,IN,46201,accounts@orchardsignal.example.com,202-555-0124,Emery Stone,2026-08-25
+A-1025,VEND-A025,Xenon Brook Rentals,16 Lantern Quay,Westhaven,NY,10002,rentals@xenonbrook.example.com,202-555-0125,Arlo West,2026-08-26
+A-1026,VEND-A026,Yellow Pine Fleet Care,390 Axle Road,Pebble Creek,CA,90002,garage@yellowpine.example.com,202-555-0126,Mina Holt,2026-08-27
+A-1027,VEND-A027,Zephyr Bell Signworks,71 Banner Street,North Quill,IL,60602,signs@zephyrbell.example.com,202-555-0127,Kai Brooks,2026-08-28
+A-1028,VEND-A028,Atlas Morrow Ceramics,808 Kiln Court,Clayhaven,TX,73302,studio@atlasmorrow.example.com,202-555-0128,Rhea Vaughn,2026-08-29
