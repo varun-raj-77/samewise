@@ -75,6 +75,24 @@
   .manual-heading p { text-align: left; }
 }
 
+@media (max-width: 767px) {
+  .ai-mapping-panel > header { padding: 15px; }
+  .ai-mapping-panel > header button { width: 100%; min-height: 46px; }
+  .mapping-notice { margin: 14px; }
+  .setup-table-wrap { overflow: visible; padding: 0 14px 16px; }
+  .setup-table, .setup-table tbody, .setup-table tr, .setup-table td { display: block; width: 100%; }
+  .setup-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .setup-table tr { margin-bottom: 10px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface-2); }
+  .setup-table td, .setup-table th:not(:first-child), .setup-table td:not(:first-child) { display: grid; grid-template-columns: minmax(108px,.7fr) minmax(0,1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); text-align: left; overflow-wrap: anywhere; }
+  .setup-table td:last-child { border-bottom: 0; }
+  .setup-table td::before { content: attr(data-label); color: var(--text-muted); font-size: 10px; font-weight: 700; }
+  .setup-table td:first-child { display: block; }
+  .setup-table td:first-child::before { display: block; margin-bottom: 7px; }
+  .recommended-setup { width: calc(100% - 28px); margin: 0 14px 14px; min-height: 46px; }
+  .proposal-note, .ai-loading, .unmapped-note { padding-inline: 14px; overflow-wrap: anywhere; }
+  .mapping-guidance { padding: 13px; }
+}
+
 /* Assistant metadata remains subordinate to human actions. */
 .ai-mapping-panel { border-color: var(--border-subtle); border-radius: 9px; background: var(--surface-1); }
 .ai-mapping-panel > header { border-color: var(--border-subtle); }

@@ -59,6 +59,27 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
+  it("opens an accessible mobile menu, exposes workflow state, and closes after navigation", async () => {
+    render(<App initialRun={runView()} initialScreen="results" />);
+    const menuButton = screen.getByRole("button", { name: "Menu" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(menuButton);
+    const dialog = await screen.findByRole("dialog", { name: "Samewise menu" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(dialog).toHaveTextContent("Review matches");
+    expect(screen.getByRole("button", { name: /Review matches Current step/ })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("button", { name: /Merge values Not yet available/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Match setup Completed/ }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Samewise menu" })).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Set up matching." })).toBeInTheDocument();
+
+    fireEvent.click(menuButton);
+    fireEvent.click(screen.getByRole("button", { name: "Close menu" }));
+    await waitFor(() => expect(menuButton).toHaveFocus());
+  });
+
   it("offers same-origin sample downloads only for an empty run", () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     const { unmount } = render(<App initialRun={empty} initialScreen="upload" />);

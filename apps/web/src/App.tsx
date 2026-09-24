@@ -69,6 +69,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [confirmNewRun, setConfirmNewRun] = useState(false);
   const [confirmSampleReplacement, setConfirmSampleReplacement] = useState(false);
   const [usingSampleData, setUsingSampleData] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const uploadInFlight = useRef(false);
   const sampleInFlight = useRef(false);
   const newRunButton = useRef<HTMLButtonElement>(null);
@@ -77,6 +78,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const sampleButton = useRef<HTMLButtonElement>(null);
   const sampleDialog = useRef<HTMLDialogElement>(null);
   const cancelSampleButton = useRef<HTMLButtonElement>(null);
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
+  const mobileMenuDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (initialRun) return;
@@ -120,6 +123,18 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     }
     cancelSampleButton.current?.focus();
   }, [confirmSampleReplacement]);
+
+  useEffect(() => {
+    const dialog = mobileMenuDialog.current;
+    if (!dialog) return;
+    if (mobileMenuOpen && !dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    } else if (!mobileMenuOpen && dialog.open) {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+  }, [mobileMenuOpen]);
 
   async function action(work: () => Promise<RunSummary>, next?: Screen) {
     setBusy(true); setError(null);
@@ -306,6 +321,15 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     finally { setBusy(false); }
   }
 
+  const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.screens.includes(screen)));
+  const reviewComplete = Boolean(run?.summary && run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0);
+  const mergeComplete = reviewComplete && Boolean(run?.trustedExportReadiness.ready);
+  const currentStep = STEPS[currentStepIndex] ?? STEPS[0]!;
+  const stepState = (step: (typeof STEPS)[number], index: number) => step.id === "review" && reviewComplete ? "complete" : step.id === "resolution" && mergeComplete ? "complete" : step.id === "resolution" && !reviewComplete ? "upcoming" : step.id === "resolution" && reviewComplete && screen !== "resolution" ? "next" : step.id === "export" && !mergeComplete ? "upcoming" : step.id === "export" && mergeComplete && screen !== "export" ? "next" : step.screens.includes(screen) ? "active" : index < currentStepIndex ? "complete" : "upcoming";
+  const canOpenStep = (step: (typeof STEPS)[number]) => step.id === "upload" || step.id === "mapping" && Boolean(run?.datasets.A && run.datasets.B) || step.id === "review" && Boolean(run?.summary) || step.id === "resolution" && reviewComplete || step.id === "export" && mergeComplete;
+  const navigateFromMobileMenu = (next: Screen) => { setMobileMenuOpen(false); setScreen(next); };
+  const closeMobileMenu = () => { setMobileMenuOpen(false); queueMicrotask(() => mobileMenuButton.current?.focus()); };
+
   return <div className="app-shell">
     <aside className="app-sidebar">
       <div className="brand"><span className="mark">S</span><strong>Samewise</strong></div>
@@ -315,9 +339,13 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           <button ref={newRunButton} className="new-reconciliation" onClick={requestNewReconciliation} disabled={busy}><span aria-hidden="true">+</span>New reconciliation</button>
           <details className="advanced-nav"><summary>Advanced</summary><button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => setScreen("evaluation")}><span aria-hidden="true">Q</span>Matching quality</button></details>
         </div>
-        {screen !== "evaluation" && <div className="run-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const currentIndex = Math.max(0, STEPS.findIndex((item) => item.screens.includes(screen))); const reviewComplete = Boolean(run?.summary && run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0); const mergeComplete = reviewComplete && Boolean(run?.trustedExportReadiness.ready); const state = step.id === "review" && reviewComplete ? "complete" : step.id === "resolution" && mergeComplete ? "complete" : step.id === "resolution" && !reviewComplete ? "upcoming" : step.id === "resolution" && reviewComplete && screen !== "resolution" ? "next" : step.id === "export" && !mergeComplete ? "upcoming" : step.id === "export" && mergeComplete && screen !== "export" ? "next" : step.screens.includes(screen) ? "active" : index < currentIndex ? "complete" : "upcoming"; return <li key={step.id} className={state} aria-current={step.screens.includes(screen) ? "step" : undefined}><span aria-hidden="true">{state === "complete" ? "✓" : index + 1}</span>{step.label}</li>; })}</ol></div>}
+        {screen !== "evaluation" && <div className="run-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const state = stepState(step, index); return <li key={step.id} className={state} aria-current={step.screens.includes(screen) ? "step" : undefined}><span aria-hidden="true">{state === "complete" ? "✓" : index + 1}</span>{step.label}</li>; })}</ol></div>}
       </nav>
     </aside>
+    <header className="mobile-header">
+      <div className="mobile-topbar"><div className="brand"><span className="mark">S</span><strong>Samewise</strong></div><button ref={mobileMenuButton} type="button" className="mobile-menu-button" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}>Menu</button></div>
+      <div className="mobile-progress" aria-label={screen === "evaluation" ? "Advanced, Matching quality" : `Step ${currentStepIndex + 1} of ${STEPS.length}, ${currentStep.label}`}><small>{screen === "evaluation" ? "Advanced" : `Step ${currentStepIndex + 1} of ${STEPS.length}`}</small><strong>{screen === "evaluation" ? "Matching quality" : currentStep.label}</strong></div>
+    </header>
     <main className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
       <section className={screen === "review" ? "content review-content" : "content"}>
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
@@ -333,7 +361,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
             {suggestionNotice && <div className="mapping-notice" role="status">{suggestionNotice}</div>}
             {mappingProposal && <>
               <p className="proposal-note">Recommendations use bounded profile metadata only. They do not inspect rows or decide identity.</p>
-              <div className="setup-table-wrap"><table className="setup-table"><thead><tr><th>Field correspondence</th><th>Use to match</th><th>Keep in result</th><th>Recommendation</th></tr></thead><tbody>{mappingProposal.suggestions.map((suggestion) => <tr key={suggestion.suggestionId}><td><strong>{suggestion.leftColumn}</strong><span> ↔ </span><strong>{suggestion.rightColumn}</strong><small>{suggestion.reason}</small></td><td>{suggestion.useForMatching ? "✓" : "—"}</td><td>{suggestion.includeInMerge ? "✓" : "—"}</td><td>{suggestion.sourceSpecific ? "Source-specific / metadata" : suggestion.relation.replaceAll("_", " ")}</td></tr>)}</tbody></table></div>
+              <div className="setup-table-wrap"><table className="setup-table"><thead><tr><th>Field correspondence</th><th>Use to match</th><th>Keep in result</th><th>Recommendation</th></tr></thead><tbody>{mappingProposal.suggestions.map((suggestion) => <tr key={suggestion.suggestionId}><td data-label="Field correspondence"><strong>{suggestion.leftColumn}</strong><span> ↔ </span><strong>{suggestion.rightColumn}</strong><small>{suggestion.reason}</small></td><td data-label="Use to match">{suggestion.useForMatching ? "✓" : "—"}</td><td data-label="Keep in result">{suggestion.includeInMerge ? "✓" : "—"}</td><td data-label="Recommendation">{suggestion.sourceSpecific ? "Source-specific / metadata" : suggestion.relation.replaceAll("_", " ")}</td></tr>)}</tbody></table></div>
               {mappingProposal.suggestions.some((item) => item.status === "pending") && <button className="primary recommended-setup" onClick={() => void useRecommendedSetup()} disabled={suggestionsLoading}>Use recommended setup</button>}
               <p className="proposal-note">Model {mappingProposal.provenance.model} · {mappingProposal.provenance.promptVersion}. Recommendations stay inactive until you confirm them.</p>
             </>}
@@ -363,6 +391,17 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       <h2 id="sample-replacement-title">Replace your selected files with the sample datasets?</h2>
       <p id="sample-replacement-description">Your selected files have not been uploaded and will remain unchanged.</p>
       <div className="dialog-actions"><button ref={cancelSampleButton} className="secondary" onClick={cancelSampleReplacement}>Cancel</button><button className="primary" onClick={() => void useSampleData()} disabled={busy}>Use sample data</button></div>
+    </dialog>}
+    {mobileMenuOpen && <dialog ref={mobileMenuDialog} className="mobile-menu-drawer" aria-modal="true" aria-label="Samewise menu" onClose={() => setMobileMenuOpen(false)} onCancel={(event) => { event.preventDefault(); closeMobileMenu(); }}>
+      <header><div className="brand"><span className="mark">S</span><strong>Samewise</strong></div><button type="button" className="mobile-menu-close" aria-label="Close menu" onClick={closeMobileMenu}>×</button></header>
+      <nav aria-label="Mobile Samewise navigation">
+        <div className="product-nav">
+          <button aria-current={screen !== "evaluation" ? "page" : undefined} onClick={() => navigateFromMobileMenu(run?.stage ?? "upload")}><span aria-hidden="true">R</span>Reconciliation</button>
+          <button className="new-reconciliation" onClick={() => { setMobileMenuOpen(false); requestNewReconciliation(); }} disabled={busy}><span aria-hidden="true">+</span>New reconciliation</button>
+          <details className="advanced-nav"><summary>Advanced</summary><button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => navigateFromMobileMenu("evaluation")}><span aria-hidden="true">Q</span>Matching quality</button></details>
+        </div>
+        {screen !== "evaluation" && <div className="mobile-step-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const state = stepState(step, index); return <li key={step.id} className={state}><button type="button" aria-current={step.screens.includes(screen) ? "step" : undefined} disabled={!canOpenStep(step)} onClick={() => navigateFromMobileMenu(step.id)}><span aria-hidden="true">{state === "complete" ? "✓" : index + 1}</span><span>{step.label}<small>{state === "active" ? "Current step" : state === "complete" ? "Completed" : state === "next" ? "Ready" : "Not yet available"}</small></span></button></li>; })}</ol></div>}
+      </nav>
     </dialog>}
   </div>;
 }
@@ -421,12 +460,12 @@ function FilePicker({ side, file, onChange }: { side: "A" | "B"; file: File | nu
   const input = useRef<HTMLInputElement>(null);
   return <div className={`file-picker${file ? " has-file" : ""}`}>
     <div className="file-picker-heading"><span className="dataset-badge">{side}</span><strong>Dataset {side}</strong><small>{file ? "Selected" : "CSV required"}</small></div>
-    {file ? <div className="selected-file-panel"><strong className="selected-file">{file.name}</strong><div><button type="button" className="file-action" aria-label={`Replace Dataset ${side} CSV`} onClick={() => input.current?.click()}>Replace</button><button type="button" className="file-action remove" aria-label={`Remove Dataset ${side} CSV`} onClick={() => { if (input.current) input.current.value = ""; onChange(null); }}>Remove</button></div></div> : <label className="drop-target" htmlFor={`dataset-${side}-file`}><strong>Drop CSV here</strong><small>or <span className="browse-affordance">browse files</span></small></label>}
+    {file ? <div className="selected-file-panel"><strong className="selected-file">{file.name}</strong><div><button type="button" className="file-action" aria-label={`Replace Dataset ${side} CSV`} onClick={() => input.current?.click()}>Replace</button><button type="button" className="file-action remove" aria-label={`Remove Dataset ${side} CSV`} onClick={() => { if (input.current) input.current.value = ""; onChange(null); }}>Remove</button></div></div> : <label className="drop-target" htmlFor={`dataset-${side}-file`}><strong><span className="desktop-upload-language">Drop CSV here</span><span className="mobile-upload-language">Choose CSV</span></strong><small><span className="desktop-upload-language">or </span><span className="browse-affordance">browse files</span></small></label>}
     <input ref={input} id={`dataset-${side}-file`} aria-label={`Dataset ${side} CSV`} type="file" accept=".csv,text/csv" onChange={(event) => onChange(event.target.files?.[0] ?? null)} />
   </div>;
 }
 function ProfileCard({ profile }: { profile: NonNullable<RunSummary["datasets"]["A"]> }) { return <article className="profile-card"><header><span className="dataset-badge">{profile.side}</span><div><h2>{profile.originalFilename}</h2><small>{profile.rowCount} rows · SHA-256 {profile.sha256.slice(0, 10)}…</small></div></header><div className="profile-columns">{profile.columns.map((column) => <div key={column.name}><strong>{column.name}</strong><span>{column.inferredType}</span><small>{column.nullCount} null · {column.distinctCount} distinct</small><p>{column.samples.join(" · ") || "No sample"}</p></div>)}</div></article>; }
-function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className="mapping-row"><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select><span>↔</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select><label className="mapping-check"><input type="checkbox" checked={mapping.useForMatching} onChange={(event) => onChange({ ...mapping, useForMatching: event.target.checked })} />Use to match</label><label className="mapping-check"><input type="checkbox" checked={mapping.includeInMerge} onChange={(event) => onChange({ ...mapping, includeInMerge: event.target.checked })} />Keep in result</label><select aria-label="Field type" value={mapping.semanticFamily ?? "unknown"} onChange={(event) => onChange({ ...mapping, semanticFamily: event.target.value as NonNullable<ManualMapping["semanticFamily"]> })}><option value="unknown">Unknown</option><option value="persistent_identifier">Persistent ID</option><option value="source_local_identifier">Source-local ID</option><option value="name_or_title">Entity name / title</option><option value="contact_person">Contact person</option><option value="email">Email</option><option value="phone">Phone</option><option value="domain">Website / domain</option><option value="address">Address</option><option value="geography">Geography</option><option value="categorical">Category</option><option value="numeric">Numeric</option><option value="date_or_timestamp">Date / timestamp</option><option value="free_text">Free text</option></select><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
+function MappingRow({ mapping, aColumns, bColumns, onChange, onRemove }: { mapping: ManualMapping; aColumns: string[]; bColumns: string[]; onChange: (mapping: ManualMapping) => void; onRemove: () => void }) { return <div className="mapping-row"><label className="mapping-field"><span>Semantic meaning</span><input aria-label="Mapping label" value={mapping.label} onChange={(event) => onChange({ ...mapping, label: event.target.value })} /></label><label className="mapping-field"><span>Dataset A field</span><select aria-label="Dataset A column" value={mapping.aColumn} onChange={(event) => onChange({ ...mapping, aColumn: event.target.value })}>{aColumns.map((column) => <option key={column}>{column}</option>)}</select></label><span aria-hidden="true">↔</span><label className="mapping-field"><span>Dataset B field</span><select aria-label="Dataset B column" value={mapping.bColumn} onChange={(event) => onChange({ ...mapping, bColumn: event.target.value })}>{bColumns.map((column) => <option key={column}>{column}</option>)}</select></label><label className="mapping-check"><input type="checkbox" checked={mapping.useForMatching} onChange={(event) => onChange({ ...mapping, useForMatching: event.target.checked })} />Use to match</label><label className="mapping-check"><input type="checkbox" checked={mapping.includeInMerge} onChange={(event) => onChange({ ...mapping, includeInMerge: event.target.checked })} />Keep in result</label><label className="mapping-field"><span>Field type</span><select aria-label="Field type" value={mapping.semanticFamily ?? "unknown"} onChange={(event) => onChange({ ...mapping, semanticFamily: event.target.value as NonNullable<ManualMapping["semanticFamily"]> })}><option value="unknown">Unknown</option><option value="persistent_identifier">Persistent ID</option><option value="source_local_identifier">Source-local ID</option><option value="name_or_title">Entity name / title</option><option value="contact_person">Contact person</option><option value="email">Email</option><option value="phone">Phone</option><option value="domain">Website / domain</option><option value="address">Address</option><option value="geography">Geography</option><option value="categorical">Category</option><option value="numeric">Numeric</option><option value="date_or_timestamp">Date / timestamp</option><option value="free_text">Free text</option></select></label><label className="mapping-field"><span>Normalizer</span><select aria-label="Normalizer" value={mapping.normalizer} onChange={(event) => onChange({ ...mapping, normalizer: event.target.value as ManualMapping["normalizer"] })}><option value="text">Text</option><option value="phone">Phone</option><option value="email">Email</option><option value="number">Number</option><option value="date">Date</option></select></label><button className="icon-button" aria-label={`Remove ${mapping.label}`} onClick={onRemove}>×</button></div>; }
 
 function MatchingSafetyGuidance({ mappings, run }: { mappings: ManualMapping[]; run: RunSummary }) {
   const matching = mappings.filter((mapping) => mapping.useForMatching);
