@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +8,7 @@ import {
   BatchIdentityDecisionResponseSchema,
   ConflictPageSchema,
   ManualMappingSchema,
+  MatchJobSchema,
   MappingSuggestionDecisionSchema,
   MappingSuggestionResponseSchema,
   HumanReviewEvidenceSchema,
@@ -84,11 +86,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     options.evaluationRoot ?? fileURLToPath(new URL("../../../evaluation/reports/sw-009/", import.meta.url)),
   );
 
+  let closing = false;
+
   app.addHook("onReady", async () => {
     await store.initialize();
+    for (const job of await store.recoverMatchJobs()) scheduleMatchJob(job.runId);
   });
 
   app.addHook("onClose", async () => {
+    closing = true;
     await store.closeRepository();
   });
 
@@ -120,6 +126,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const runId = (request.params as { runId?: string } | undefined)?.runId;
       if (!runId) return originalHandler.call(this, request, reply);
       return withRunLock(runId, async () => {
+        if (persistedMethods.has(request.method) && !request.url.includes("/match-jobs") && store.activeMatchJob(runId)) {
+          throw new WorkflowError("match_job_in_progress", "Wait for the current matcher job before changing this reconciliation.", 409);
+        }
         const response = await originalHandler.call(this, request, reply);
         if (persistedMethods.has(request.method) && reply.statusCode < 400) {
           await store.persist(runId);
@@ -128,6 +137,51 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       });
     };
   });
+
+  // A bounded in-process worker with durable checkpoints. No external queue is
+  // installed; after a process restart queued/interrupted jobs are reclaimed.
+  const scheduledMatchRuns = new Set<string>();
+
+  function scheduleMatchJob(runId: string): void {
+    if (closing || scheduledMatchRuns.has(runId)) return;
+    scheduledMatchRuns.add(runId);
+    setImmediate(() => {
+      void processMatchJob(runId).finally(() => scheduledMatchRuns.delete(runId));
+    });
+  }
+
+  async function processMatchJob(runId: string): Promise<void> {
+    let jobId: string | null = null;
+    try {
+      jobId = await withRunLock(runId, async () => {
+        const queued = store.getMatchJob(runId);
+        if (!queued || queued.state !== "queued") return null;
+        const started = store.beginMatchJob(runId, queued.jobId);
+        await store.persist(runId);
+        return started ? queued.jobId : null;
+      });
+      if (!jobId || closing) return;
+      const result = await store.executeMatchJob(runId, jobId);
+      if (closing) return;
+      await withRunLock(runId, async () => {
+        store.completeMatchJob(runId, jobId!, result);
+        await store.persist(runId);
+      });
+      app.log.info({ runId, jobId }, "matcher job completed");
+    } catch (error) {
+      // Never log matcher stderr, source records, or exception payloads.
+      app.log.error({ runId, jobId, errorType: error instanceof Error ? error.name : "unknown" }, "matcher job failed");
+      if (!closing && jobId) {
+        try {
+          await withRunLock(runId, async () => {
+            if (store.failMatchJob(runId, jobId!)) await store.persist(runId);
+          });
+        } catch {
+          app.log.error({ runId, jobId }, "matcher job failure state could not be persisted");
+        }
+      }
+    }
+  }
 
   app.addContentTypeParser(
     ["text/csv", "application/csv", "application/vnd.ms-excel"],
@@ -284,6 +338,37 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const response = MappingSuggestionResponseSchema.parse(store.decideMappingSuggestion(runId, suggestionId, decision));
     app.log.info({ runId, stage: "mapping_review", suggestionId, decision: decision.decision }, "mapping suggestion reviewed");
     return response;
+  });
+
+  // Opt-in asynchronous API. The existing POST /match response remains unchanged.
+  app.post("/api/runs/:runId/match-jobs", async (request, reply) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const key = request.headers["idempotency-key"];
+    if (typeof key !== "string" || !/^[a-zA-Z0-9_.:-]{8,128}$/.test(key)) {
+      throw new WorkflowError("idempotency_key_required", "Provide an Idempotency-Key header of 8 to 128 safe characters.");
+    }
+    const job = MatchJobSchema.parse(store.enqueueMatchJob(runId, createHash("sha256").update(key).digest("hex")));
+    if (job.state === "queued") scheduleMatchJob(runId);
+    reply.code(job.state === "succeeded" ? 200 : 202);
+    return job;
+  });
+
+  app.get("/api/runs/:runId/match-jobs/current", async (request) => {
+    const { runId } = routeParams(request.params);
+    if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
+    const job = store.getMatchJob(runId);
+    if (!job) throw new WorkflowError("match_job_not_found", "No matcher job exists for this run.", 404);
+    return MatchJobSchema.parse(job);
+  });
+
+  app.post("/api/runs/:runId/match-jobs/:jobId/retry", async (request, reply) => {
+    const { runId, jobId } = routeParams(request.params);
+    if (!runId || !jobId) throw new WorkflowError("invalid_request", "Run ID and job ID are required.");
+    const job = MatchJobSchema.parse(store.retryMatchJob(runId, jobId));
+    scheduleMatchJob(runId);
+    reply.code(202);
+    return job;
   });
 
   app.post("/api/runs/:runId/match", async (request) => {
