@@ -34,7 +34,15 @@ function envelopeFromRow(row: Record<string, unknown>): PersistedRunStateEnvelop
   if (row.snapshot_version !== RUN_STATE_SNAPSHOT_VERSION) {
     throw new RunRepositoryError("Database run snapshot version is not supported.");
   }
-  if (!row.state || typeof row.state !== "object" || Array.isArray(row.state)) {
+  let state: unknown = row.state;
+  if (typeof state === "string") {
+    try {
+      state = JSON.parse(state) as unknown;
+    } catch {
+      throw new RunRepositoryError("Database run snapshot JSON is malformed.");
+    }
+  }
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
     throw new RunRepositoryError("Database run snapshot is malformed.");
   }
   const saved = row.saved_at;
@@ -44,7 +52,7 @@ function envelopeFromRow(row: Record<string, unknown>): PersistedRunStateEnvelop
     snapshotVersion: RUN_STATE_SNAPSHOT_VERSION,
     revision: resultRevision(row.revision),
     savedAt,
-    state: row.state,
+    state,
   };
 }
 
