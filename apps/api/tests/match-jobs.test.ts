@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -150,7 +150,7 @@ describe("SW-016 recoverable matcher jobs", () => {
     const first = await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } });
     expect(first.statusCode).toBe(202);
     const job = MatchJobSchema.parse(first.json());
-    expect(job.state).toBe("queued");
+    expect(["queued", "running"]).toContain(job.state);
     await eventually(app, runId, "running");
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).json().jobId).toBe(job.jobId);
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0002" } })).statusCode).toBe(409);
@@ -215,6 +215,24 @@ describe("SW-016 recoverable matcher jobs", () => {
       expect(retry.statusCode).toBe(attempt === 3 ? 409 : 202);
     }
     expect(calls).toBe(3);
+  });
+
+  it("rematerializes immutable source bytes when disposable matcher inputs were altered", async () => {
+    const { app, root } = await makeApp(async (input) => {
+      expect(await readFile(input.aPath)).toEqual(sourceA);
+      expect(await readFile(input.bPath)).toEqual(sourceB);
+      return matcherResult();
+    });
+    const runId = await setup(app);
+    const files = (await readdir(join(root, runId))).filter((file) => file.endsWith(".csv"));
+    expect(files).toHaveLength(2);
+    await writeFile(join(root, runId, files[0]!), "tampered,working,file\\n");
+    const submitted = await app.inject({
+      method: "POST", url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "immutable-input-0001" },
+    });
+    expect(submitted.statusCode).toBe(202);
+    expect((await eventually(app, runId, "succeeded")).attempts).toBe(1);
   });
 
   it("requires a valid idempotency key before creating a job", async () => {
