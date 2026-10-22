@@ -28,6 +28,9 @@ import {
   type IdentityDecision,
   type ManualMapping,
   type MatcherResult,
+  MatchJobSchema,
+  MATCH_JOB_CONTRACT_VERSION,
+  type MatchJob,
   type MappingSuggestionDecision,
   type MappingSuggestionResponse,
   type Pagination,
@@ -93,6 +96,7 @@ interface RunState {
   mergePlanPreviewToken?: string;
   mergePlanRevision: number;
   rulesApplied: boolean;
+  matchJob?: MatchJob;
 }
 
 interface UndoEntry {
@@ -124,6 +128,7 @@ interface PersistedRunState {
   mergePlanPreviewToken?: string;
   mergePlanRevision: number;
   rulesApplied: boolean;
+  matchJob?: MatchJob;
 }
 
 export class WorkflowError extends Error {
@@ -151,6 +156,10 @@ function parsePersistedRunState(value: unknown, expectedRunId: string): Persiste
     || typeof state.rulesApplied !== "boolean"
   ) {
     throw new Error(`Persisted run ${expectedRunId} uses an invalid state shape.`);
+  }
+  if (state.matchJob !== undefined) {
+    MatchJobSchema.parse(state.matchJob);
+    if (state.matchJob.runId !== expectedRunId) throw new Error("Persisted matcher job belongs to another run.");
   }
   return state as PersistedRunState;
 }
@@ -396,6 +405,7 @@ export class WorkflowStore {
       ...(run.mergePlanPreviewToken !== undefined ? { mergePlanPreviewToken: run.mergePlanPreviewToken } : {}),
       mergePlanRevision: run.mergePlanRevision,
       rulesApplied: run.rulesApplied,
+      ...(run.matchJob !== undefined ? { matchJob: run.matchJob } : {}),
     };
   }
 
@@ -445,6 +455,7 @@ export class WorkflowStore {
       ...(state.mergePlanPreviewToken !== undefined ? { mergePlanPreviewToken: state.mergePlanPreviewToken } : {}),
       mergePlanRevision: state.mergePlanRevision,
       rulesApplied: state.rulesApplied,
+      ...(state.matchJob !== undefined ? { matchJob: state.matchJob } : {}),
     });
   }
 
@@ -653,16 +664,25 @@ export class WorkflowStore {
     };
   }
 
-  async match(runId: string): Promise<RunSummary> {
-    const run = this.requireRun(runId);
+  private matcherInput(run: RunState): { aPath: string; bPath: string; mappings: ManualMapping[] } {
     if (!run.datasets.A || !run.datasets.B || !run.mappings.some((mapping) => mapping.useForMatching)) {
       throw new WorkflowError("run_not_ready", "Both datasets and at least one matching field are required.");
     }
-    run.result = await this.matcher.match({
+    return {
       aPath: run.datasets.A.path,
       bPath: run.datasets.B.path,
       mappings: run.mappings.filter((mapping) => mapping.useForMatching),
-    });
+    };
+  }
+
+  async match(runId: string): Promise<RunSummary> {
+    const run = this.requireRun(runId);
+    const result = await this.matcher.match(this.matcherInput(run));
+    return this.applyMatchResult(run, result);
+  }
+
+  private applyMatchResult(run: RunState, result: MatcherResult): RunSummary {
+    run.result = result;
     run.decisions.clear();
     run.conflicts.clear();
     run.deferredARowIds.clear();
@@ -675,6 +695,115 @@ export class WorkflowStore {
     }
     run.stage = "results";
     return this.summaryView(run);
+  }
+
+  // SW-016: this is an opt-in API. The existing synchronous match route stays unchanged.
+  // The job record is part of the same CAS-protected run snapshot as its result.
+  getMatchJob(runId: string): MatchJob | null {
+    return this.requireRun(runId).matchJob ?? null;
+  }
+
+  activeMatchJob(runId: string): boolean {
+    const state = this.getMatchJob(runId)?.state;
+    return state === "queued" || state === "running";
+  }
+
+  enqueueMatchJob(runId: string, idempotencyKeyHash: string): MatchJob {
+    const run = this.requireRun(runId);
+    this.matcherInput(run);
+    if (run.matchJob) {
+      if (run.matchJob.idempotencyKeyHash === idempotencyKeyHash) return run.matchJob;
+      throw new WorkflowError("match_job_exists", "This reconciliation already has a matcher job.", 409);
+    }
+    if (run.result) throw new WorkflowError("run_already_matched", "Start a new reconciliation to run a new matching job.", 409);
+    const now = new Date().toISOString();
+    run.matchJob = {
+      contractVersion: MATCH_JOB_CONTRACT_VERSION,
+      runId,
+      jobId: `match-job-${randomUUID()}`,
+      idempotencyKeyHash,
+      state: "queued",
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      failureCode: null,
+    };
+    return run.matchJob;
+  }
+
+  beginMatchJob(runId: string, jobId: string): boolean {
+    const job = this.getMatchJob(runId);
+    if (!job || job.jobId !== jobId || job.state !== "queued") return false;
+    if (job.attempts >= 3) {
+      job.state = "failed";
+      job.failureCode = "retry_exhausted";
+      job.updatedAt = new Date().toISOString();
+      return false;
+    }
+    job.state = "running";
+    job.attempts += 1;
+    job.failureCode = null;
+    job.updatedAt = new Date().toISOString();
+    return true;
+  }
+
+  async executeMatchJob(runId: string, jobId: string): Promise<MatcherResult> {
+    const run = this.requireRun(runId);
+    if (!run.matchJob || run.matchJob.jobId !== jobId || run.matchJob.state !== "running") {
+      throw new WorkflowError("match_job_not_running", "Matcher job is not running.", 409);
+    }
+    return this.matcher.match(this.matcherInput(run));
+  }
+
+  completeMatchJob(runId: string, jobId: string, result: MatcherResult): MatchJob {
+    const run = this.requireRun(runId);
+    const job = run.matchJob;
+    if (!job || job.jobId !== jobId || job.state !== "running") {
+      throw new WorkflowError("match_job_not_running", "Matcher job cannot be completed.", 409);
+    }
+    this.applyMatchResult(run, result);
+    job.state = "succeeded";
+    job.failureCode = null;
+    job.updatedAt = new Date().toISOString();
+    return job;
+  }
+
+  failMatchJob(runId: string, jobId: string): MatchJob | null {
+    const job = this.getMatchJob(runId);
+    if (!job || job.jobId !== jobId || job.state !== "running") return null;
+    job.state = "failed";
+    job.failureCode = "matcher_failed";
+    job.updatedAt = new Date().toISOString();
+    return job;
+  }
+
+  retryMatchJob(runId: string, jobId: string): MatchJob {
+    const job = this.getMatchJob(runId);
+    if (!job || job.jobId !== jobId) throw new WorkflowError("match_job_not_found", "Matcher job was not found.", 404);
+    if (job.state !== "failed") throw new WorkflowError("match_job_not_failed", "Only failed matcher jobs can be retried.", 409);
+    if (job.attempts >= 3) throw new WorkflowError("retry_exhausted", "Matcher job retry limit has been reached.", 409);
+    job.state = "queued";
+    job.failureCode = null;
+    job.updatedAt = new Date().toISOString();
+    return job;
+  }
+
+  // A running job cannot survive API process termination. Reclaim only its
+  // metadata; recompute deterministically from immutable uploaded sources.
+  async recoverMatchJobs(): Promise<MatchJob[]> {
+    const queued: MatchJob[] = [];
+    for (const run of this.runs.values()) {
+      const job = run.matchJob;
+      if (!job) continue;
+      if (job.state === "running") {
+        job.state = job.attempts >= 3 ? "failed" : "queued";
+        job.failureCode = job.attempts >= 3 ? "retry_exhausted" : "worker_interrupted";
+        job.updatedAt = new Date().toISOString();
+        await this.persist(run.runId);
+      }
+      if (job.state === "queued") queued.push(job);
+    }
+    return queued;
   }
 
   decide(runId: string, candidateId: string, humanDecision: "same_entity" | "different_entity"): RunSummary {
