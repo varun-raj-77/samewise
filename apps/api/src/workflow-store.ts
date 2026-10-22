@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 
 import {
@@ -53,6 +53,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
+import type { PersistedRunStateEnvelope, RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
   SemanticMapperError,
@@ -103,10 +104,55 @@ interface UndoEntry {
   reviewGroupId: string | null;
 }
 
+interface PersistedDatasetArtifact {
+  profile: DatasetProfile;
+}
+
+interface PersistedRunState {
+  runId: string;
+  stage: RunView["stage"];
+  datasets: Partial<Record<DatasetSide, PersistedDatasetArtifact>>;
+  mappings: ManualMapping[];
+  result?: MatcherResult;
+  decisions: IdentityDecision[];
+  conflicts: FieldConflict[];
+  deferredARowIds: string[];
+  undoStack: UndoEntry[];
+  mappingProposal?: SemanticMappingProposal;
+  survivorshipPolicy?: SurvivorshipPolicy;
+  previewedRuleIds: string[];
+  mergePlanPreviewToken?: string;
+  mergePlanRevision: number;
+  rulesApplied: boolean;
+}
+
 export class WorkflowError extends Error {
   constructor(public readonly code: string, message: string, public readonly statusCode = 400) {
     super(message);
   }
+}
+
+function parsePersistedRunState(value: unknown, expectedRunId: string): PersistedRunState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Persisted run ${expectedRunId} is malformed.`);
+  }
+  const state = value as Partial<PersistedRunState>;
+  if (
+    state.runId !== expectedRunId
+    || typeof state.stage !== "string"
+    || !state.datasets
+    || !Array.isArray(state.mappings)
+    || !Array.isArray(state.decisions)
+    || !Array.isArray(state.conflicts)
+    || !Array.isArray(state.deferredARowIds)
+    || !Array.isArray(state.undoStack)
+    || !Array.isArray(state.previewedRuleIds)
+    || typeof state.mergePlanRevision !== "number"
+    || typeof state.rulesApplied !== "boolean"
+  ) {
+    throw new Error(`Persisted run ${expectedRunId} uses an invalid state shape.`);
+  }
+  return state as PersistedRunState;
 }
 
 function safeOriginalFilename(value: string): string {
@@ -253,12 +299,115 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
 
 export class WorkflowStore {
   private readonly runs = new Map<string, RunState>();
+  private readonly persistedSourceKeys = new Set<string>();
 
   constructor(
     private readonly dataRoot: string,
     private readonly matcher: MatcherRunner,
     private readonly semanticMapper: SemanticMapper,
+    private readonly repository: RunRepository,
   ) {}
+
+  async initialize(): Promise<void> {
+    await this.repository.initialize();
+    const envelopes = await this.repository.loadStates();
+    for (const envelope of envelopes) {
+      await this.restorePersistedRun(envelope);
+    }
+  }
+
+  async closeRepository(): Promise<void> {
+    await this.repository.close();
+  }
+
+  async persist(runId: string): Promise<void> {
+    const run = this.requireRun(runId);
+    for (const side of ["A", "B"] as const) {
+      const dataset = run.datasets[side];
+      if (!dataset) continue;
+      const key = `${runId}:${side}`;
+      if (this.persistedSourceKeys.has(key)) continue;
+      const bytes = await readFile(dataset.path);
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      if (sha256 !== dataset.profile.sha256) {
+        throw new Error(`Immutable source bytes for ${runId} dataset ${side} no longer match their fingerprint.`);
+      }
+      await this.repository.saveSource(runId, side, bytes);
+      this.persistedSourceKeys.add(key);
+    }
+    await this.repository.saveState(runId, this.persistedState(run));
+  }
+
+  private persistedState(run: RunState): PersistedRunState {
+    const datasets: PersistedRunState["datasets"] = {};
+    if (run.datasets.A) datasets.A = { profile: run.datasets.A.profile };
+    if (run.datasets.B) datasets.B = { profile: run.datasets.B.profile };
+    return {
+      runId: run.runId,
+      stage: run.stage,
+      datasets,
+      mappings: run.mappings,
+      result: run.result,
+      decisions: [...run.decisions.values()],
+      conflicts: [...run.conflicts.values()],
+      deferredARowIds: [...run.deferredARowIds],
+      undoStack: run.undoStack,
+      mappingProposal: run.mappingProposal,
+      survivorshipPolicy: run.survivorshipPolicy,
+      previewedRuleIds: [...run.previewedRuleIds],
+      mergePlanPreviewToken: run.mergePlanPreviewToken,
+      mergePlanRevision: run.mergePlanRevision,
+      rulesApplied: run.rulesApplied,
+    };
+  }
+
+  private async restorePersistedRun(envelope: PersistedRunStateEnvelope): Promise<void> {
+    if (this.runs.has(envelope.runId)) {
+      throw new Error(`Duplicate persisted run ${envelope.runId}.`);
+    }
+    const state = parsePersistedRunState(envelope.state, envelope.runId);
+    const datasets: RunState["datasets"] = {};
+    for (const side of ["A", "B"] as const) {
+      const persisted = state.datasets[side];
+      if (!persisted) continue;
+      const bytes = await this.repository.readSource(state.runId, side);
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      if (sha256 !== persisted.profile.sha256) {
+        throw new Error(`Persisted source bytes for ${state.runId} dataset ${side} failed fingerprint validation.`);
+      }
+      const runDirectory = resolve(this.dataRoot, state.runId);
+      await mkdir(runDirectory, { recursive: true });
+      const path = resolve(runDirectory, `${persisted.profile.datasetId}.csv`);
+      try {
+        const current = await readFile(path);
+        if (!current.equals(bytes)) {
+          throw new Error(`Materialized source bytes for ${state.runId} dataset ${side} differ from persisted bytes.`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        await writeFile(path, bytes, { flag: "wx" });
+      }
+      datasets[side] = { profile: persisted.profile, path };
+      this.persistedSourceKeys.add(`${state.runId}:${side}`);
+    }
+    this.runs.set(state.runId, {
+      runId: state.runId,
+      stage: state.stage,
+      datasets,
+      mappings: state.mappings,
+      result: state.result,
+      decisions: new Map(state.decisions.map((decision) => [decision.candidateId, decision])),
+      conflicts: new Map(state.conflicts.map((conflict) => [conflict.conflictId, conflict])),
+      deferredARowIds: new Set(state.deferredARowIds),
+      undoStack: state.undoStack,
+      mappingProposal: state.mappingProposal,
+      survivorshipPolicy: state.survivorshipPolicy,
+      previewedRuleIds: new Set(state.previewedRuleIds),
+      mergePlanPreviewToken: state.mergePlanPreviewToken,
+      mergePlanRevision: state.mergePlanRevision,
+      rulesApplied: state.rulesApplied,
+    });
+  }
 
   createRun(): RunSummary {
     const run: RunState = {
