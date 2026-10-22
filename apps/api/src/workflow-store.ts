@@ -325,6 +325,8 @@ export class WorkflowStore {
     const snapshot = await this.repository.loadState(runId);
     this.runs.delete(runId);
     this.persistedRevisions.delete(runId);
+    this.persistedSourceKeys.delete(`${runId}:A`);
+    this.persistedSourceKeys.delete(`${runId}:B`);
     if (snapshot) await this.restorePersistedRun(snapshot);
   }
 
