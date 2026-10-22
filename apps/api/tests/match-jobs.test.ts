@@ -170,6 +170,28 @@ describe("SW-016 recoverable matcher jobs", () => {
     expect(calls).toBe(1);
     const summary = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
     expect(summary.summary).not.toBeNull();
+    // After success, legitimate downstream identity review must still work.
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`,
+      payload: { decision: "different_entity" },
+    })).statusCode).toBe(200);
+    // But upstream changes must never invalidate the persisted job result.
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/runs/${runId}/mappings?probe=/match-jobs`,
+      payload: { mappings: [{
+        mappingId: "name", label: "Organization name", aColumn: "name",
+        bColumn: "organization", useForMatching: true, includeInMerge: false,
+        normalizer: "text",
+      }] },
+    })).statusCode).toBe(409);
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/datasets/A`,
+      headers: { "content-type": "text/csv", "x-file-name": "replacement.csv" },
+      payload: sourceA,
+    })).statusCode).toBe(409);
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).statusCode).toBe(200);
     expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(409);
     // A query suffix must not unlock a second synchronous matcher execution.
