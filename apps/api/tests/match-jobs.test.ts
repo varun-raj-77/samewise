@@ -160,6 +160,9 @@ describe("SW-016 recoverable matcher jobs", () => {
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).json().jobId).toBe(job.jobId);
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0002" } })).statusCode).toBe(409);
     expect((await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings: [] } })).statusCode).toBe(409);
+    // User-controlled query strings must never bypass the active-job mutation lock.
+    expect((await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings?probe=/match-jobs`, payload: { mappings: [] } })).statusCode).toBe(409);
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match?probe=/match-jobs` })).statusCode).toBe(409);
     await matcherStarted;
     finish(matcherResult());
     const succeeded = await eventually(app, runId, "succeeded");
@@ -169,6 +172,8 @@ describe("SW-016 recoverable matcher jobs", () => {
     expect(summary.summary).not.toBeNull();
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).statusCode).toBe(200);
     expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(409);
+    // A query suffix must not unlock a second synchronous matcher execution.
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match?probe=1` })).statusCode).toBe(409);
   });
 
   it("reclaims a running job from immutable sources after an API restart", async () => {
