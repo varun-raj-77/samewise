@@ -96,6 +96,20 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
     expect(await restarted.readSource(runId, "A")).toEqual(source);
   });
 
+  it("rolls back the revision when an immutable source conflicts", async () => {
+    const repo = connect();
+    await repo.initialize();
+    const runId = `run-${randomUUID()}`;
+    testRunIds.push(runId);
+    const original = Buffer.from("id,name\nA1,Original\n");
+    expect(await repo.saveStateWithSources(runId, { label: "original" }, 0, [{ side: "A", bytes: original }])).toBe(1);
+    await expect(repo.saveStateWithSources(
+      runId, { label: "should-not-commit" }, 1,
+      [{ side: "A", bytes: Buffer.from("id,name\nA1,Different\n") }],
+    )).rejects.toBeInstanceOf(RunRepositoryError);
+    expect(await repo.loadState(runId)).toMatchObject({ revision: 1, state: { label: "original" } });
+    expect(await repo.readSource(runId, "A")).toEqual(original);
+  });
   it("returns 409 on a stale API write, reloads authority, then permits a safe retry", async () => {
     const matcher: MatcherRunner = {
       async profile(input) {
@@ -150,15 +164,21 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
       expect(stale.statusCode).toBe(409);
       expect(stale.json().error.code).toBe("stale_run_revision");
 
+      const persisted = connect();
+      await persisted.initialize();
+      await expect(persisted.readSource(runId, "B")).rejects.toBeInstanceOf(RunRepositoryError);
+
       const refreshed = await apiB.inject({ method: "GET", url: `/api/runs/${runId}` });
       expect(refreshed.statusCode).toBe(200);
       expect(refreshed.json().datasets.A).toBeTruthy();
       expect(refreshed.json().datasets.B).toBeFalsy();
 
-      const retry = await apiB.inject(uploadRequest);
+      const retryRequest = { ...uploadRequest, payload: Buffer.from("id,name\nB2,Fresh Corp\n") };
+      const retry = await apiB.inject(retryRequest);
       expect(retry.statusCode).toBe(201);
       expect(retry.json().datasets.A).toBeTruthy();
       expect(retry.json().datasets.B).toBeTruthy();
+      expect(await persisted.readSource(runId, "B")).toEqual(retryRequest.payload);
     } finally {
       await Promise.all([apiA.close(), apiB.close()]);
     }
