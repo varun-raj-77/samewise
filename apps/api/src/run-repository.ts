@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -5,23 +6,33 @@ export const RUN_STATE_SNAPSHOT_VERSION = "run-state-snapshot-v1";
 
 export type PersistedDatasetSide = "A" | "B";
 
+export interface PendingSourceWrite {
+  side: PersistedDatasetSide;
+  bytes: Buffer;
+}
+
 export interface PersistedRunStateEnvelope {
   snapshotVersion: typeof RUN_STATE_SNAPSHOT_VERSION;
   runId: string;
   savedAt: string;
+  revision: number;
   state: unknown;
 }
 
 export interface RunRepository {
   initialize(): Promise<void>;
   loadStates(): Promise<PersistedRunStateEnvelope[]>;
-  saveState(runId: string, state: unknown): Promise<void>;
+  loadState(runId: string): Promise<PersistedRunStateEnvelope | null>;
+  saveState(runId: string, state: unknown, expectedRevision: number): Promise<number>;
+  // PostgreSQL can commit the revision and its new immutable source bytes atomically.
+  saveStateWithSources?(runId: string, state: unknown, expectedRevision: number, sources: readonly PendingSourceWrite[]): Promise<number>;
   saveSource(runId: string, side: PersistedDatasetSide, bytes: Buffer): Promise<void>;
   readSource(runId: string, side: PersistedDatasetSide): Promise<Buffer>;
   close(): Promise<void>;
 }
 
 export class RunRepositoryError extends Error {}
+export class RunRevisionConflictError extends RunRepositoryError {}
 
 function assertRunId(runId: string): void {
   if (!/^run-[0-9a-f-]+$/i.test(runId)) {
@@ -38,6 +49,7 @@ function assertEnvelope(value: unknown, expectedRunId?: string): PersistedRunSta
     envelope.snapshotVersion !== RUN_STATE_SNAPSHOT_VERSION
     || typeof envelope.runId !== "string"
     || typeof envelope.savedAt !== "string"
+    || (envelope.revision !== undefined && (!Number.isSafeInteger(envelope.revision) || (envelope.revision as number) < 1))
     || !("state" in envelope)
   ) {
     throw new RunRepositoryError("Persisted run state uses an unsupported schema.");
@@ -46,7 +58,7 @@ function assertEnvelope(value: unknown, expectedRunId?: string): PersistedRunSta
   if (expectedRunId && envelope.runId !== expectedRunId) {
     throw new RunRepositoryError("Persisted run state does not match its directory.");
   }
-  return envelope as unknown as PersistedRunStateEnvelope;
+  return { ...(envelope as unknown as PersistedRunStateEnvelope), revision: (envelope.revision as number | undefined) ?? 1 };
 }
 
 export class InMemoryRunRepository implements RunRepository {
@@ -59,14 +71,27 @@ export class InMemoryRunRepository implements RunRepository {
     return [...this.states.values()].map((value) => structuredClone(value));
   }
 
-  async saveState(runId: string, state: unknown): Promise<void> {
+  async loadState(runId: string): Promise<PersistedRunStateEnvelope | null> {
     assertRunId(runId);
+    const value = this.states.get(runId);
+    return value ? structuredClone(value) : null;
+  }
+
+  async saveState(runId: string, state: unknown, expectedRevision: number): Promise<number> {
+    assertRunId(runId);
+    const current = this.states.get(runId);
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || (current?.revision ?? 0) !== expectedRevision) {
+      throw new RunRevisionConflictError("Run state was changed since it was loaded.");
+    }
+    const revision = expectedRevision + 1;
     this.states.set(runId, {
       snapshotVersion: RUN_STATE_SNAPSHOT_VERSION,
       runId,
       savedAt: new Date().toISOString(),
+      revision,
       state: structuredClone(state),
     });
+    return revision;
   }
 
   async saveSource(runId: string, side: PersistedDatasetSide, bytes: Buffer): Promise<void> {
@@ -103,39 +128,51 @@ export class FileRunRepository implements RunRepository {
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.startsWith("run-")) continue;
       assertRunId(entry.name);
-      const statePath = join(this.root, entry.name, "state.json");
-      let text: string;
-      try {
-        text = await readFile(statePath, "utf8");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-        throw error;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        throw new RunRepositoryError(`Persisted state for ${entry.name} is not valid JSON.`);
-      }
-      states.push(assertEnvelope(parsed, entry.name));
+      const state = await this.loadState(entry.name);
+      if (state) states.push(state);
     }
     return states.sort((left, right) => left.runId.localeCompare(right.runId));
   }
 
-  async saveState(runId: string, state: unknown): Promise<void> {
+  async loadState(runId: string): Promise<PersistedRunStateEnvelope | null> {
     assertRunId(runId);
+    let text: string;
+    try {
+      text = await readFile(join(this.root, runId, "state.json"), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new RunRepositoryError(`Persisted state for ${runId} is not valid JSON.`);
+    }
+    return assertEnvelope(parsed, runId);
+  }
+
+  async saveState(runId: string, state: unknown, expectedRevision: number): Promise<number> {
+    assertRunId(runId);
+    const current = await this.loadState(runId);
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || (current?.revision ?? 0) !== expectedRevision) {
+      throw new RunRevisionConflictError("Run state was changed since it was loaded.");
+    }
     const directory = resolve(this.root, runId);
     await mkdir(directory, { recursive: true });
+    const revision = expectedRevision + 1;
     const envelope: PersistedRunStateEnvelope = {
       snapshotVersion: RUN_STATE_SNAPSHOT_VERSION,
       runId,
       savedAt: new Date().toISOString(),
+      revision,
       state,
     };
     const finalPath = join(directory, "state.json");
-    const temporaryPath = join(directory, `state.json.tmp-${process.pid}-${Date.now()}`);
+    const temporaryPath = join(directory, `state.json.tmp-${randomUUID()}`);
     await writeFile(temporaryPath, JSON.stringify(envelope), { encoding: "utf8", flag: "wx" });
     await rename(temporaryPath, finalPath);
+    return revision;
   }
 
   async saveSource(runId: string, side: PersistedDatasetSide, bytes: Buffer): Promise<void> {

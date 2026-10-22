@@ -53,7 +53,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
-import type { PersistedRunStateEnvelope, RunRepository } from "./run-repository.js";
+import { RunRevisionConflictError, type PendingSourceWrite, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
   SemanticMapperError,
@@ -300,6 +300,7 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
 export class WorkflowStore {
   private readonly runs = new Map<string, RunState>();
   private readonly persistedSourceKeys = new Set<string>();
+  private readonly persistedRevisions = new Map<string, number>();
 
   constructor(
     private readonly dataRoot: string,
@@ -320,24 +321,61 @@ export class WorkflowStore {
     await this.repository.close();
   }
 
-  async persist(runId: string): Promise<void> {
-    const run = this.requireRun(runId);
-    for (const side of ["A", "B"] as const) {
-      const dataset = run.datasets[side];
-      if (!dataset) continue;
-      const key = `${runId}:${side}`;
-      if (this.persistedSourceKeys.has(key)) continue;
-      const bytes = await readFile(dataset.path);
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-      if (sha256 !== dataset.profile.sha256) {
-        throw new Error(`Immutable source bytes for ${runId} dataset ${side} no longer match their fingerprint.`);
-      }
-      await this.repository.saveSource(runId, side, bytes);
-      this.persistedSourceKeys.add(key);
-    }
-    await this.repository.saveState(runId, this.persistedState(run));
+  private async reloadPersistedRun(runId: string): Promise<void> {
+    const snapshot = await this.repository.loadState(runId);
+    this.runs.delete(runId);
+    this.persistedRevisions.delete(runId);
+    this.persistedSourceKeys.delete(`${runId}:A`);
+    this.persistedSourceKeys.delete(`${runId}:B`);
+    if (snapshot) await this.restorePersistedRun(snapshot);
   }
 
+  async persist(runId: string): Promise<void> {
+    const run = this.requireRun(runId);
+    try {
+      const pendingSources: PendingSourceWrite[] = [];
+      for (const side of ["A", "B"] as const) {
+        const dataset = run.datasets[side];
+        if (!dataset || this.persistedSourceKeys.has(`${runId}:${side}`)) continue;
+        const bytes = await readFile(dataset.path);
+        const sha256 = createHash("sha256").update(bytes).digest("hex");
+        if (sha256 !== dataset.profile.sha256) {
+          throw new Error(`Immutable source bytes for ${runId} dataset ${side} no longer match their fingerprint.`);
+        }
+        pendingSources.push({ side, bytes });
+      }
+
+      const state = this.persistedState(run);
+      const expectedRevision = this.persistedRevisions.get(runId) ?? 0;
+      let revision: number;
+      if (this.repository.saveStateWithSources) {
+        revision = await this.repository.saveStateWithSources(runId, state, expectedRevision, pendingSources);
+      } else {
+        // File storage remains single-process: no cross-file atomicity is promised.
+        for (const { side, bytes } of pendingSources) {
+          await this.repository.saveSource(runId, side, bytes);
+        }
+        revision = await this.repository.saveState(runId, state, expectedRevision);
+      }
+      this.persistedRevisions.set(runId, revision);
+      for (const { side } of pendingSources) this.persistedSourceKeys.add(`${runId}:${side}`);
+    } catch (error) {
+      if (error instanceof RunRevisionConflictError) {
+        await this.reloadPersistedRun(runId);
+        throw new WorkflowError("stale_run_revision", "This reconciliation changed in another request. Refresh the run before making another decision.", 409);
+      }
+      // A failed durable write must not leave uncommitted state authoritative in this API process.
+      try {
+        await this.reloadPersistedRun(runId);
+      } catch {
+        this.runs.delete(runId);
+        this.persistedRevisions.delete(runId);
+        this.persistedSourceKeys.delete(`${runId}:A`);
+        this.persistedSourceKeys.delete(`${runId}:B`);
+      }
+      throw error;
+    }
+  }
   private persistedState(run: RunState): PersistedRunState {
     const datasets: PersistedRunState["datasets"] = {};
     if (run.datasets.A) datasets.A = { profile: run.datasets.A.profile };
@@ -390,6 +428,7 @@ export class WorkflowStore {
       datasets[side] = { profile: persisted.profile, path };
       this.persistedSourceKeys.add(`${state.runId}:${side}`);
     }
+    this.persistedRevisions.set(state.runId, envelope.revision);
     this.runs.set(state.runId, {
       runId: state.runId,
       stage: state.stage,

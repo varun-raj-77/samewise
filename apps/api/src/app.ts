@@ -29,6 +29,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
 import { FileRunRepository, type RunRepository } from "./run-repository.js";
+import { PostgresRunRepository } from "./postgres-run-repository.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
 import { DEFAULT_PAGE_LIMIT, MAX_CSV_BYTES, MAX_PAGE_LIMIT, WorkflowError, WorkflowStore } from "./workflow-store.js";
@@ -75,7 +76,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     dataRoot,
     options.matcher ?? createMatcherRunner(),
     options.semanticMapper ?? createSemanticMapperFromEnvironment(),
-    options.runRepository ?? new FileRunRepository(resolve(dataRoot, "_run-store")),
+    options.runRepository ?? (process.env.DATABASE_URL
+      ? new PostgresRunRepository(process.env.DATABASE_URL)
+      : new FileRunRepository(resolve(dataRoot, "_run-store"))),
   );
   const evaluations = new EvaluationStore(
     options.evaluationRoot ?? fileURLToPath(new URL("../../../evaluation/reports/sw-009/", import.meta.url)),
@@ -89,12 +92,41 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     await store.closeRepository();
   });
 
+  // Shared run state must not be mutated by two requests before either
+  // mutation is durably committed. Lock the complete handler + persistence.
   const persistedMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-  app.addHook("preSerialization", async (request, reply, payload) => {
-    if (reply.statusCode >= 400 || !persistedMethods.has(request.method)) return payload;
-    const runId = (request.params as { runId?: string } | undefined)?.runId;
-    if (runId) await store.persist(runId);
-    return payload;
+  const runQueueTails = new Map<string, Promise<void>>();
+
+  async function withRunLock<T>(runId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = runQueueTails.get(runId);
+    let release!: () => void;
+    const completion = new Promise<void>((resolve) => { release = resolve; });
+    runQueueTails.set(runId, completion);
+    if (previous) await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (runQueueTails.get(runId) === completion) runQueueTails.delete(runId);
+    }
+  }
+
+  // Read requests are serialized too, preventing an uncommitted mutation
+  // from appearing in a result before the corresponding write succeeds.
+  app.addHook("onRoute", (routeOptions) => {
+    if (!routeOptions.url.includes(":runId")) return;
+    const originalHandler = routeOptions.handler;
+    routeOptions.handler = async function (request, reply) {
+      const runId = (request.params as { runId?: string } | undefined)?.runId;
+      if (!runId) return originalHandler.call(this, request, reply);
+      return withRunLock(runId, async () => {
+        const response = await originalHandler.call(this, request, reply);
+        if (persistedMethods.has(request.method) && reply.statusCode < 400) {
+          await store.persist(runId);
+        }
+        return response;
+      });
+    };
   });
 
   app.addContentTypeParser(
