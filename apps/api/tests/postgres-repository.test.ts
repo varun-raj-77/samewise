@@ -183,4 +183,78 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
       await Promise.all([apiA.close(), apiB.close()]);
     }
   });
+
+  it("serializes concurrent uploads within one API instance and commits each accepted mutation", async () => {
+    let notifyAStarted!: () => void;
+    let releaseProfiles!: () => void;
+    const aStarted = new Promise<void>((resolve) => { notifyAStarted = resolve; });
+    const profileGate = new Promise<void>((resolve) => { releaseProfiles = resolve; });
+    const matcher: MatcherRunner = {
+      async profile(input) {
+        if (input.side === "A") notifyAStarted();
+        await profileGate;
+        return {
+          contractVersion: "1.0.0",
+          datasetId: input.datasetId,
+          side: input.side,
+          originalFilename: input.originalFilename,
+          sha256: input.sha256,
+          rowCount: 1,
+          columns: ["id", "name"].map((name) => ({
+            name, inferredType: "string" as const, nullCount: 0, nullRate: 0,
+            distinctCount: 1, distinctRate: 1, samples: [name],
+          })),
+        };
+      },
+      async match() { throw new Error("Not needed for concurrent upload test."); },
+    };
+    const api = buildApp({
+      dataRoot: await mkdtemp(join(tmpdir(), "samewise-pg-concurrent-")),
+      matcher,
+      runRepository: new PostgresRunRepository(databaseUrl!),
+    });
+    const bytesA = Buffer.from("id,name\\nA1,Acme\\n");
+    const bytesB = Buffer.from("id,name\\nB1,Acme Corp\\n");
+    try {
+      await api.ready();
+      const created = await api.inject({ method: "POST", url: "/api/runs" });
+      expect(created.statusCode).toBe(201);
+      const runId = created.json().runId as string;
+      testRunIds.push(runId);
+      const uploadA = api.inject({
+        method: "POST",
+        url: `/api/runs/${runId}/datasets/A`,
+        headers: { "content-type": "text/csv", "x-file-name": "a.csv" },
+        payload: bytesA,
+      });
+      await aStarted;
+      const uploadB = api.inject({
+        method: "POST",
+        url: `/api/runs/${runId}/datasets/B`,
+        headers: { "content-type": "text/csv", "x-file-name": "b.csv" },
+        payload: bytesB,
+      });
+      // Give the second request a chance to overlap the first's unfinished
+      // profile; the run gate must still commit them one at a time.
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+      releaseProfiles();
+      const [a, b] = await Promise.all([uploadA, uploadB]);
+      expect(a.statusCode).toBe(201);
+      expect(b.statusCode).toBe(201);
+      const persisted = connect();
+      await persisted.initialize();
+      const snapshot = await persisted.loadState(runId);
+      expect(snapshot?.revision).toBe(3); // creation plus two accepted uploads
+      expect(await persisted.readSource(runId, "A")).toEqual(bytesA);
+      expect(await persisted.readSource(runId, "B")).toEqual(bytesB);
+      const view = await api.inject({ method: "GET", url: `/api/runs/${runId}` });
+      expect(view.statusCode).toBe(200);
+      expect(view.json().datasets.A).toBeTruthy();
+      expect(view.json().datasets.B).toBeTruthy();
+    } finally {
+      releaseProfiles();
+      await api.close();
+    }
+  });
+
 });
