@@ -6,6 +6,11 @@ export const RUN_STATE_SNAPSHOT_VERSION = "run-state-snapshot-v1";
 
 export type PersistedDatasetSide = "A" | "B";
 
+export interface PendingSourceWrite {
+  side: PersistedDatasetSide;
+  bytes: Buffer;
+}
+
 export interface PersistedRunStateEnvelope {
   snapshotVersion: typeof RUN_STATE_SNAPSHOT_VERSION;
   runId: string;
@@ -19,6 +24,8 @@ export interface RunRepository {
   loadStates(): Promise<PersistedRunStateEnvelope[]>;
   loadState(runId: string): Promise<PersistedRunStateEnvelope | null>;
   saveState(runId: string, state: unknown, expectedRevision: number): Promise<number>;
+  // PostgreSQL can commit the revision and its new immutable source bytes atomically.
+  saveStateWithSources?(runId: string, state: unknown, expectedRevision: number, sources: readonly PendingSourceWrite[]): Promise<number>;
   saveSource(runId: string, side: PersistedDatasetSide, bytes: Buffer): Promise<void>;
   readSource(runId: string, side: PersistedDatasetSide): Promise<Buffer>;
   close(): Promise<void>;
