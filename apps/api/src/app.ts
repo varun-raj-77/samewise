@@ -101,6 +101,21 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Shared run state must not be mutated by two requests before either
   // mutation is durably committed. Lock the complete handler + persistence.
   const persistedMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  // An async match result remains tied to frozen sources and mappings even
+  // after completion. Only downstream review/resolution mutations may proceed.
+  const downstreamReviewRoutes = new Set([
+    "/api/runs/:runId/review-groups/:groupId/decisions",
+    "/api/runs/:runId/candidates/:candidateId/decisions",
+    "/api/runs/:runId/review-items/:aRowId",
+    "/api/runs/:runId/review-undo",
+    "/api/runs/:runId/conflicts/:conflictId/resolutions",
+    "/api/runs/:runId/conflicts/:conflictId/resolution",
+    "/api/runs/:runId/survivorship-policy",
+    "/api/runs/:runId/survivorship-preview",
+    "/api/runs/:runId/survivorship-apply",
+    "/api/runs/:runId/merge-plan-preview",
+    "/api/runs/:runId/merge-plan-apply",
+  ]);
   const runQueueTails = new Map<string, Promise<void>>();
 
   async function withRunLock<T>(runId: string, operation: () => Promise<T>): Promise<T> {
@@ -125,7 +140,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     // Route definitions are trusted; the incoming URL contains attacker-controlled
     // query parameters and must never control the matcher-job mutation guard.
     const isMatchJobRoute = routeOptions.url.includes("/match-jobs");
-    const isSynchronousMatchRoute = routeOptions.url === "/api/runs/:runId/match";
+    const isDownstreamReviewRoute = downstreamReviewRoutes.has(routeOptions.url);
     routeOptions.handler = async function (request, reply) {
       const runId = (request.params as { runId?: string } | undefined)?.runId;
       if (!runId) return originalHandler.call(this, request, reply);
@@ -134,7 +149,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           const job = store.getMatchJob(runId);
           // Freeze inputs across failed retries, and never let legacy /match
           // overwrite the result associated with an already-created job.
-          if (job && (job.state !== "succeeded" || isSynchronousMatchRoute)) {
+          if (job && (job.state !== "succeeded" || !isDownstreamReviewRoute)) {
             throw new WorkflowError("match_job_locked", "This reconciliation has a matcher job. Complete or retry it before making other changes.", 409);
           }
         }
