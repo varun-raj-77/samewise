@@ -126,8 +126,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const runId = (request.params as { runId?: string } | undefined)?.runId;
       if (!runId) return originalHandler.call(this, request, reply);
       return withRunLock(runId, async () => {
-        if (persistedMethods.has(request.method) && !request.url.includes("/match-jobs") && store.activeMatchJob(runId)) {
-          throw new WorkflowError("match_job_in_progress", "Wait for the current matcher job before changing this reconciliation.", 409);
+        if (persistedMethods.has(request.method) && !request.url.includes("/match-jobs")) {
+          const job = store.getMatchJob(runId);
+          // Freeze inputs across failed retries, and never let legacy /match
+          // overwrite the result associated with an already-created job.
+          if (job && (job.state !== "succeeded" || request.url.endsWith("/match"))) {
+            throw new WorkflowError("match_job_locked", "This reconciliation has a matcher job. Complete or retry it before making other changes.", 409);
+          }
         }
         const response = await originalHandler.call(this, request, reply);
         if (persistedMethods.has(request.method) && reply.statusCode < 400) {
