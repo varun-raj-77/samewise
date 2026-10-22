@@ -752,6 +752,17 @@ export class WorkflowStore {
     if (!run.matchJob || run.matchJob.jobId !== jobId || run.matchJob.state !== "running") {
       throw new WorkflowError("match_job_not_running", "Matcher job is not running.", 409);
     }
+    // Working CSVs are disposable. Rebuild them from the immutable repository
+    // before every attempt, and reject any corrupted repository source.
+    for (const side of ["A", "B"] as const) {
+      const artifact = run.datasets[side];
+      if (!artifact) throw new WorkflowError("run_not_ready", "Both datasets are required.");
+      const bytes = await this.repository.readSource(runId, side);
+      if (createHash("sha256").update(bytes).digest("hex") !== artifact.profile.sha256) {
+        throw new Error("Persisted source fingerprint mismatch during matcher retry.");
+      }
+      await writeFile(artifact.path, bytes);
+    }
     return this.matcher.match(this.matcherInput(run));
   }
 
