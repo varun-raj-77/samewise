@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import postgres from "postgres";
 
 import { buildApp } from "../src/app.js";
 import type { MatcherRunner } from "../src/matcher-process.js";
@@ -14,6 +15,7 @@ const databaseUrl = process.env.SAMEWISE_TEST_DATABASE_URL;
 
 describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
   const repositories: PostgresRunRepository[] = [];
+  const testRunIds: string[] = [];
 
   function connect(): PostgresRunRepository {
     const repo = new PostgresRunRepository(databaseUrl!);
@@ -23,6 +25,19 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
 
   afterEach(async () => {
     await Promise.all(repositories.splice(0).map((repo) => repo.close()));
+    if (!testRunIds.length) return;
+
+    // Repository-level tests intentionally persist arbitrary JSON. Remove only
+    // their rows before an API instance hydrates full workflow states.
+    const sql = postgres(databaseUrl!, { max: 1 });
+    try {
+      for (const runId of testRunIds.splice(0)) {
+        await sql`DELETE FROM samewise_run_snapshots WHERE run_id = ${runId}`;
+        await sql`DELETE FROM samewise_source_blobs WHERE run_id = ${runId}`;
+      }
+    } finally {
+      await sql.end();
+    }
   });
 
   it("persists immutable sources, restores snapshots, and rejects stale writers across connections", async () => {
@@ -30,6 +45,7 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
     const staleWriter = connect();
     await Promise.all([writer.initialize(), staleWriter.initialize()]);
     const runId = `run-${randomUUID()}`;
+    testRunIds.push(runId);
     const sourceA = Buffer.from("id,name\nA1,Acme\n");
     const sourceB = Buffer.from("id,name\nB1,Acme Corp\n");
     await writer.saveSource(runId, "A", sourceA);
@@ -66,6 +82,7 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
     const repo = connect();
     await repo.initialize();
     const runId = `run-${randomUUID()}`;
+    testRunIds.push(runId);
     const source = Buffer.from("record,name\n1,Orchard Signal\n");
     await repo.saveSource(runId, "A", source);
     await repo.saveState(runId, { marker: "persisted", decisions: ["same_entity"] }, 0);
@@ -106,6 +123,7 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
     const created = await apiA.inject({ method: "POST", url: "/api/runs" });
     expect(created.statusCode).toBe(201);
     const runId = created.json().runId as string;
+    testRunIds.push(runId);
 
     const apiB = buildApp({
       dataRoot: await mkdtemp(join(tmpdir(), "samewise-pg-api-b-")),
