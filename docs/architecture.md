@@ -1,6 +1,6 @@
 # Architecture
 
-Samewise is a browser workflow over a process-local Fastify API and a short-lived Python matcher subprocess. The boundaries are deliberate: source bytes stay immutable, row matching remains deterministic and independently evaluable, and optional AI is limited to schema interpretation. [ADR 0012](decisions/0012-dataset-adaptive-semantic-evidence-and-review-groups.md) describes the current semantic and review-group design.
+Samewise is a browser workflow over a Fastify API, a durable run-repository boundary, and a short-lived Python matcher subprocess. The boundaries are deliberate: source bytes stay immutable, row matching remains deterministic and independently evaluable, and optional AI is limited to schema interpretation. [ADR 0012](decisions/0012-dataset-adaptive-semantic-evidence-and-review-groups.md) describes the semantic and review-group design; [ADR 0013](decisions/0013-durable-run-repository-boundary.md) describes restart recovery and the persistence boundary.
 
 ```mermaid
 flowchart TB
@@ -27,7 +27,7 @@ flowchart TB
 ## Components and contracts
 
 - **`apps/web`** presents Upload, Match setup, Review matches, Merge values, and Export. It consumes validated compact summaries and paged projections. It fetches complete candidate evidence on selection and keeps only a bounded detail cache.
-- **`apps/api`** owns run state, immutable upload handling, mapping validation, review decisions, merge policies, readiness, and deterministic export generation. It retains the complete matcher result authoritatively in memory. List pages have a 50-item default and 100-item server maximum.
+- **`apps/api`** owns run state, immutable upload handling, mapping validation, review decisions, merge policies, readiness, deterministic export generation, and restart hydration. The live process retains the complete matcher result in memory, while successful run mutations are snapshotted through a `RunRepository`; the default SW-015A adapter stores versioned state plus immutable source copies under `.samewise-data/_run-store/`. List pages have a 50-item default and 100-item server maximum.
 - **`services/matcher`** profiles CSVs, builds evidence plans and indexed candidate routes, computes versioned field evidence and bands, and contains evaluation tooling. It is invoked by Node through validated JSON on stdin/stdout; there is no Python HTTP server.
 - **`packages/contracts`** holds the canonical JSON Schemas and Zod validation; Python has corresponding Pydantic models and shared compatibility tests. The internal workflow schema path is pre-release, not a public compatibility promise.
 - **`fixtures` and `evaluation`** separate visible synthetic CSV inputs from hidden canonical truth, corruption provenance, and reports. Truth is loaded by evaluation after the matcher runs, never by product matching.
@@ -36,7 +36,7 @@ Current product constants live in `packages/contracts/src/workflow.ts`: `confirm
 
 ## Run lifecycle
 
-1. **Upload and profile.** Fastify writes each CSV once under a server-generated name in the ignored `.samewise-data/<run-id>/` directory, records a SHA-256 fingerprint, and invokes Python profiling. The source bytes are never rewritten by later actions.
+1. **Upload and profile.** Fastify writes each CSV under a server-generated working name in the ignored `.samewise-data/<run-id>/` directory, records a SHA-256 fingerprint, and invokes Python profiling. After a successful mutation, the repository stores an immutable source copy before state that references it. Working matcher files can later be rematerialized from repository-owned bytes and must pass the original SHA-256 fingerprint.
 2. **Confirm mappings.** A person connects A/B columns and independently sets `useForMatching` and `includeInMerge`. Optional OpenAI suggestions use column name, inferred type, null rate, and distinct rate only. The API validates structured output and referenced columns; the proposal has no authority until confirmed. Provider failure leaves manual setup available.
 3. **Plan evidence and candidates.** The matcher uses confirmed semantic families: persistent identifiers, source-local identifiers, entity names, contact people, contact channels, addresses, geography, categorical/numeric/date/free text, and unknown. Explicit unknown fields stay conservative. Persistent IDs and domains use exact normalized comparison; source-local IDs are excluded from cross-source identity routes by default. The bounded evidence plan retains comparator and candidate configuration. Independent inverted-index routes union candidate pairs; oversized buckets are suppressed as whole units with provenance.
 4. **Score and abstain.** Candidate pairs receive field-level normalized values, features, evidence classes, configured weights, positive and contradiction contributions, and deterministic explanation codes. Missing values do not shrink the denominator. Contradictions, narrow margins, alternatives, and collisions can prevent an automatic link. Scores are evidence, not calibrated probabilities. Matching never reads AI confidence, hidden fixture truth, or merge policy.
