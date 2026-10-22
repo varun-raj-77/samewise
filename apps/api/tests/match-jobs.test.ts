@@ -162,6 +162,7 @@ describe("SW-016 recoverable matcher jobs", () => {
     const summary = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
     expect(summary.summary).not.toBeNull();
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(409);
   });
 
   it("reclaims a running job from immutable sources after an API restart", async () => {
@@ -204,6 +205,12 @@ describe("SW-016 recoverable matcher jobs", () => {
       expect(failed.attempts).toBe(attempt);
       expect(failed.failureCode).toBe("matcher_failed");
       expect(JSON.stringify(failed)).not.toContain("private source content");
+      expect((await app.inject({
+        method: "POST",
+        url: `/api/runs/${runId}/match-jobs`,
+        headers: { "idempotency-key": "failure-test-0001" },
+      })).statusCode).toBe(200);
+      expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/match` })).statusCode).toBe(409);
       const retry = await app.inject({ method: "POST", url: `/api/runs/${runId}/match-jobs/${jobId}/retry` });
       expect(retry.statusCode).toBe(attempt === 3 ? 409 : 202);
     }
