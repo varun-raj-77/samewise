@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { buildApp } from "../src/app.js";
+import type { MatcherRunner } from "../src/matcher-process.js";
 import { PostgresRunRepository } from "../src/postgres-run-repository.js";
 import { RunRevisionConflictError, RunRepositoryError } from "../src/run-repository.js";
 
@@ -72,5 +77,72 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
     const state = await restarted.loadState(runId);
     expect(state).toMatchObject({ revision: 1, state: { marker: "persisted", decisions: ["same_entity"] } });
     expect(await restarted.readSource(runId, "A")).toEqual(source);
+  });
+
+  it("returns 409 on a stale API write, reloads authority, then permits a safe retry", async () => {
+    const matcher: MatcherRunner = {
+      async profile(input) {
+        return {
+          contractVersion: "1.0.0",
+          datasetId: input.datasetId,
+          side: input.side,
+          originalFilename: input.originalFilename,
+          sha256: input.sha256,
+          rowCount: 1,
+          columns: ["id", "name"].map((name) => ({
+            name, inferredType: "string" as const, nullCount: 0, nullRate: 0,
+            distinctCount: 1, distinctRate: 1, samples: [name],
+          })),
+        };
+      },
+      async match() { throw new Error("Not needed for storage test."); },
+    };
+
+    const apiA = buildApp({
+      dataRoot: await mkdtemp(join(tmpdir(), "samewise-pg-api-a-")),
+      matcher,
+      runRepository: new PostgresRunRepository(databaseUrl!),
+    });
+    const created = await apiA.inject({ method: "POST", url: "/api/runs" });
+    expect(created.statusCode).toBe(201);
+    const runId = created.json().runId as string;
+
+    const apiB = buildApp({
+      dataRoot: await mkdtemp(join(tmpdir(), "samewise-pg-api-b-")),
+      matcher,
+      runRepository: new PostgresRunRepository(databaseUrl!),
+    });
+    try {
+      await apiB.ready();
+      const uploadA = await apiA.inject({
+        method: "POST",
+        url: `/api/runs/${runId}/datasets/A`,
+        headers: { "content-type": "text/csv", "x-file-name": "a.csv" },
+        payload: Buffer.from("id,name\\nA1,Acme\\n"),
+      });
+      expect(uploadA.statusCode).toBe(201);
+
+      const uploadRequest = {
+        method: "POST" as const,
+        url: `/api/runs/${runId}/datasets/B`,
+        headers: { "content-type": "text/csv", "x-file-name": "b.csv" },
+        payload: Buffer.from("id,name\\nB1,Acme Corp\\n"),
+      };
+      const stale = await apiB.inject(uploadRequest);
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json().error.code).toBe("stale_run_revision");
+
+      const refreshed = await apiB.inject({ method: "GET", url: `/api/runs/${runId}` });
+      expect(refreshed.statusCode).toBe(200);
+      expect(refreshed.json().datasets.A).toBeTruthy();
+      expect(refreshed.json().datasets.B).toBeFalsy();
+
+      const retry = await apiB.inject(uploadRequest);
+      expect(retry.statusCode).toBe(201);
+      expect(retry.json().datasets.A).toBeTruthy();
+      expect(retry.json().datasets.B).toBeTruthy();
+    } finally {
+      await Promise.all([apiA.close(), apiB.close()]);
+    }
   });
 });
