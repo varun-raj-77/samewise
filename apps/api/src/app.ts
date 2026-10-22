@@ -28,6 +28,7 @@ import {
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
+import { FileRunRepository, type RunRepository } from "./run-repository.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
 import { DEFAULT_PAGE_LIMIT, MAX_CSV_BYTES, MAX_PAGE_LIMIT, WorkflowError, WorkflowStore } from "./workflow-store.js";
@@ -38,6 +39,7 @@ interface BuildAppOptions {
   matcher?: MatcherRunner;
   semanticMapper?: SemanticMapper;
   evaluationRoot?: string;
+  runRepository?: RunRepository;
 }
 
 function objectBody(value: unknown): Record<string, unknown> {
@@ -68,14 +70,32 @@ function pageQuery(value: unknown): { offset: number; limit: number } {
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: MAX_CSV_BYTES });
+  const dataRoot = options.dataRoot ?? resolve(process.cwd(), ".samewise-data");
   const store = new WorkflowStore(
-    options.dataRoot ?? resolve(process.cwd(), ".samewise-data"),
+    dataRoot,
     options.matcher ?? createMatcherRunner(),
     options.semanticMapper ?? createSemanticMapperFromEnvironment(),
+    options.runRepository ?? new FileRunRepository(resolve(dataRoot, "_run-store")),
   );
   const evaluations = new EvaluationStore(
     options.evaluationRoot ?? fileURLToPath(new URL("../../../evaluation/reports/sw-009/", import.meta.url)),
   );
+
+  app.addHook("onReady", async () => {
+    await store.initialize();
+  });
+
+  app.addHook("onClose", async () => {
+    await store.closeRepository();
+  });
+
+  const persistedMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  app.addHook("preSerialization", async (request, reply, payload) => {
+    if (reply.statusCode >= 400 || !persistedMethods.has(request.method)) return payload;
+    const runId = (request.params as { runId?: string } | undefined)?.runId;
+    if (runId) await store.persist(runId);
+    return payload;
+  });
 
   app.addContentTypeParser(
     ["text/csv", "application/csv", "application/vnd.ms-excel"],
@@ -114,6 +134,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.post("/api/runs", async (_request, reply) => {
     const view = RunSummarySchema.parse(store.createRun());
+    await store.persist(view.runId);
     app.log.info({ runId: view.runId, stage: view.stage }, "run created");
     reply.code(201);
     return view;
