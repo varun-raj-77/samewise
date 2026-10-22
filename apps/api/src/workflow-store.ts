@@ -53,7 +53,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
-import type { PersistedRunStateEnvelope, RunRepository } from "./run-repository.js";
+import { RunRevisionConflictError, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
   SemanticMapperError,
@@ -300,6 +300,7 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
 export class WorkflowStore {
   private readonly runs = new Map<string, RunState>();
   private readonly persistedSourceKeys = new Set<string>();
+  private readonly persistedRevisions = new Map<string, number>();
 
   constructor(
     private readonly dataRoot: string,
@@ -320,6 +321,13 @@ export class WorkflowStore {
     await this.repository.close();
   }
 
+  private async reloadPersistedRun(runId: string): Promise<void> {
+    const snapshot = await this.repository.loadState(runId);
+    this.runs.delete(runId);
+    this.persistedRevisions.delete(runId);
+    if (snapshot) await this.restorePersistedRun(snapshot);
+  }
+
   async persist(runId: string): Promise<void> {
     const run = this.requireRun(runId);
     for (const side of ["A", "B"] as const) {
@@ -335,7 +343,23 @@ export class WorkflowStore {
       await this.repository.saveSource(runId, side, bytes);
       this.persistedSourceKeys.add(key);
     }
-    await this.repository.saveState(runId, this.persistedState(run));
+    try {
+      const revision = await this.repository.saveState(runId, this.persistedState(run), this.persistedRevisions.get(runId) ?? 0);
+      this.persistedRevisions.set(runId, revision);
+    } catch (error) {
+      if (error instanceof RunRevisionConflictError) {
+        await this.reloadPersistedRun(runId);
+        throw new WorkflowError("stale_run_revision", "This reconciliation changed in another request. Refresh the run before making another decision.", 409);
+      }
+      // A failed durable write must not leave uncommitted state authoritative in this API process.
+      try {
+        await this.reloadPersistedRun(runId);
+      } catch {
+        this.runs.delete(runId);
+        this.persistedRevisions.delete(runId);
+      }
+      throw error;
+    }
   }
 
   private persistedState(run: RunState): PersistedRunState {
@@ -390,6 +414,7 @@ export class WorkflowStore {
       datasets[side] = { profile: persisted.profile, path };
       this.persistedSourceKeys.add(`${state.runId}:${side}`);
     }
+    this.persistedRevisions.set(state.runId, envelope.revision);
     this.runs.set(state.runId, {
       runId: state.runId,
       stage: state.stage,
