@@ -140,10 +140,15 @@ describe("SW-016 recoverable matcher jobs", () => {
 
   it("persists queued/running/succeeded states and deduplicates idempotent requests", async () => {
     let finish!: (result: MatcherResult) => void;
+    let signalStarted!: () => void;
+    const matcherStarted = new Promise<void>((resolve) => { signalStarted = resolve; });
     let calls = 0;
     const { app } = await makeApp(async () => {
       calls += 1;
-      return new Promise<MatcherResult>((resolve) => { finish = resolve; });
+      return new Promise<MatcherResult>((resolve) => {
+        finish = resolve;
+        signalStarted();
+      });
     });
     const runId = await setup(app);
     const url = `/api/runs/${runId}/match-jobs`;
@@ -155,6 +160,7 @@ describe("SW-016 recoverable matcher jobs", () => {
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0001" } })).json().jobId).toBe(job.jobId);
     expect((await app.inject({ method: "POST", url, headers: { "idempotency-key": "reconciliation-0002" } })).statusCode).toBe(409);
     expect((await app.inject({ method: "PUT", url: `/api/runs/${runId}/mappings`, payload: { mappings: [] } })).statusCode).toBe(409);
+    await matcherStarted;
     finish(matcherResult());
     const succeeded = await eventually(app, runId, "succeeded");
     expect(succeeded.attempts).toBe(1);
@@ -167,7 +173,12 @@ describe("SW-016 recoverable matcher jobs", () => {
 
   it("reclaims a running job from immutable sources after an API restart", async () => {
     let finishFirst!: (result: MatcherResult) => void;
-    const { app: first, root } = await makeApp(async () => new Promise<MatcherResult>((resolve) => { finishFirst = resolve; }));
+    let signalStarted!: () => void;
+    const matcherStarted = new Promise<void>((resolve) => { signalStarted = resolve; });
+    const { app: first, root } = await makeApp(async () => new Promise<MatcherResult>((resolve) => {
+      finishFirst = resolve;
+      signalStarted();
+    }));
     const runId = await setup(first);
     const submitted = await first.inject({
       method: "POST", url: `/api/runs/${runId}/match-jobs`,
@@ -175,6 +186,7 @@ describe("SW-016 recoverable matcher jobs", () => {
     });
     expect(submitted.statusCode).toBe(202);
     const initial = await eventually(first, runId, "running");
+    await matcherStarted;
     await first.close();
     apps.splice(apps.indexOf(first), 1);
     finishFirst(matcherResult());
