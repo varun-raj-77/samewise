@@ -381,7 +381,7 @@ export class WorkflowStore {
       try {
         const current = await readFile(path);
         if (!current.equals(bytes)) {
-          throw new Error(`Materialized source bytes for ${state.runId} dataset ${side} differ from persisted bytes.`);
+          await writeFile(path, bytes);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
