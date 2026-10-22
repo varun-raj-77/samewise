@@ -118,7 +118,7 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
         method: "POST",
         url: `/api/runs/${runId}/datasets/A`,
         headers: { "content-type": "text/csv", "x-file-name": "a.csv" },
-        payload: Buffer.from("id,name\\nA1,Acme\\n"),
+        payload: Buffer.from("id,name\nA1,Acme\n"),
       });
       expect(uploadA.statusCode).toBe(201);
 
@@ -126,7 +126,7 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
         method: "POST" as const,
         url: `/api/runs/${runId}/datasets/B`,
         headers: { "content-type": "text/csv", "x-file-name": "b.csv" },
-        payload: Buffer.from("id,name\\nB1,Acme Corp\\n"),
+        payload: Buffer.from("id,name\nB1,Acme Corp\n"),
       };
       const stale = await apiB.inject(uploadRequest);
       expect(stale.statusCode).toBe(409);
