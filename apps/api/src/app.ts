@@ -29,6 +29,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
 import { FileRunRepository, type RunRepository } from "./run-repository.js";
+import { PostgresRunRepository } from "./postgres-run-repository.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
 import { createSemanticMapperFromEnvironment, type SemanticMapper } from "./semantic-mapper.js";
 import { DEFAULT_PAGE_LIMIT, MAX_CSV_BYTES, MAX_PAGE_LIMIT, WorkflowError, WorkflowStore } from "./workflow-store.js";
@@ -75,7 +76,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     dataRoot,
     options.matcher ?? createMatcherRunner(),
     options.semanticMapper ?? createSemanticMapperFromEnvironment(),
-    options.runRepository ?? new FileRunRepository(resolve(dataRoot, "_run-store")),
+    options.runRepository ?? (process.env.DATABASE_URL
+      ? new PostgresRunRepository(process.env.DATABASE_URL)
+      : new FileRunRepository(resolve(dataRoot, "_run-store"))),
   );
   const evaluations = new EvaluationStore(
     options.evaluationRoot ?? fileURLToPath(new URL("../../../evaluation/reports/sw-009/", import.meta.url)),
