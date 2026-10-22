@@ -165,16 +165,32 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // A bounded in-process worker with durable checkpoints. No external queue is
   // installed; after a process restart queued/interrupted jobs are reclaimed.
   const scheduledMatchRuns = new Set<string>();
+  const startCheckpointRetries = new Map<string, number>();
+  const MAX_START_CHECKPOINT_RETRIES = 2;
 
   function scheduleMatchJob(runId: string): void {
     if (closing || scheduledMatchRuns.has(runId)) return;
     scheduledMatchRuns.add(runId);
     setImmediate(() => {
-      void processMatchJob(runId).finally(() => scheduledMatchRuns.delete(runId));
+      void processMatchJob(runId)
+        .then((retryStartCheckpoint) => {
+          if (!retryStartCheckpoint || closing) {
+            startCheckpointRetries.delete(runId);
+            return;
+          }
+          const retries = startCheckpointRetries.get(runId) ?? 0;
+          if (retries >= MAX_START_CHECKPOINT_RETRIES) return;
+          startCheckpointRetries.set(runId, retries + 1);
+          // Back off transient storage errors; do not spin against a failing
+          // repository or claim that this is a distributed worker lease.
+          const timer = setTimeout(() => scheduleMatchJob(runId), 100 * 2 ** retries);
+          timer.unref();
+        })
+        .finally(() => scheduledMatchRuns.delete(runId));
     });
   }
 
-  async function processMatchJob(runId: string): Promise<void> {
+  async function processMatchJob(runId: string): Promise<boolean> {
     let jobId: string | null = null;
     try {
       jobId = await withRunLock(runId, async () => {
@@ -184,9 +200,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         await store.persist(runId);
         return started ? queued.jobId : null;
       });
-      if (!jobId || closing) return;
+      if (!jobId || closing) return false;
       const result = await store.executeMatchJob(runId, jobId);
-      if (closing) return;
+      if (closing) return false;
       await withRunLock(runId, async () => {
         store.completeMatchJob(runId, jobId!, result);
         await store.persist(runId);
@@ -204,7 +220,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           app.log.error({ runId, jobId }, "matcher job failure state could not be persisted");
         }
       }
+      // A failed queued -> running checkpoint is rolled back to queued by
+      // WorkflowStore.persist(). Retry it a bounded number of times in-process.
+      if (!jobId && !closing) {
+        try {
+          return store.getMatchJob(runId)?.state === "queued";
+        } catch {
+          return false;
+        }
+      }
     }
+    return false;
   }
 
   app.addContentTypeParser(

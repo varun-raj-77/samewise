@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { MatcherRunner } from "../src/matcher-process.js";
+import { InMemoryRunRepository } from "../src/run-repository.js";
 
 const sourceA = Buffer.from("id,name,status\nA1,Acme Corp,active\n");
 const sourceB = Buffer.from("id,organization,status\nB1,Acme Corporation,inactive\n");
@@ -83,6 +84,34 @@ function runner(match: MatcherRunner["match"]): MatcherRunner {
   };
 }
 
+// Deliberately fails only the selected run-state transitions. Never modify
+// authoritative source bytes in the repository under normal operation.
+class FaultInjectingRunRepository extends InMemoryRunRepository {
+  failNextState: string | null = null;
+  alwaysFailState: string | null = null;
+  corruptNextSourceRead = false;
+  runningSaveAttempts = 0;
+
+  override async saveState(runId: string, state: unknown, expectedRevision: number): Promise<number> {
+    const jobState = (state as { matchJob?: { state?: string } })?.matchJob?.state;
+    if (jobState === "running") this.runningSaveAttempts += 1;
+    if (jobState && (this.alwaysFailState === jobState || this.failNextState === jobState)) {
+      this.failNextState = null;
+      throw new Error("injected private repository failure");
+    }
+    return super.saveState(runId, state, expectedRevision);
+  }
+
+  override async readSource(runId: string, side: "A" | "B"): Promise<Buffer> {
+    const bytes = await super.readSource(runId, side);
+    if (this.corruptNextSourceRead) {
+      this.corruptNextSourceRead = false;
+      return Buffer.from("tampered persisted source bytes");
+    }
+    return bytes;
+  }
+}
+
 async function setup(app: ReturnType<typeof buildApp>): Promise<string> {
   const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
   for (const [side, bytes] of [["A", sourceA], ["B", sourceB]] as const) {
@@ -125,10 +154,10 @@ describe("SW-016 recoverable matcher jobs", () => {
   const apps: ReturnType<typeof buildApp>[] = [];
   const roots: string[] = [];
 
-  async function makeApp(match: MatcherRunner["match"], dataRoot?: string) {
+  async function makeApp(match: MatcherRunner["match"], dataRoot?: string, runRepository?: FaultInjectingRunRepository) {
     const root = dataRoot ?? await mkdtemp(join(tmpdir(), "samewise-match-jobs-"));
     if (!roots.includes(root)) roots.push(root);
-    const app = buildApp({ dataRoot: root, matcher: runner(match) });
+    const app = buildApp({ dataRoot: root, matcher: runner(match), ...(runRepository ? { runRepository } : {}) });
     apps.push(app);
     return { app, root };
   }
@@ -272,6 +301,101 @@ describe("SW-016 recoverable matcher jobs", () => {
     });
     expect(submitted.statusCode).toBe(202);
     expect((await eventually(app, runId, "succeeded")).attempts).toBe(1);
+  });
+
+  it("recovers a transient failure to checkpoint the running state without duplicate matcher calls", async () => {
+    const repository = new FaultInjectingRunRepository();
+    repository.failNextState = "running";
+    let calls = 0;
+    const { app } = await makeApp(async () => { calls += 1; return matcherResult(); }, undefined, repository);
+    const runId = await setup(app);
+    const submit = await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "start-checkpoint-0001" },
+    });
+    expect(submit.statusCode).toBe(202);
+    const success = await eventually(app, runId, "succeeded");
+    expect(success.attempts).toBe(1);
+    expect(repository.runningSaveAttempts).toBe(2);
+    expect(calls).toBe(1);
+  });
+
+  it("fails closed on a lost success checkpoint and permits an explicit retry", async () => {
+    const repository = new FaultInjectingRunRepository();
+    repository.failNextState = "succeeded";
+    let calls = 0;
+    const { app } = await makeApp(async () => { calls += 1; return matcherResult(); }, undefined, repository);
+    const runId = await setup(app);
+    const submitted = await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "result-checkpoint-0001" },
+    });
+    const jobId = MatchJobSchema.parse(submitted.json()).jobId;
+    const failed = await eventually(app, runId, "failed");
+    expect(failed.failureCode).toBe("matcher_failed");
+    expect(failed.attempts).toBe(1);
+    const beforeRetry = RunSummarySchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}`,
+    })).json());
+    expect(beforeRetry.summary).toBeNull();
+    expect((await app.inject({
+      method: "POST", url: `/api/runs/${runId}/match-jobs/${jobId}/retry`,
+    })).statusCode).toBe(202);
+    const success = await eventually(app, runId, "succeeded");
+    expect(success.attempts).toBe(2);
+    expect(calls).toBe(2);
+    expect(RunSummarySchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}`,
+    })).json()).summary).not.toBeNull();
+  });
+
+  it("bounds retries during a persistent checkpoint outage instead of spinning", async () => {
+    const repository = new FaultInjectingRunRepository();
+    repository.alwaysFailState = "running";
+    let calls = 0;
+    const { app } = await makeApp(async () => { calls += 1; return matcherResult(); }, undefined, repository);
+    const runId = await setup(app);
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "outage-checkpoint-0001" },
+    })).statusCode).toBe(202);
+    for (let i = 0; i < 120 && repository.runningSaveAttempts < 3; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(repository.runningSaveAttempts).toBe(3);
+    await new Promise((resolve) => setTimeout(resolve, 260));
+    expect(repository.runningSaveAttempts).toBe(3);
+    expect(calls).toBe(0);
+    const queued = MatchJobSchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}/match-jobs/current`,
+    })).json());
+    expect(queued.state).toBe("queued");
+    expect(queued.attempts).toBe(0);
+  });
+
+  it("detects corrupt authoritative input before matching and recovers on retry", async () => {
+    const repository = new FaultInjectingRunRepository();
+    let calls = 0;
+    const { app } = await makeApp(async () => { calls += 1; return matcherResult(); }, undefined, repository);
+    const runId = await setup(app);
+    repository.corruptNextSourceRead = true;
+    const submitted = await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "source-corruption-0001" },
+    });
+    const jobId = MatchJobSchema.parse(submitted.json()).jobId;
+    const failed = await eventually(app, runId, "failed");
+    expect(failed.failureCode).toBe("matcher_failed");
+    expect(calls).toBe(0);
+    expect((await app.inject({
+      method: "POST", url: `/api/runs/${runId}/match-jobs/${jobId}/retry`,
+    })).statusCode).toBe(202);
+    expect((await eventually(app, runId, "succeeded")).attempts).toBe(2);
+    expect(calls).toBe(1);
   });
 
   it("requires a valid idempotency key before creating a job", async () => {
