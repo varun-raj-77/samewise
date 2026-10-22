@@ -355,7 +355,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
     const job = MatchJobSchema.parse(store.enqueueMatchJob(runId, createHash("sha256").update(key).digest("hex")));
     if (job.state === "queued") scheduleMatchJob(runId);
-    reply.code(job.state === "succeeded" ? 200 : 202);
+    reply.code(job.state === "queued" || job.state === "running" ? 202 : 200);
     return job;
   });
 
