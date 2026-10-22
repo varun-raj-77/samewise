@@ -1,3 +1,4 @@
+export { MATCH_JOB_CONTRACT_VERSION, MatchJobSchema, type MatchJob } from "./match-job.js";
 export {
   EXPORT_SNAPSHOT_VERSION,
   ExportArtifactSchema,
