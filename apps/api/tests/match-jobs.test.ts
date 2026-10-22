@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { MatcherRunner } from "../src/matcher-process.js";
+import { InMemoryRunRepository } from "../src/run-repository.js";
 
 const sourceA = Buffer.from("id,name,status\nA1,Acme Corp,active\n");
 const sourceB = Buffer.from("id,organization,status\nB1,Acme Corporation,inactive\n");
@@ -83,6 +84,34 @@ function runner(match: MatcherRunner["match"]): MatcherRunner {
   };
 }
 
+// Deliberately fails only the selected run-state transitions. Never modify
+// authoritative source bytes in the repository under normal operation.
+class FaultInjectingRunRepository extends InMemoryRunRepository {
+  failNextState: string | null = null;
+  alwaysFailState: string | null = null;
+  corruptNextSourceRead = false;
+  runningSaveAttempts = 0;
+
+  override async saveState(runId: string, state: unknown, expectedRevision: number): Promise<number> {
+    const jobState = (state as { matchJob?: { state?: string } })?.matchJob?.state;
+    if (jobState === "running") this.runningSaveAttempts += 1;
+    if (jobState && (this.alwaysFailState === jobState || this.failNextState === jobState)) {
+      this.failNextState = null;
+      throw new Error("injected private repository failure");
+    }
+    return super.saveState(runId, state, expectedRevision);
+  }
+
+  override async readSource(runId: string, side: "A" | "B"): Promise<Buffer> {
+    const bytes = await super.readSource(runId, side);
+    if (this.corruptNextSourceRead) {
+      this.corruptNextSourceRead = false;
+      return Buffer.from("tampered persisted source bytes");
+    }
+    return bytes;
+  }
+}
+
 async function setup(app: ReturnType<typeof buildApp>): Promise<string> {
   const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
   for (const [side, bytes] of [["A", sourceA], ["B", sourceB]] as const) {
@@ -125,10 +154,10 @@ describe("SW-016 recoverable matcher jobs", () => {
   const apps: ReturnType<typeof buildApp>[] = [];
   const roots: string[] = [];
 
-  async function makeApp(match: MatcherRunner["match"], dataRoot?: string) {
+  async function makeApp(match: MatcherRunner["match"], dataRoot?: string, runRepository?: FaultInjectingRunRepository) {
     const root = dataRoot ?? await mkdtemp(join(tmpdir(), "samewise-match-jobs-"));
     if (!roots.includes(root)) roots.push(root);
-    const app = buildApp({ dataRoot: root, matcher: runner(match) });
+    const app = buildApp({ dataRoot: root, matcher: runner(match), runRepository });
     apps.push(app);
     return { app, root };
   }
