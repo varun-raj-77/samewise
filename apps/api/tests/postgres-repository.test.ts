@@ -213,8 +213,8 @@ describe.skipIf(!databaseUrl)("SW-015B PostgreSQL durability and CAS", () => {
       matcher,
       runRepository: new PostgresRunRepository(databaseUrl!),
     });
-    const bytesA = Buffer.from("id,name\\nA1,Acme\\n");
-    const bytesB = Buffer.from("id,name\\nB1,Acme Corp\\n");
+    const bytesA = Buffer.from("id,name\nA1,Acme\n");
+    const bytesB = Buffer.from("id,name\nB1,Acme Corp\n");
     try {
       await api.ready();
       const created = await api.inject({ method: "POST", url: "/api/runs" });
