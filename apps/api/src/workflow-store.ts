@@ -53,7 +53,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
-import { RunRevisionConflictError, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
+import { RunRevisionConflictError, type PendingSourceWrite, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
   SemanticMapperError,
@@ -332,22 +332,33 @@ export class WorkflowStore {
 
   async persist(runId: string): Promise<void> {
     const run = this.requireRun(runId);
-    for (const side of ["A", "B"] as const) {
-      const dataset = run.datasets[side];
-      if (!dataset) continue;
-      const key = `${runId}:${side}`;
-      if (this.persistedSourceKeys.has(key)) continue;
-      const bytes = await readFile(dataset.path);
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-      if (sha256 !== dataset.profile.sha256) {
-        throw new Error(`Immutable source bytes for ${runId} dataset ${side} no longer match their fingerprint.`);
-      }
-      await this.repository.saveSource(runId, side, bytes);
-      this.persistedSourceKeys.add(key);
-    }
     try {
-      const revision = await this.repository.saveState(runId, this.persistedState(run), this.persistedRevisions.get(runId) ?? 0);
+      const pendingSources: PendingSourceWrite[] = [];
+      for (const side of ["A", "B"] as const) {
+        const dataset = run.datasets[side];
+        if (!dataset || this.persistedSourceKeys.has(`${runId}:${side}`)) continue;
+        const bytes = await readFile(dataset.path);
+        const sha256 = createHash("sha256").update(bytes).digest("hex");
+        if (sha256 !== dataset.profile.sha256) {
+          throw new Error(`Immutable source bytes for ${runId} dataset ${side} no longer match their fingerprint.`);
+        }
+        pendingSources.push({ side, bytes });
+      }
+
+      const state = this.persistedState(run);
+      const expectedRevision = this.persistedRevisions.get(runId) ?? 0;
+      let revision: number;
+      if (this.repository.saveStateWithSources) {
+        revision = await this.repository.saveStateWithSources(runId, state, expectedRevision, pendingSources);
+      } else {
+        // File storage remains single-process: no cross-file atomicity is promised.
+        for (const { side, bytes } of pendingSources) {
+          await this.repository.saveSource(runId, side, bytes);
+        }
+        revision = await this.repository.saveState(runId, state, expectedRevision);
+      }
       this.persistedRevisions.set(runId, revision);
+      for (const { side } of pendingSources) this.persistedSourceKeys.add(`${runId}:${side}`);
     } catch (error) {
       if (error instanceof RunRevisionConflictError) {
         await this.reloadPersistedRun(runId);
@@ -359,11 +370,12 @@ export class WorkflowStore {
       } catch {
         this.runs.delete(runId);
         this.persistedRevisions.delete(runId);
+        this.persistedSourceKeys.delete(`${runId}:A`);
+        this.persistedSourceKeys.delete(`${runId}:B`);
       }
       throw error;
     }
   }
-
   private persistedState(run: RunState): PersistedRunState {
     const datasets: PersistedRunState["datasets"] = {};
     if (run.datasets.A) datasets.A = { profile: run.datasets.A.profile };
