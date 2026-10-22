@@ -122,15 +122,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.addHook("onRoute", (routeOptions) => {
     if (!routeOptions.url.includes(":runId")) return;
     const originalHandler = routeOptions.handler;
+    // Route definitions are trusted; the incoming URL contains attacker-controlled
+    // query parameters and must never control the matcher-job mutation guard.
+    const isMatchJobRoute = routeOptions.url.includes("/match-jobs");
+    const isSynchronousMatchRoute = routeOptions.url === "/api/runs/:runId/match";
     routeOptions.handler = async function (request, reply) {
       const runId = (request.params as { runId?: string } | undefined)?.runId;
       if (!runId) return originalHandler.call(this, request, reply);
       return withRunLock(runId, async () => {
-        if (persistedMethods.has(request.method) && !request.url.includes("/match-jobs")) {
+        if (persistedMethods.has(request.method) && !isMatchJobRoute) {
           const job = store.getMatchJob(runId);
           // Freeze inputs across failed retries, and never let legacy /match
           // overwrite the result associated with an already-created job.
-          if (job && (job.state !== "succeeded" || request.url.endsWith("/match"))) {
+          if (job && (job.state !== "succeeded" || isSynchronousMatchRoute)) {
             throw new WorkflowError("match_job_locked", "This reconciliation has a matcher job. Complete or retry it before making other changes.", 409);
           }
         }
