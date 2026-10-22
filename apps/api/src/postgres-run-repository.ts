@@ -7,6 +7,7 @@ import {
   RunRepositoryError,
   RunRevisionConflictError,
   type PersistedDatasetSide,
+  type PendingSourceWrite,
   type PersistedRunStateEnvelope,
   type RunRepository,
 } from "./run-repository.js";
@@ -132,33 +133,64 @@ export class PostgresRunRepository implements RunRepository {
   }
 
   async saveState(runId: string, state: unknown, expectedRevision: number): Promise<number> {
+    return this.saveStateWithSources(runId, state, expectedRevision, []);
+  }
+
+  async saveStateWithSources(
+    runId: string,
+    state: unknown,
+    expectedRevision: number,
+    sources: readonly PendingSourceWrite[],
+  ): Promise<number> {
     assertRunId(runId);
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
       throw new RunRevisionConflictError("Invalid expected run revision.");
     }
     const json = JSON.stringify(state);
     if (json === undefined) throw new RunRepositoryError("Run state could not be serialized.");
-    if (expectedRevision === 0) {
-      const rows = await this.sql`
-        INSERT INTO samewise_run_snapshots (run_id, revision, snapshot_version, state)
-        VALUES (${runId}, 1, ${RUN_STATE_SNAPSHOT_VERSION}, ${json}::jsonb)
-        ON CONFLICT (run_id) DO NOTHING
-        RETURNING revision
-      `;
-      if (!rows.length) throw new RunRevisionConflictError("Run revision changed before insert.");
-      return resultRevision(rows[0]?.revision);
-    }
-    const rows = await this.sql`
-      UPDATE samewise_run_snapshots
-      SET revision = revision + 1, state = ${json}::jsonb,
-          snapshot_version = ${RUN_STATE_SNAPSHOT_VERSION}, saved_at = now()
-      WHERE run_id = ${runId} AND revision = ${expectedRevision}
-      RETURNING revision
-    `;
-    if (!rows.length) throw new RunRevisionConflictError("Run revision changed before update.");
-    return resultRevision(rows[0]?.revision);
-  }
+    const preparedSources = sources.map(({ side, bytes }) => {
+      if (side !== "A" && side !== "B") throw new RunRepositoryError("Invalid source side.");
+      if (!Buffer.isBuffer(bytes)) throw new RunRepositoryError("Invalid source bytes.");
+      return { side, bytes, sha256: createHash("sha256").update(bytes).digest("hex") };
+    });
 
+    // Revision CAS and immutable source writes must succeed or fail together.
+    // Otherwise a losing writer can strand bytes which block the winning run.
+    return this.sql.begin(async (tx) => {
+      const rows = expectedRevision === 0
+        ? await tx`
+            INSERT INTO samewise_run_snapshots (run_id, revision, snapshot_version, state)
+            VALUES (${runId}, 1, ${RUN_STATE_SNAPSHOT_VERSION}, ${json}::jsonb)
+            ON CONFLICT (run_id) DO NOTHING
+            RETURNING revision
+          `
+        : await tx`
+            UPDATE samewise_run_snapshots
+            SET revision = revision + 1, state = ${json}::jsonb,
+                snapshot_version = ${RUN_STATE_SNAPSHOT_VERSION}, saved_at = now()
+            WHERE run_id = ${runId} AND revision = ${expectedRevision}
+            RETURNING revision
+          `;
+      if (!rows.length) throw new RunRevisionConflictError("Run revision changed before write.");
+
+      for (const { side, bytes, sha256 } of preparedSources) {
+        await tx`
+          INSERT INTO samewise_source_blobs (run_id, side, sha256, source_bytes)
+          VALUES (${runId}, ${side}, ${sha256}, ${bytes})
+          ON CONFLICT (run_id, side) DO NOTHING
+        `;
+        const existing = await tx`
+          SELECT sha256, source_bytes FROM samewise_source_blobs
+          WHERE run_id = ${runId} AND side = ${side}
+        `;
+        const row = existing[0];
+        if (!row || row.sha256 !== sha256 || !Buffer.from(row.source_bytes as Uint8Array).equals(bytes)) {
+          throw new RunRepositoryError("Immutable source bytes conflict with previously stored data.");
+        }
+      }
+      return resultRevision(rows[0]?.revision);
+    });
+  }
   async saveSource(runId: string, side: PersistedDatasetSide, bytes: Buffer): Promise<void> {
     assertRunId(runId);
     const fingerprint = createHash("sha256").update(bytes).digest("hex");
