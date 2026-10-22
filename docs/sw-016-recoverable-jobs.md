@@ -4,13 +4,13 @@
 
 Samewise can now submit an asynchronous matcher job for an existing reconciliation without changing the synchronous `POST /api/runs/:runId/match` contract that the current web UI uses.
 
-- `POST /api/runs/:runId/match-jobs`, with an `Idempotency-Key` header of 8–128 safe characters, returns the durable job (HTTP 202, or 200 for a previously succeeded request).
+- `POST /api/runs/:runId/match-jobs`, with an `Idempotency-Key` header of 8–128 safe characters, returns the durable job (HTTP 202 while queued/running, or 200 when an identical request already reached a terminal state).
 - `GET /api/runs/:runId/match-jobs/current` reports queued, running, succeeded, or failed.
 - `POST /api/runs/:runId/match-jobs/:jobId/retry` explicitly retries a failed attempt (maximum three total attempts).
 
 The idempotency key is stored only as a SHA-256 digest. Job metadata, attempts, and the final matcher result share the existing versioned run snapshot and revision/CAS repository boundary. A completed attempt persists the matcher result and job success together, so a crash cannot show a committed success without its result.
 
-A single API-process worker runs the existing matcher. It checkpoints `queued → running`, computes from immutable source copies, and checkpoints `running → succeeded|failed`. Run mutations are rejected while an asynchronous match is active; read-only job polling remains available. Failed jobs store only a closed, non-sensitive error code, never source rows or Python exception text.
+A single API-process worker runs the existing matcher. It checkpoints `queued → running`, computes from immutable source copies, and checkpoints `running → succeeded|failed`. Run mutations are blocked while a matcher job is queued, running, or failed, keeping retry inputs frozen. After success, normal review and field-resolution mutations are available; the legacy rematch endpoint remains blocked. Read-only job polling remains available. Failed jobs store only a closed, non-sensitive error code, never source rows or Python exception text.
 
 On startup, `queued` jobs are scheduled again, while jobs left `running` after an interrupted process are marked `queued` and re-executed if fewer than three attempts were started. Attempts exhausted on recovery become `failed` with `retry_exhausted`. Successful jobs are never rerun.
 
