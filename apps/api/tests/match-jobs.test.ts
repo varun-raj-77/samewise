@@ -157,7 +157,7 @@ describe("SW-016 recoverable matcher jobs", () => {
   async function makeApp(match: MatcherRunner["match"], dataRoot?: string, runRepository?: FaultInjectingRunRepository) {
     const root = dataRoot ?? await mkdtemp(join(tmpdir(), "samewise-match-jobs-"));
     if (!roots.includes(root)) roots.push(root);
-    const app = buildApp({ dataRoot: root, matcher: runner(match), runRepository });
+    const app = buildApp({ dataRoot: root, matcher: runner(match), ...(runRepository ? { runRepository } : {}) });
     apps.push(app);
     return { app, root };
   }
