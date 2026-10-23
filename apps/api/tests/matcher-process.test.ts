@@ -43,7 +43,8 @@ describe("SW-018 real matcher child-process deadline", () => {
     const rejection = expect(running).rejects.toBeInstanceOf(MatcherTimeoutError);
     await vi.advanceTimersByTimeAsync(25);
     await rejection;
-    expect(child.kill).toHaveBeenCalledExactlyOnceWith("SIGKILL");
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
     child.emit("close", null);
   });
 
@@ -55,7 +56,8 @@ describe("SW-018 real matcher child-process deadline", () => {
     const rejection = expect(running).rejects.toBeInstanceOf(MatcherInterruptedError);
     controller.abort();
     await rejection;
-    expect(child.kill).toHaveBeenCalledExactlyOnceWith("SIGKILL");
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
     await vi.advanceTimersByTimeAsync(30_001);
     expect(child.kill).toHaveBeenCalledTimes(1);
   });
@@ -72,7 +74,11 @@ describe("SW-018 real matcher child-process deadline", () => {
       originalFilename: "a.csv",
       sha256: "a".repeat(64),
       rowCount: 0,
-      columns: [],
+      columns: [{
+        name: "id", inferredType: "string",
+        nullCount: 0, nullRate: 0, distinctCount: 0, distinctRate: 0,
+        samples: [],
+      }],
     }));
     child.emit("close", 0);
     await expect(profile).resolves.toMatchObject({ datasetId: "dataset-1" });
