@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   MATCHER_VERSION,
@@ -11,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import type { MatcherRunner } from "../src/matcher-process.js";
 import { MatcherReplayError, verifyRecordedMatch } from "../src/matcher-replay.js";
-import { InMemoryRunRepository } from "../src/run-repository.js";
+import { FileRunRepository, InMemoryRunRepository, type RunRepository } from "../src/run-repository.js";
 
 const runId = "run-1234abcd";
 const aBytes = Buffer.from("id,name\n1,Secret Acme\n");
@@ -58,7 +60,7 @@ function result(): MatcherResult {
   };
 }
 
-async function recorded(repository: InMemoryRunRepository, recordedResult: unknown = result()): Promise<void> {
+async function recorded(repository: RunRepository, recordedResult: unknown = result()): Promise<void> {
   await repository.initialize();
   await repository.saveSource(runId, "A", aBytes);
   await repository.saveSource(runId, "B", bBytes);
@@ -101,6 +103,27 @@ describe("SW-019 offline replay and source lineage", () => {
     expect(calls).toBe(1);
     expect(await repository.loadState(runId)).toEqual(stateBefore);
     expect(await repository.readSource(runId, "A")).toEqual(aBytes);
+  });
+
+  it("verifies a real file-backed snapshot after reopening its repository", async () => {
+    const root = await mkdtemp(join(tmpdir(), "samewise-file-replay-test-"));
+    try {
+      const first = new FileRunRepository(join(root, "_run-store"));
+      await recorded(first);
+      await first.close();
+      const restored = new FileRunRepository(join(root, "_run-store"));
+      try {
+        const before = await restored.loadState(runId);
+        const verified = await verifyRecordedMatch(restored, runner(async () => result()), runId);
+        expect(verified.outcome).toBe("identical");
+        expect(verified.storedRevision).toBe(1);
+        expect(await restored.loadState(runId)).toEqual(before);
+      } finally {
+        await restored.close();
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("reports matcher drift without changing a historical result or human decisions", async () => {
