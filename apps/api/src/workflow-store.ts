@@ -763,7 +763,7 @@ export class WorkflowStore {
       }
       await writeFile(artifact.path, bytes);
     }
-    return this.matcher.match({ ...this.matcherInput(run), signal });
+    return this.matcher.match({ ...this.matcherInput(run), ...(signal ? { signal } : {}) });
   }
 
   completeMatchJob(runId: string, jobId: string, result: MatcherResult): MatchJob {
