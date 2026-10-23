@@ -21,7 +21,7 @@ class FakeChild extends EventEmitter {
 
 const spawnMock = vi.mocked(spawn);
 
-describe("SW-018 real matcher child-process deadline", () => {
+describe("SW-018 subprocess adapter deadlines (mocked spawn)", () => {
   let child: FakeChild;
 
   beforeEach(() => {
@@ -46,6 +46,18 @@ describe("SW-018 real matcher child-process deadline", () => {
     expect(child.kill).toHaveBeenCalledTimes(1);
     expect(child.kill).toHaveBeenCalledWith("SIGKILL");
     child.emit("close", null);
+  });
+
+  it("bounds an unresponsive dataset profiler using the same child termination path", async () => {
+    const profiling = createMatcherRunner({ profileTimeoutMs: 25 }).profile({
+      datasetId: "dataset-1", side: "A", originalFilename: "a.csv",
+      sha256: "a".repeat(64), path: "a.csv",
+    });
+    const rejection = expect(profiling).rejects.toBeInstanceOf(MatcherTimeoutError);
+    await vi.advanceTimersByTimeAsync(25);
+    await rejection;
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
   });
 
   it("aborts an active match child on shutdown rather than waiting for its deadline", async () => {
