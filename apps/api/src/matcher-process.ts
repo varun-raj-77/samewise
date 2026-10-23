@@ -66,9 +66,8 @@ function runPython(payload: unknown, timeoutMs: number, signal?: AbortSignal): P
     let stdout = "";
     let stderr = "";
     let settled = false;
-    let timer: NodeJS.Timeout | undefined;
     const cleanup = () => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
     };
     const resolveOnce = (value: unknown) => {
@@ -119,7 +118,7 @@ function runPython(payload: unknown, timeoutMs: number, signal?: AbortSignal): P
       }
     });
 
-    timer = setTimeout(() => terminate(new MatcherTimeoutError()), timeoutMs);
+    const timer = setTimeout(() => terminate(new MatcherTimeoutError()), timeoutMs);
     timer.unref();
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) {
