@@ -8,6 +8,7 @@ import {
   RECONCILIATION_EXPORT_VERSION,
   RUN_MANIFEST_VERSION,
   CandidateEvidenceDetailSchema,
+  IdentityExplanationSchema,
   ConflictPageSchema,
   BatchIdentityDecisionResponseSchema,
   ReviewGroupListSchema,
@@ -105,6 +106,82 @@ describe("SW-003 API workflow", () => {
   async function conflictPage(runId: string) {
     return ConflictPageSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/conflicts?limit=100` })).json());
   }
+
+  it("explains pending, human-rejected and human-confirmed pairs using only recorded evidence", async () => {
+    const { runId } = await setup();
+    const url = `/api/runs/${runId}/identity-explanations/A1`;
+    const initialResponse = await app.inject({ method: "GET", url });
+    expect(initialResponse.statusCode).toBe(200);
+    const initial = IdentityExplanationSchema.parse(initialResponse.json());
+    expect(initial).toMatchObject({
+      aRowId: "A1", bRowId: "B1", reasonCode: "candidate_awaiting_review",
+      evidenceScope: "retained_candidate", candidateRank: 1, matchScore: 0.72,
+      candidateCount: 1, linkedBRowId: null, blockingRuleIds: ["name_token_v1"],
+      fieldEvidence: [{ mappingId: "name", explanationCode: "name_partial", positiveContribution: 0.72 }],
+    });
+    expect(initial).not.toHaveProperty("aRecord");
+    expect(JSON.stringify(initial)).not.toContain("=SUM");
+
+    const noPair = IdentityExplanationSchema.parse((await app.inject({
+      method: "GET", url: `${url}?bRowId=B2`,
+    })).json());
+    expect(noPair).toMatchObject({
+      reasonCode: "no_candidate_retained", evidenceScope: "none_retained",
+      bRowId: "B2", candidateId: null, matchScore: null, fieldEvidence: [],
+      candidateCount: 1,
+    });
+
+    expect((await app.inject({
+      method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`,
+      payload: { decision: "different_entity" },
+    })).statusCode).toBe(200);
+    const rejected = IdentityExplanationSchema.parse((await app.inject({ method: "GET", url })).json());
+    expect(rejected).toMatchObject({ reasonCode: "rejected_by_human", humanDecision: "different_entity" });
+    expect((await app.inject({ method: "GET", url: `/api/runs/${runId}/identity-explanations/unknown` })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `${url}?bRowId=` })).statusCode).toBe(400);
+  });
+
+  it("distinguishes automatic links from a human SAME judgment and competing alternatives", async () => {
+    const result = baseMatcherResult();
+    result.candidates[0]!.band = "auto_match";
+    matcherResultOverride = result;
+    const { runId } = await setup();
+    const url = `/api/runs/${runId}/identity-explanations/A1`;
+    expect(IdentityExplanationSchema.parse((await app.inject({ method: "GET", url })).json()))
+      .toMatchObject({ reasonCode: "linked_automatically", linkedBRowId: "B1", humanDecision: null });
+
+    const alternative = { ...baseMatcherResult().candidates[0]!, candidateId: "candidate-1-2",
+      bRowId: "B2", rank: 2, matchScore: 0.64, band: "needs_review" as const };
+    matcherResultOverride = {
+      ...baseMatcherResult(),
+      candidates: [{ ...baseMatcherResult().candidates[0]!, band: "needs_review" }, alternative],
+    };
+    const { runId: secondRun } = await setup();
+    const secondUrl = `/api/runs/${secondRun}/identity-explanations/A1`;
+    expect((await app.inject({
+      method: "POST", url: `/api/runs/${secondRun}/candidates/candidate-1-2/decisions`,
+      payload: { decision: "same_entity" },
+    })).statusCode).toBe(200);
+    expect(IdentityExplanationSchema.parse((await app.inject({ method: "GET", url: secondUrl })).json()))
+      .toMatchObject({ reasonCode: "linked_by_human", bRowId: "B2", linkedBRowId: "B2", humanDecision: "same_entity" });
+    expect(IdentityExplanationSchema.parse((await app.inject({ method: "GET", url: `${secondUrl}?bRowId=B1` })).json()))
+      .toMatchObject({ reasonCode: "other_candidate_linked", bRowId: "B1", linkedBRowId: "B2", humanDecision: null });
+  });
+
+  it("does not invent matcher explanations for genuine source-only rows", async () => {
+    matcherResultOverride = {
+      ...baseMatcherResult(), candidates: [],
+      onlyA: [{ rowId: "A1", record: { id: "A1", name: "Acme Corp", status: "=SUM(1,2)" } }],
+    };
+    const { runId } = await setup();
+    const response = await app.inject({ method: "GET", url: `/api/runs/${runId}/identity-explanations/A1` });
+    expect(response.statusCode).toBe(200);
+    expect(IdentityExplanationSchema.parse(response.json())).toMatchObject({
+      reasonCode: "no_candidate_retained", bRowId: null,
+      candidateCount: 0, retainedEvidenceCount: 0, blockingRuleIds: [],
+      evidenceScope: "none_retained", fieldEvidence: [],
+    });
+  });
 
   it("uploads, profiles, maps, matches, decides SAME, resolves explicitly, and exports without mutating sources", async () => {
     const { runId, result } = await setup();
