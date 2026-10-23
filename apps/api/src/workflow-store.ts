@@ -747,7 +747,7 @@ export class WorkflowStore {
     return true;
   }
 
-  async executeMatchJob(runId: string, jobId: string): Promise<MatcherResult> {
+  async executeMatchJob(runId: string, jobId: string, signal?: AbortSignal): Promise<MatcherResult> {
     const run = this.requireRun(runId);
     if (!run.matchJob || run.matchJob.jobId !== jobId || run.matchJob.state !== "running") {
       throw new WorkflowError("match_job_not_running", "Matcher job is not running.", 409);
@@ -763,7 +763,7 @@ export class WorkflowStore {
       }
       await writeFile(artifact.path, bytes);
     }
-    return this.matcher.match(this.matcherInput(run));
+    return this.matcher.match({ ...this.matcherInput(run), ...(signal ? { signal } : {}) });
   }
 
   completeMatchJob(runId: string, jobId: string, result: MatcherResult): MatchJob {
@@ -779,11 +779,11 @@ export class WorkflowStore {
     return job;
   }
 
-  failMatchJob(runId: string, jobId: string): MatchJob | null {
+  failMatchJob(runId: string, jobId: string, failureCode: "matcher_failed" | "matcher_timed_out" = "matcher_failed"): MatchJob | null {
     const job = this.getMatchJob(runId);
     if (!job || job.jobId !== jobId || job.state !== "running") return null;
     job.state = "failed";
-    job.failureCode = "matcher_failed";
+    job.failureCode = failureCode;
     job.updatedAt = new Date().toISOString();
     return job;
   }

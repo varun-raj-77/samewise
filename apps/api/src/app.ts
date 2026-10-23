@@ -29,7 +29,7 @@ import {
 } from "@samewise/contracts";
 import Fastify, { type FastifyInstance } from "fastify";
 
-import { createMatcherRunner, type MatcherRunner } from "./matcher-process.js";
+import { createMatcherRunner, MatcherTimeoutError, type MatcherRunner } from "./matcher-process.js";
 import { FileRunRepository, type RunRepository } from "./run-repository.js";
 import { PostgresRunRepository } from "./postgres-run-repository.js";
 import { EvaluationStore, humanReviewEvidence } from "./evaluation-store.js";
@@ -93,8 +93,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     for (const job of await store.recoverMatchJobs()) scheduleMatchJob(job.runId);
   });
 
+  // Abort real Python children on shutdown. Running jobs remain checkpointed
+  // for recovery on the next process start; shutdown does not mark them failed.
+  const activeJobControllers = new Map<string, AbortController>();
   app.addHook("onClose", async () => {
     closing = true;
+    for (const controller of activeJobControllers.values()) controller.abort();
     await store.closeRepository();
   });
 
@@ -201,7 +205,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         return started ? queued.jobId : null;
       });
       if (!jobId || closing) return false;
-      const result = await store.executeMatchJob(runId, jobId);
+      const controller = new AbortController();
+      activeJobControllers.set(runId, controller);
+      let result;
+      try {
+        result = await store.executeMatchJob(runId, jobId, controller.signal);
+      } finally {
+        activeJobControllers.delete(runId);
+      }
       if (closing) return false;
       await withRunLock(runId, async () => {
         store.completeMatchJob(runId, jobId!, result);
@@ -210,11 +221,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       app.log.info({ runId, jobId }, "matcher job completed");
     } catch (error) {
       // Never log matcher stderr, source records, or exception payloads.
-      app.log.error({ runId, jobId, errorType: error instanceof Error ? error.name : "unknown" }, "matcher job failed");
+      if (!closing) app.log.error({ runId, jobId, errorType: error instanceof Error ? error.name : "unknown" }, "matcher job failed");
       if (!closing && jobId) {
         try {
           await withRunLock(runId, async () => {
-            if (store.failMatchJob(runId, jobId!)) await store.persist(runId);
+            if (store.failMatchJob(runId, jobId!, error instanceof MatcherTimeoutError ? "matcher_timed_out" : "matcher_failed")) await store.persist(runId);
           });
         } catch {
           app.log.error({ runId, jobId }, "matcher job failure state could not be persisted");
