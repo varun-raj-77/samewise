@@ -19,7 +19,7 @@ import type { RunRepository } from "./run-repository.js";
 export const MATCHER_REPLAY_VERIFICATION_VERSION = "matcher-replay-verification-v1";
 
 export class MatcherReplayError extends Error {
-  constructor(public readonly code: "run_not_matched" | "source_integrity_failed" | "replay_inputs_invalid") {
+  constructor(public readonly code: "run_not_matched" | "source_integrity_failed" | "replay_inputs_invalid" | "incompatible_matcher_version") {
     super("Recorded matcher replay could not be verified safely.");
     this.name = "MatcherReplayError";
   }
@@ -29,7 +29,7 @@ export interface MatcherReplayVerification {
   verificationVersion: typeof MATCHER_REPLAY_VERIFICATION_VERSION;
   runId: string;
   storedRevision: number;
-  outcome: "identical" | "different" | "incompatible_version";
+  outcome: "identical" | "different";
   sourceSha256: { A: string; B: string };
   storedMatcherVersion: string;
   replayMatcherVersion: string | null;
@@ -62,6 +62,10 @@ function recordedData(state: unknown): {
   }
   const recorded = state as Record<string, unknown>;
   if (!recorded.result) throw new MatcherReplayError("run_not_matched");
+  if (typeof recorded.result !== "object" || Array.isArray(recorded.result)
+    || (recorded.result as Record<string, unknown>).matcherVersion !== MATCHER_VERSION) {
+    throw new MatcherReplayError("incompatible_matcher_version");
+  }
   const result = MatcherResultSchema.safeParse(recorded.result);
   const datasets = recorded.datasets;
   if (!datasets || typeof datasets !== "object" || Array.isArray(datasets)) {
@@ -129,16 +133,6 @@ export async function verifyRecordedMatch(
     storedMatcherVersion: result.matcherVersion,
     storedResultSha256: hash(canonicalJson(result)),
   };
-  if (result.matcherVersion !== MATCHER_VERSION) {
-    // Do not label a different code version's output as an exact replay.
-    return {
-      ...baseline,
-      outcome: "incompatible_version",
-      replayMatcherVersion: MATCHER_VERSION,
-      replayResultSha256: null,
-    };
-  }
-
   const temporary = await mkdtemp(join(tmpdir(), "samewise-offline-replay-"));
   try {
     const aPath = join(temporary, "A.csv");
