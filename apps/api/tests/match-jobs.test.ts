@@ -6,7 +6,7 @@ import { MATCHER_VERSION, MatchJobSchema, RunSummarySchema, type MatcherResult }
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
-import type { MatcherRunner } from "../src/matcher-process.js";
+import { MatcherInterruptedError, MatcherTimeoutError, type MatcherRunner } from "../src/matcher-process.js";
 import { InMemoryRunRepository } from "../src/run-repository.js";
 
 const sourceA = Buffer.from("id,name,status\nA1,Acme Corp,active\n");
@@ -396,6 +396,66 @@ describe("SW-016 recoverable matcher jobs", () => {
     })).statusCode).toBe(202);
     expect((await eventually(app, runId, "succeeded")).attempts).toBe(2);
     expect(calls).toBe(1);
+  });
+
+  it("persists a distinct timeout failure without a fake result, then retries explicitly", async () => {
+    let calls = 0;
+    const { app } = await makeApp(async () => {
+      calls += 1;
+      if (calls === 1) throw new MatcherTimeoutError();
+      return matcherResult();
+    });
+    const runId = await setup(app);
+    const submitted = await app.inject({
+      method: "POST", url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "timeout-job-0001" },
+    });
+    expect(submitted.statusCode).toBe(202);
+    const jobId = MatchJobSchema.parse(submitted.json()).jobId;
+    const failed = await eventually(app, runId, "failed");
+    expect(failed.failureCode).toBe("matcher_timed_out");
+    expect(failed.attempts).toBe(1);
+    expect(RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json()).summary).toBeNull();
+    const retry = await app.inject({ method: "POST", url: `/api/runs/${runId}/match-jobs/${jobId}/retry` });
+    expect(retry.statusCode).toBe(202);
+    expect((await eventually(app, runId, "succeeded")).attempts).toBe(2);
+    expect(calls).toBe(2);
+  });
+
+  it("aborts the active matcher on API shutdown and reclaims its checkpoint after restart", async () => {
+    let matcherSignal!: () => void;
+    let interrupted = false;
+    const running = new Promise<void>((resolve) => { matcherSignal = resolve; });
+    const { app: first, root } = await makeApp(async (input) => {
+      expect(input.signal).toBeDefined();
+      return new Promise<MatcherResult>((_resolve, reject) => {
+        const signal = input.signal!;
+        signal.addEventListener("abort", () => {
+          interrupted = true;
+          reject(new MatcherInterruptedError());
+        }, { once: true });
+        matcherSignal();
+      });
+    });
+    const runId = await setup(first);
+    expect((await first.inject({
+      method: "POST", url: `/api/runs/${runId}/match-jobs`,
+      headers: { "idempotency-key": "shutdown-job-0001" },
+    })).statusCode).toBe(202);
+    await eventually(first, runId, "running");
+    await running;
+    await first.close();
+    apps.splice(apps.indexOf(first), 1);
+    expect(interrupted).toBe(true);
+
+    let recoveredCalls = 0;
+    const { app: restored } = await makeApp(async () => {
+      recoveredCalls += 1;
+      return matcherResult();
+    }, root);
+    const recovered = await eventually(restored, runId, "succeeded");
+    expect(recovered.attempts).toBe(2);
+    expect(recoveredCalls).toBe(1);
   });
 
   it("requires a valid idempotency key before creating a job", async () => {
