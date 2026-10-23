@@ -12,7 +12,7 @@ class FakeChild extends EventEmitter {
   stdout = new PassThrough();
   stderr = new PassThrough();
   stdin = new PassThrough();
-  kill = vi.fn((_signal: string) => {
+  kill = vi.fn(() => {
     // OS child-process close is asynchronous after a kill request.
     queueMicrotask(() => this.emit("close", null));
     return true;
