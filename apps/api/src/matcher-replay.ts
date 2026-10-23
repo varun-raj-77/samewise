@@ -126,7 +126,7 @@ export async function verifyRecordedMatch(
   }
 
   const baseline = {
-    verificationVersion: MATCHER_REPLAY_VERIFICATION_VERSION,
+    verificationVersion: MATCHER_REPLAY_VERIFICATION_VERSION as typeof MATCHER_REPLAY_VERIFICATION_VERSION,
     runId,
     storedRevision: snapshot.revision,
     sourceSha256: { A: profiles.A.sha256, B: profiles.B.sha256 },
