@@ -11,7 +11,7 @@ export const MatchJobSchema = z.object({
   attempts: z.number().int().min(0).max(3),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-  failureCode: z.enum(["matcher_failed", "worker_interrupted", "retry_exhausted"]).nullable(),
+  failureCode: z.enum(["matcher_failed", "matcher_timed_out", "worker_interrupted", "retry_exhausted"]).nullable(),
 }).strict();
 
 export type MatchJob = z.infer<typeof MatchJobSchema>;
