@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   CandidateEvidenceDetailSchema,
+  IdentityExplanationSchema,
   BatchIdentityDecisionInputSchema,
   BatchIdentityDecisionResponseSchema,
   ConflictPageSchema,
@@ -331,6 +332,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const result = store.batchDecide(runId, groupId, input.decision);
     app.log.info({ runId, stage: "review", groupId, decision: input.decision, appliedCount: result.appliedCount, excludedCount: result.excludedCount }, "batch identity decision recorded");
     return BatchIdentityDecisionResponseSchema.parse(result);
+  });
+
+  app.get("/api/runs/:runId/identity-explanations/:aRowId", async (request) => {
+    const { runId, aRowId } = routeParams(request.params);
+    const query = request.query as { bRowId?: unknown };
+    if (!runId || !aRowId || aRowId.length > 200 || !query || (query.bRowId !== undefined &&
+      (typeof query.bRowId !== "string" || query.bRowId.length < 1 || query.bRowId.length > 200))) {
+      throw new WorkflowError("invalid_request", "Provide a valid Dataset A row ID and optional Dataset B row ID.");
+    }
+    return IdentityExplanationSchema.parse(store.identityExplanation(runId, aRowId, query.bRowId as string | undefined));
   });
 
   app.get("/api/runs/:runId/candidates/:candidateId", async (request) => {

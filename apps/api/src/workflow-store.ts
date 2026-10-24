@@ -18,6 +18,8 @@ import {
   WORKFLOW_PROJECTION_CONTRACT_VERSION,
   inferSemanticFamily,
   type CandidateEvidenceDetail,
+  IDENTITY_EXPLANATION_VERSION,
+  type IdentityExplanation,
   type BatchIdentityDecisionResponse,
   type CandidatePair,
   type CandidateSummary,
@@ -1335,6 +1337,78 @@ export class WorkflowStore {
       decision: humanDecision,
       appliedCount: eligible.length,
       excludedCount: group.caseCount - eligible.length,
+    };
+  }
+
+  identityExplanation(runId: string, aRowId: string, requestedBRowId?: string): IdentityExplanation {
+    const run = this.requireRun(runId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before inspecting outcomes.", 409);
+    const candidates = run.result.candidates.filter((item) => item.aRowId === aRowId);
+    const sourceOnly = run.result.onlyA.some((item) => item.rowId === aRowId);
+    if (!candidates.length && !sourceOnly) {
+      throw new WorkflowError("a_row_not_found", "That Dataset A row was not present in the recorded result.", 404);
+    }
+    const ordered = [...candidates].sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+    const linked = this.effectiveLinks(run).find((item) => item.aRowId === aRowId);
+    const candidate = requestedBRowId !== undefined
+      ? ordered.find((item) => item.bRowId === requestedBRowId)
+      : linked ?? ordered[0];
+    const humanDecision = candidate ? run.decisions.get(candidate.candidateId)?.humanDecision ?? null : null;
+    // These codes describe only recorded links and judgments. Missing pairs
+    // may have been blocked, pruned, or never scored: we cannot tell which.
+    const reasonCode: IdentityExplanation["reasonCode"] = !candidate
+      ? "no_candidate_retained"
+      : humanDecision === "different_entity"
+        ? "rejected_by_human"
+        : humanDecision === "same_entity"
+          ? "linked_by_human"
+          : linked?.candidateId === candidate.candidateId
+            ? "linked_automatically"
+            : linked
+              ? "other_candidate_linked"
+              : candidate.band === "needs_review"
+                ? "candidate_awaiting_review"
+                : "alternative_not_selected";
+    const evidence = candidate?.evidence ?? [];
+    // Six real, high-impact field explanations suffice for the overview.
+    // Complete raw candidate evidence remains available through /candidates.
+    const topEvidence = [...evidence]
+      .sort((left, right) =>
+        (right.positiveContribution + right.conflictContribution)
+        - (left.positiveContribution + left.conflictContribution)
+        || left.mappingId.localeCompare(right.mappingId))
+      .slice(0, 6)
+      .map((item) => ({
+        mappingId: item.mappingId,
+        label: item.label,
+        explanationCode: item.explanationCode,
+        explanation: item.explanation,
+        evidenceClass: item.evidenceClass,
+        positiveContribution: item.positiveContribution,
+        conflictContribution: item.conflictContribution,
+        featurePipelineVersion: item.featurePipelineVersion,
+      }));
+    return {
+      explanationVersion: IDENTITY_EXPLANATION_VERSION,
+      runId,
+      aRowId,
+      bRowId: requestedBRowId ?? candidate?.bRowId ?? null,
+      reasonCode,
+      evidenceScope: candidate ? "retained_candidate" : "none_retained",
+      linkedBRowId: linked?.bRowId ?? null,
+      humanDecision,
+      candidateId: candidate?.candidateId ?? null,
+      candidateRank: candidate?.rank ?? null,
+      candidateCount: ordered.length,
+      matchScore: candidate?.matchScore ?? null,
+      matchBand: candidate?.band ?? null,
+      hasCollision: candidate?.collision ?? false,
+      strongContradiction: candidate?.strongContradiction ?? false,
+      matcherVersion: run.result.matcherVersion,
+      candidateEngineVersion: run.result.candidateEngineVersion,
+      retainedEvidenceCount: evidence.length,
+      fieldEvidence: topEvidence,
+      blockingRuleIds: [...new Set(candidate?.blockingEvidence.map((item) => item.blockerId) ?? [])].slice(0, 6),
     };
   }
 

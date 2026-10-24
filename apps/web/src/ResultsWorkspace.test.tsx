@@ -38,6 +38,38 @@ describe("bounded results workspace", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("offset=50&limit=50"))).toBe(true);
   });
 
+  it("shows evidence-backed explanations and explicitly avoids claiming why unmatched pairs were discarded", async () => {
+    const missing = page(0, "A1");
+    missing.items[0] = {
+      ...missing.items[0]!, status: "unmatched",
+      topCandidate: null, topBIdentity: null, alternativeCount: 0,
+    };
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const data = url.includes("/identity-explanations/")
+        ? {
+          explanationVersion: "identity-explanation-v1", runId: "run-1",
+          aRowId: "A1", bRowId: null,
+          reasonCode: "no_candidate_retained", evidenceScope: "none_retained",
+          linkedBRowId: null, humanDecision: null, candidateId: null, candidateRank: null,
+          candidateCount: 0, matchScore: null, matchBand: null, hasCollision: false,
+          strongContradiction: false, matcherVersion: "explainable-matcher-v0.3.0",
+          candidateEngineVersion: "candidate-engine-v0.4.0", retainedEvidenceCount: 0,
+          fieldEvidence: [], blockingRuleIds: [],
+        }
+        : missing;
+      return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ResultsWorkspace run={run} onReview={vi.fn()} onResolution={vi.fn()} onOpenReview={vi.fn()} onExport={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: "Why this result?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Why this result?" }));
+    expect(await screen.findByText(/It might have been blocked, pruned, or never scored/)).toBeInTheDocument();
+    expect(screen.getByText(/describes recorded decisions, not independently verified ground truth/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/identity-explanations/A1"))).toBe(true);
+    expect(screen.getByRole("button", { name: /A1.*No match found/ })).toBeDisabled();
+  });
+
   it("hands unresolved identity work to Review using authoritative progress", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(page(0, "A1")), { status: 200, headers: { "Content-Type": "application/json" } })));
     const onOpenReview = vi.fn();
