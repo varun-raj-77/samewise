@@ -308,6 +308,67 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
   };
 }
 
+/**
+ * A matcher score is pair-local; it is not a global identity assignment.
+ * A B record with plausible candidates from two distinct A rows must never
+ * be claimed automatically, even when only one pair was ranked auto_match.
+ * Historical human SAME judgments are authoritative, but contradictory
+ * persisted judgments fail closed instead of silently picking a winner.
+ */
+function automaticIdentityCandidateIds(candidates: CandidatePair[]): Set<string> {
+  const ownersByB = new Map<string, Set<string>>();
+  const automaticByA = new Map<string, number>();
+  for (const candidate of candidates) {
+    const owners = ownersByB.get(candidate.bRowId) ?? new Set<string>();
+    owners.add(candidate.aRowId);
+    ownersByB.set(candidate.bRowId, owners);
+    if (candidate.rank === 1 && candidate.band === "auto_match") {
+      automaticByA.set(candidate.aRowId, (automaticByA.get(candidate.aRowId) ?? 0) + 1);
+    }
+  }
+  return new Set(candidates.filter((candidate) =>
+    candidate.rank === 1
+    && candidate.band === "auto_match"
+    && !candidate.collision
+    && ownersByB.get(candidate.bRowId)?.size === 1
+    && automaticByA.get(candidate.aRowId) === 1
+  ).map((candidate) => candidate.candidateId));
+}
+
+function selectedIdentityLinks(
+  candidates: CandidatePair[],
+  decisions: IdentityDecision[],
+): { candidate: CandidatePair; decision: IdentityDecision | null }[] {
+  const candidateById = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
+  const confirmedA = new Set<string>();
+  const claimedB = new Set<string>();
+  const links: { candidate: CandidatePair; decision: IdentityDecision | null }[] = [];
+  for (const decision of decisions.filter((item) => item.humanDecision === "same_entity")) {
+    const candidate = candidateById.get(decision.candidateId);
+    if (!candidate || candidate.aRowId !== decision.aRowId || candidate.bRowId !== decision.bRowId
+      || confirmedA.has(decision.aRowId) || claimedB.has(decision.bRowId)) {
+      throw new WorkflowError(
+        "one_to_one_integrity_violation",
+        "Stored identity decisions conflict with one-to-one matching. Resolve the inconsistent judgments before exporting.",
+        409,
+      );
+    }
+    confirmedA.add(candidate.aRowId);
+    claimedB.add(candidate.bRowId);
+    links.push({ candidate, decision });
+  }
+  const rejected = new Set(decisions.filter((item) => item.humanDecision === "different_entity").map((item) => item.candidateId));
+  const automatic = automaticIdentityCandidateIds(candidates);
+  for (const candidate of candidates) {
+    if (!automatic.has(candidate.candidateId) || confirmedA.has(candidate.aRowId)
+      || claimedB.has(candidate.bRowId) || rejected.has(candidate.candidateId)) continue;
+    confirmedA.add(candidate.aRowId);
+    claimedB.add(candidate.bRowId);
+    links.push({ candidate, decision: null });
+  }
+  return links;
+}
+
 export class WorkflowStore {
   private readonly runs = new Map<string, RunState>();
   private readonly persistedSourceKeys = new Set<string>();
@@ -692,7 +753,7 @@ export class WorkflowStore {
     run.previewedRuleIds.clear();
     run.mergePlanRevision += 1;
     run.rulesApplied = false;
-    for (const candidate of run.result.candidates.filter((item) => item.rank === 1 && item.band === "auto_match")) {
+    for (const { candidate } of selectedIdentityLinks(run.result.candidates, [])) {
       for (const conflict of comparisonConflicts(run, candidate, null, "system_matcher")) run.conflicts.set(conflict.conflictId, conflict);
     }
     run.stage = "results";
@@ -864,6 +925,13 @@ export class WorkflowStore {
   ): { decision: IdentityDecision; createdConflictIds: string[]; wasDeferred: boolean } {
     const result = run.result;
     if (!result) throw new Error("Matcher result is unavailable for this run.");
+    if (humanDecision === "same_entity") {
+      if ([...run.decisions.values()].some((item) => item.humanDecision === "same_entity"
+        && item.candidateId !== candidate.candidateId
+        && (item.aRowId === candidate.aRowId || item.bRowId === candidate.bRowId))) {
+        throw new WorkflowError("b_row_already_confirmed", "Another identity decision already claims this record. One-to-one reconciliation requires different records or an explicit undo.", 409);
+      }
+    }
     const decision: IdentityDecision = {
       decisionId: `decision-${randomUUID()}`,
       runId: run.runId,
@@ -1469,17 +1537,8 @@ export class WorkflowStore {
   }
 
   private effectiveLinks(run: RunState): CandidatePair[] {
-    const candidates = run.result?.candidates ?? [];
-    const humanSameByA = new Map(
-      [...run.decisions.values()].filter((decision) => decision.humanDecision === "same_entity").map((decision) => [decision.aRowId, decision]),
-    );
-    const rejectedCandidates = new Set(
-      [...run.decisions.values()].filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId),
-    );
-    return [
-      ...candidates.filter((candidate) => humanSameByA.get(candidate.aRowId)?.candidateId === candidate.candidateId),
-      ...candidates.filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameByA.has(candidate.aRowId) && !rejectedCandidates.has(candidate.candidateId)),
-    ];
+    return selectedIdentityLinks(run.result?.candidates ?? [], [...run.decisions.values()])
+      .map((link) => link.candidate);
   }
 
   private identityRecord(run: RunState, candidate: CandidatePair, side: DatasetSide): Record<string, string> {
@@ -1736,14 +1795,18 @@ export class WorkflowStore {
       groups.set(candidate.aRowId, group);
     }
     const decisions = [...run.decisions.values()];
+    const eligibleAutomatic = automaticIdentityCandidateIds(candidates);
     const queue: ReviewQueueItem[] = [];
     let sourceOrder = 0;
     for (const [aRowId, unsorted] of groups) {
       const options = [...unsorted].sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
       const rowDecisions = decisions.filter((decision) => decision.aRowId === aRowId);
-      const untouchedAutomatic = options.some((candidate) => candidate.rank === 1 && candidate.band === "auto_match") && rowDecisions.length === 0;
+      const untouchedAutomatic = options.some((candidate) => eligibleAutomatic.has(candidate.candidateId)) && rowDecisions.length === 0;
       if (untouchedAutomatic) continue;
-      if (!options.some((candidate) => candidate.band === "needs_review") && rowDecisions.length === 0) continue;
+      // An auto_match score can still be globally ambiguous. Keep the original
+      // matcher band for provenance, but require explicit review for such links.
+      if (!options.some((candidate) => candidate.band === "needs_review" || !eligibleAutomatic.has(candidate.candidateId))
+        && rowDecisions.length === 0) continue;
       const sameDecision = rowDecisions.find((decision) => decision.humanDecision === "same_entity");
       const allDifferent = options.every((candidate) => run.decisions.get(candidate.candidateId)?.humanDecision === "different_entity");
       const current = (sameDecision ? options.find((candidate) => candidate.candidateId === sameDecision.candidateId) : null)
@@ -1824,16 +1887,10 @@ function csv(rows: string[][]): string {
 function compareIds(left: string, right: string): number { return left.localeCompare(right, "en"); }
 
 function effectiveLinks(view: RunView) {
-  const candidateById = new Map(view.candidates.map((candidate) => [candidate.candidateId, candidate]));
-  const humanSame = view.decisions.filter((decision) => decision.humanDecision === "same_entity");
-  const humanSameA = new Set(humanSame.map((decision) => decision.aRowId));
-  const rejected = new Set(view.decisions.filter((decision) => decision.humanDecision === "different_entity").map((decision) => decision.candidateId));
-  return [
-    ...humanSame.map((decision) => ({ candidate: candidateById.get(decision.candidateId), source: "human", decision })),
-    ...view.candidates
-      .filter((candidate) => candidate.rank === 1 && candidate.band === "auto_match" && !humanSameA.has(candidate.aRowId) && !rejected.has(candidate.candidateId))
-      .map((candidate) => ({ candidate, source: "system_matcher", decision: null })),
-  ].filter((link): link is { candidate: CandidatePair; source: string; decision: IdentityDecision | null } => Boolean(link.candidate))
+  return selectedIdentityLinks(view.candidates, view.decisions)
+    .map(({ candidate, decision }) => ({
+      candidate, source: decision ? "human" : "system_matcher", decision,
+    }))
     .sort((left, right) => compareIds(left.candidate.aRowId, right.candidate.aRowId) || compareIds(left.candidate.bRowId, right.candidate.bRowId));
 }
 
