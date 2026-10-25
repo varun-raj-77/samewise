@@ -665,6 +665,104 @@ describe("SW-003 API workflow", () => {
     expect(summary.summary).toEqual({ matched: 0, needsReview: 2, onlyA: 0, onlyB: 1 });
   });
 
+  it("demotes competing automatic links to explicit review without mutating matcher evidence", async () => {
+    const base = baseMatcherResult();
+    const first = { ...base.candidates[0]!, band: "auto_match" as const, collision: false };
+    const second = {
+      ...first, candidateId: "candidate-2-1", aRowId: "A2",
+      aRecord: { id: "A2", name: "Acme Holdings", status: "active" }, matchScore: 0.91,
+    };
+    matcherResultOverride = { ...base, candidates: [first, second] };
+    const { runId, result } = await setup();
+
+    expect(result.summary).toEqual({ matched: 0, needsReview: 2, onlyA: 0, onlyB: 1 });
+    expect(result.trustedExportReadiness).toMatchObject({ ready: false, unresolvedIdentityCount: 2, eligibleConfirmedCount: 0 });
+    const review = await reviewPage(runId);
+    expect(review.items).toHaveLength(2);
+    expect(review.items.every((item) => item.state === "needs_review" && item.collision)).toBe(true);
+    expect(review.items.map((item) => item.collisionARowIds)).toEqual([["A2"], ["A1"]]);
+    expect((await conflictPage(runId)).items).toHaveLength(0);
+
+    const explanation = IdentityExplanationSchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}/identity-explanations/A2`,
+    })).json());
+    expect(explanation).toMatchObject({
+      reasonCode: "candidate_awaiting_review", matchBand: "auto_match",
+      hasCollision: true, linkedBRowId: null,
+    });
+    const report = (await app.inject({ method: "GET", url: `/api/runs/${runId}/export` })).body;
+    expect(report).not.toContain("same_entity,system_matcher");
+    expect(report).toContain("A1,B1,needs_review");
+    expect(report).toContain("A2,B1,needs_review");
+  });
+
+  it("prevents two human SAME decisions from claiming the same B row and exports one trusted link", async () => {
+    const base = baseMatcherResult();
+    const first = { ...base.candidates[0]!, band: "auto_match" as const, collision: false };
+    const second = {
+      ...first, candidateId: "candidate-2-1", aRowId: "A2",
+      aRecord: { id: "A2", name: "Acme Holdings", status: "active" }, matchScore: 0.93,
+    };
+    matcherResultOverride = { ...base, candidates: [first, second] };
+    const { runId } = await setup();
+    const same = await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`,
+      payload: { decision: "same_entity" } });
+    expect(same.statusCode).toBe(200);
+    expect(RunSummarySchema.parse(same.json()).summary).toMatchObject({ matched: 1, needsReview: 1 });
+    const blocked = await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-2-1/decisions`,
+      payload: { decision: "same_entity" } });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error.code).toBe("b_row_already_confirmed");
+    const afterBlocked = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    expect(afterBlocked.summary).toMatchObject({ matched: 1, needsReview: 1 });
+    expect((await candidateDetail(runId, "candidate-2-1")).humanDecision).toBeNull();
+
+    const rejected = await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-2-1/decisions`,
+      payload: { decision: "different_entity" } });
+    expect(rejected.statusCode).toBe(200);
+    expect(RunSummarySchema.parse(rejected.json()).summary).toMatchObject({ matched: 1, needsReview: 0, onlyA: 1 });
+    const unresolved = await conflictPage(runId);
+    expect(unresolved.items).toHaveLength(1);
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${unresolved.items[0]!.conflictId}/resolutions`,
+      payload: { action: "keep_both" } })).statusCode).toBe(200);
+    const readiness = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}` })).json());
+    expect(readiness.trustedExportReadiness).toMatchObject({ ready: true, eligibleConfirmedCount: 1 });
+    const trusted = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    expect(trusted.statusCode).toBe(200);
+    const lines = trusted.body.trim().split("\r\n");
+    expect(lines.filter((line) => line.startsWith("confirmed_cross_source,")).length).toBe(1);
+    expect(lines.filter((line) => line.startsWith("source_only_a,A2,")).length).toBe(1);
+    expect(lines.filter((line) => line.startsWith("confirmed_cross_source,A1,B1,"))).toHaveLength(1);
+  });
+
+  it("blocks undo of a human SAME on an automatic link when an existing field conflict was resolved", async () => {
+    const base = baseMatcherResult();
+    matcherResultOverride = { ...base, candidates: [{ ...base.candidates[0]!, band: "auto_match" }] };
+    const { runId } = await setup();
+    const initial = await conflictPage(runId);
+    expect(initial.items).toHaveLength(1);
+    const confirmed = await app.inject({
+      method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`,
+      payload: { decision: "same_entity" },
+    });
+    expect(confirmed.statusCode).toBe(200);
+    expect((await conflictPage(runId)).items[0]?.identitySource).toBe("human");
+    const conflictId = initial.items[0]!.conflictId;
+    expect((await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflictId}/resolutions`,
+      payload: { action: "use_a" } })).statusCode).toBe(200);
+    const undoBlocked = await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` });
+    expect(undoBlocked.statusCode).toBe(409);
+    expect(undoBlocked.json().error.code).toBe("undo_blocked_by_resolutions");
+
+    expect((await app.inject({ method: "DELETE", url: `/api/runs/${runId}/conflicts/${conflictId}/resolution` })).statusCode).toBe(200);
+    const undo = await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` });
+    expect(undo.statusCode).toBe(200);
+    expect((await conflictPage(runId)).items[0]).toMatchObject({
+      identitySource: "system_matcher", identityDecisionId: null,
+    });
+    expect(RunSummarySchema.parse(undo.json()).summary?.matched).toBe(1);
+  });
+
   it("keeps an automatic match out of review and no-match even with a retained alternative", async () => {
     const base = baseMatcherResult();
     const automatic = { ...base.candidates[0]!, band: "auto_match" as const };

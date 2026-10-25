@@ -101,6 +101,26 @@ describe("bounded review workspace", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/candidates/c11"))).toBe(true);
   });
 
+  it("disables SAME and the S shortcut when the selected B row is linked to a different A row", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const response = url.includes("/review?") ? reviewPage() : {
+        ...detail(), effectiveCollisionARowIds: ["A2"],
+      };
+      return Promise.resolve(new Response(JSON.stringify(response), { status: 200 }));
+    }));
+    const onDecision = vi.fn(async () => run());
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Same entity" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Different entities" })).not.toBeDisabled();
+    expect(screen.getByText(/SAME is disabled; inspect or undo that prior identity decision/)).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "s" });
+    await act(async () => { await Promise.resolve(); });
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
   it("switches candidate rank without recording a decision", async () => {
     vi.stubGlobal("fetch", fetchSuccess());
     const onDecision = vi.fn(async () => run());
