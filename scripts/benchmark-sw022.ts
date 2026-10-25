@@ -34,8 +34,15 @@ async function runOne(fixture: string) {
   ]);
   const inputMappings = JSON.parse(mappingBytes.toString("utf8")) as { mappings: unknown[] };
   if (!Array.isArray(inputMappings.mappings)) throw new Error("Missing frozen mapping list.");
-  const mappings = inputMappings.mappings.map((item) =>
-    normalizeLegacyMapping(LegacyManualMappingSchema.parse(item)));
+  const mappings = inputMappings.mappings.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid frozen mapping.");
+    const raw = item as Record<string, unknown>;
+    const legacy = LegacyManualMappingSchema.parse({
+      mappingId: raw.mappingId, label: raw.label, aColumn: raw.aColumn, bColumn: raw.bColumn,
+      role: raw.role, normalizer: raw.normalizer,
+    });
+    return { ...normalizeLegacyMapping(legacy), ...(raw.semanticFamily ? { semanticFamily: raw.semanticFamily } : {}) };
+  });
   const truth = JSON.parse(truthBytes.toString("utf8")) as IdentityTruthFixture;
   const matcher = createMatcherRunner();
   // The matcher sees only product-visible CSVs and mappings. Truth is supplied
