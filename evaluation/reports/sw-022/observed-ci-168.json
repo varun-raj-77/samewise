@@ -1,0 +1,156 @@
+{
+  "benchmarkVersion": "one-to-one-impact-v1",
+  "scope": "Synthetic fixtures only. Same current matcher output for both assignment policies; no humans simulated.",
+  "definitions": {
+    "autoMatchPrecision": "True assigned pairs / automatically assigned pairs; null when no auto-assignment.",
+    "autoMatchRecallPerMatchableARow": "True automatically assigned pairs / A records with any cross-source truth link.",
+    "reviewRateAllARows": "A records with retained candidates but no auto-assignment / all A records.",
+    "reviewRateMatchableARows": "Matchable A records with retained candidates but no auto-assignment / matchable A records.",
+    "retainedCandidatePairRecall": "True cross-source pairs among final retained candidate pairs / all cross-source true pairs; NOT pre-scoring candidate generation recall.",
+    "retainedPairReductionFraction": "1 - retained candidate count/(A rows × B rows); NOT pre-scoring candidate generation reduction.",
+    "duplicateBClaims": "Extra automatically assigned claims for already-claimed B row IDs.",
+    "runtime": "Measured CI environment only, matcher run once per fixture, selector medians across 51 repeats."
+  },
+  "fixtures": [
+    {
+      "fixture": "organizations-dev-v1",
+      "fixtureSource": "synthetic_ground_truth",
+      "matcherVersion": "explainable-matcher-v0.3.0",
+      "candidateEngineVersion": "candidate-engine-v0.4.0",
+      "inputFingerprints": {
+        "aSha256": "33cd7600bb45b9e031b9b40c520a2bb4fb1a5b0213ca99823bf039381e8196a4",
+        "bSha256": "8c3ba23355ec76cfd8b745a31f8f2c2ddcc6dc39b428d6011d1dd785a1d70219",
+        "truthSha256": "b1a14c048764d5aeda33b723d420563c508940833447b8b0509bad75cd628edb",
+        "mappingsSha256": "9544e0248a67048c0b7740f6bd7420d6803a2f23adb7b3b6728c8b4eaa08caf7"
+      },
+      "timings": {
+        "matcherSubprocessWallMs": 189.346697,
+        "baselineMedianMs": 0.001242000000047483,
+        "oneToOneMedianMs": 0.01417199999997365,
+        "repetitions": 51,
+        "note": "Selector medians measure in-process selection only; Python subprocess wall time is measured once. Not production SLOs."
+      },
+      "benchmarkVersion": "one-to-one-impact-v1",
+      "denominators": {
+        "sourceARows": 23,
+        "sourceBRows": 22,
+        "matchableARows": 19,
+        "truthCrossSourcePairs": 21,
+        "retainedCandidatePairs": 21,
+        "retainedTruePairs": 21,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 19,
+        "retainedPairReductionFraction": 0.958498023715415
+      },
+      "baseline": {
+        "autoAssignedARows": 12,
+        "autoAssignedPairs": 12,
+        "trueAutoPairs": 12,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.631578947368421,
+        "reviewRoutedARows": 7,
+        "reviewRateAllARows": 0.30434782608695654,
+        "reviewRateMatchableARows": 0.3684210526315789,
+        "duplicateBClaims": 0
+      },
+      "oneToOne": {
+        "autoAssignedARows": 12,
+        "autoAssignedPairs": 12,
+        "trueAutoPairs": 12,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.631578947368421,
+        "reviewRoutedARows": 7,
+        "reviewRateAllARows": 0.30434782608695654,
+        "reviewRateMatchableARows": 0.3684210526315789,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "regressionInvariants": {
+        "uniqueBClaims": true,
+        "falseAutoPairsDidNotIncrease": true,
+        "retainedCandidateRecallUnchanged": true
+      }
+    },
+    {
+      "fixture": "organizations-matcher-holdout-1200-v1",
+      "fixtureSource": "synthetic_ground_truth",
+      "matcherVersion": "explainable-matcher-v0.3.0",
+      "candidateEngineVersion": "candidate-engine-v0.4.0",
+      "inputFingerprints": {
+        "aSha256": "3d766768fdca30a4a072887e1743619b8e263bc527d51f3d7289ebc30bd7bb33",
+        "bSha256": "8b12bf2b4624dc3fc5cd735b5c084e692de4d838d5059ff7590c870d19e28958",
+        "truthSha256": "74d7bc0f3a2b31f13b718dcd71565c81add6b40fd123a24b94b5811ff1412b61",
+        "mappingsSha256": "9544e0248a67048c0b7740f6bd7420d6803a2f23adb7b3b6728c8b4eaa08caf7"
+      },
+      "timings": {
+        "matcherSubprocessWallMs": 2370.59182,
+        "baselineMedianMs": 0.021882999999888852,
+        "oneToOneMedianMs": 0.11778800000001866,
+        "repetitions": 51,
+        "note": "Selector medians measure in-process selection only; Python subprocess wall time is measured once. Not production SLOs."
+      },
+      "benchmarkVersion": "one-to-one-impact-v1",
+      "denominators": {
+        "sourceARows": 1044,
+        "sourceBRows": 1044,
+        "matchableARows": 858,
+        "truthCrossSourcePairs": 879,
+        "retainedCandidatePairs": 1714,
+        "retainedTruePairs": 866,
+        "retainedCandidatePairRecall": 0.9852104664391353,
+        "aRowsWithRetainedCandidates": 938,
+        "retainedPairReductionFraction": 0.9984274306014298
+      },
+      "baseline": {
+        "autoAssignedARows": 169,
+        "autoAssignedPairs": 169,
+        "trueAutoPairs": 169,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.19696969696969696,
+        "reviewRoutedARows": 769,
+        "reviewRateAllARows": 0.7365900383141762,
+        "reviewRateMatchableARows": 0.7937062937062938,
+        "duplicateBClaims": 0
+      },
+      "oneToOne": {
+        "autoAssignedARows": 89,
+        "autoAssignedPairs": 89,
+        "trueAutoPairs": 89,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.10372960372960373,
+        "reviewRoutedARows": 849,
+        "reviewRateAllARows": 0.8132183908045977,
+        "reviewRateMatchableARows": 0.8869463869463869,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -80,
+        "trueAutoPairs": -80,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 80,
+        "reviewRateAllARows": 0.07662835249042144,
+        "reviewRateMatchableARows": 0.09324009324009319,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "regressionInvariants": {
+        "uniqueBClaims": true,
+        "falseAutoPairsDidNotIncrease": true,
+        "retainedCandidateRecallUnchanged": true
+      }
+    }
+  ]
+}
