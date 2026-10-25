@@ -9,6 +9,7 @@ import {
   LegacyManualMappingSchema,
   MATCHER_VERSION,
   MatcherResultSchema,
+  SemanticFamilySchema,
   normalizeLegacyMapping,
 } from "@samewise/contracts";
 
@@ -41,7 +42,7 @@ async function runOne(fixture: string) {
       mappingId: raw.mappingId, label: raw.label, aColumn: raw.aColumn, bColumn: raw.bColumn,
       role: raw.role, normalizer: raw.normalizer,
     });
-    return { ...normalizeLegacyMapping(legacy), ...(raw.semanticFamily ? { semanticFamily: raw.semanticFamily } : {}) };
+    return { ...normalizeLegacyMapping(legacy), ...(raw.semanticFamily ? { semanticFamily: SemanticFamilySchema.parse(raw.semanticFamily) } : {}) };
   });
   const truth = JSON.parse(truthBytes.toString("utf8")) as IdentityTruthFixture;
   const matcher = createMatcherRunner();
