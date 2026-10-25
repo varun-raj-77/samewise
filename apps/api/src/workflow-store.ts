@@ -58,6 +58,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
+import { automaticIdentityCandidateIds } from "./identity-selection.js";
 import { RunRevisionConflictError, type PendingSourceWrite, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
@@ -306,33 +307,6 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
     collision: first.item.collision,
     strongContradiction: first.item.strongContradiction,
   };
-}
-
-/**
- * A matcher score is pair-local; it is not a global identity assignment.
- * A B record with plausible candidates from two distinct A rows must never
- * be claimed automatically, even when only one pair was ranked auto_match.
- * Historical human SAME judgments are authoritative, but contradictory
- * persisted judgments fail closed instead of silently picking a winner.
- */
-function automaticIdentityCandidateIds(candidates: CandidatePair[]): Set<string> {
-  const ownersByB = new Map<string, Set<string>>();
-  const automaticByA = new Map<string, number>();
-  for (const candidate of candidates) {
-    const owners = ownersByB.get(candidate.bRowId) ?? new Set<string>();
-    owners.add(candidate.aRowId);
-    ownersByB.set(candidate.bRowId, owners);
-    if (candidate.rank === 1 && candidate.band === "auto_match") {
-      automaticByA.set(candidate.aRowId, (automaticByA.get(candidate.aRowId) ?? 0) + 1);
-    }
-  }
-  return new Set(candidates.filter((candidate) =>
-    candidate.rank === 1
-    && candidate.band === "auto_match"
-    && !candidate.collision
-    && ownersByB.get(candidate.bRowId)?.size === 1
-    && automaticByA.get(candidate.aRowId) === 1
-  ).map((candidate) => candidate.candidateId));
 }
 
 function selectedIdentityLinks(
