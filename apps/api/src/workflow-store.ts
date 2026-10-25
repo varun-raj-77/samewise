@@ -997,8 +997,9 @@ export class WorkflowStore {
     if (decisions.some((decision, index) => !decision || decision.decisionId !== entry.decisionIds[index])) {
       throw new WorkflowError("undo_state_changed", "The recent decision can no longer be undone safely.", 409);
     }
+    const affectedDecisionIds = new Set(entry.decisionIds);
     const hasDependentResolution = [...run.conflicts.values()].some((conflict) =>
-      entry.decisionIds.includes(conflict.identityDecisionId ?? "") && conflict.resolution !== null);
+      conflict.identityDecisionId !== null && affectedDecisionIds.has(conflict.identityDecisionId) && conflict.resolution !== null);
     if (hasDependentResolution) {
       throw new WorkflowError(
         "undo_blocked_by_resolutions",
@@ -1011,7 +1012,7 @@ export class WorkflowStore {
     // A human SAME on an existing safe automatic link updates the conflict's
     // identity provenance in-place. Undo must restore the system provenance.
     for (const conflict of run.conflicts.values()) {
-      if (conflict.identityDecisionId && entry.decisionIds.includes(conflict.identityDecisionId)) {
+      if (conflict.identityDecisionId && affectedDecisionIds.has(conflict.identityDecisionId)) {
         conflict.identityDecisionId = null;
         conflict.identitySource = "system_matcher";
       }
@@ -1485,7 +1486,6 @@ export class WorkflowStore {
       hasCollision: Boolean(candidate && (
         candidate.collision || run.result.candidates.some((other) =>
           other.bRowId === candidate.bRowId && other.aRowId !== candidate.aRowId))),
-
       strongContradiction: candidate?.strongContradiction ?? false,
       matcherVersion: run.result.matcherVersion,
       candidateEngineVersion: run.result.candidateEngineVersion,
@@ -1737,8 +1737,9 @@ export class WorkflowStore {
     const remaining = reviewQueue.filter((item) => item.state === "needs_review").length;
     const undoEntry = run.undoStack.at(-1);
     const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateIds[0]!) : undefined;
-    const undoBlocked = undoEntry?.decisionIds.some((decisionId) =>
-      [...run.conflicts.values()].some((conflict) => conflict.identityDecisionId === decisionId && conflict.resolution !== null)) ?? false;
+    const undoDecisionIds = new Set(undoEntry?.decisionIds ?? []);
+    const undoBlocked = [...run.conflicts.values()].some((conflict) =>
+      conflict.identityDecisionId !== null && undoDecisionIds.has(conflict.identityDecisionId) && conflict.resolution !== null);
     const effectiveCandidateIds = new Set(effectiveLinks.map((candidate) => candidate.candidateId));
     const visibleConflicts = [...run.conflicts.values()].filter((conflict) => effectiveCandidateIds.has(conflict.candidateId));
     const readiness: TrustedExportReadiness = {
