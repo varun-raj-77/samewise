@@ -11,7 +11,7 @@ import {
   MatcherResultSchema,
   SemanticFamilySchema,
   normalizeLegacyMapping,
-} from "@samewise/contracts";
+} from "../packages/contracts/src/index.js";
 
 import { createMatcherRunner } from "../apps/api/src/matcher-process.js";
 import {
