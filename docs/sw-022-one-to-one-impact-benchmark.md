@@ -41,6 +41,30 @@ The script writes `evaluation/reports/sw-022/latest-ci.json` in the local workin
 
 CI runs `pnpm verify`, the benchmark, and the production web build. The benchmark fails closed if A/B truth identifiers are malformed, candidate pairs are duplicated, the current selector produces duplicate B claims, or the current selector increases false automatic matches relative to the legacy selection.
 
+## Observed reproducible CI run — synthetic holdout
+
+[CI run #168](https://github.com/varun-raj-77/samewise/actions/runs/40161197358) executed the current matcher and both assignment policies. The unedited, machine-generated JSON is preserved at [`evaluation/reports/sw-022/observed-ci-168.json`](../evaluation/reports/sw-022/observed-ci-168.json).
+
+| Measure | Frozen legacy | SW-021 one-to-one | Delta |
+|---|---:|---:|---:|
+| Heldout A rows | 1,044 | 1,044 | — |
+| Heldout B rows | 1,044 | 1,044 | — |
+| True automatically linked pairs | 169 | 89 | **−80** |
+| False automatically linked pairs | 0 | 0 | 0 |
+| Auto-match precision | 100% (169/169) | 100% (89/89) | 0 pp |
+| A rows sent to review | 769 | 849 | **+80** |
+| Review rate, all A rows | 73.66% | 81.32% | **+7.66 pp** |
+| Review rate, matchable A rows | 79.37% | 88.69% | **+9.32 pp** |
+| Duplicated B automatic claims | 0 | 0 | 0 |
+| Final-retained candidate true-pair recall | 866/879 = 98.52% | same | unchanged |
+| In-process selector median (51 trials) | 0.022 ms | 0.118 ms | +0.096 ms |
+
+The development smoke fixture (23 A rows, 22 B rows) showed no selection difference: both policies auto-linked 12 correct pairs and sent 7 A records to review. Its final-retained candidate recall was 21/21.
+
+For the holdout, the Python subprocess matcher consumed **2,370.59 ms wall clock** on the CI runner. Selector timing is a separate microbenchmark (not an end-to-end latency target). The held-out data contains **858 matchable A rows and 879 true pairs**, including duplicate occurrence structure; precision is measured on selected links, not on all possible true pairs.
+
+**Decision:** this fixture supplies **no demonstrated precision or duplicate-B benefit** for the additional 80 correct auto links routed to review, even though the safety invariant is valuable. Do not remove the invariant or silently choose a global winner. Prioritize a narrower, provably one-to-one assignment policy and evaluate across more independent, collision-heavy labeled fixtures before promoting it. This holdout result is diagnostic, not sufficient evidence to tune a threshold on the same held-out data.
+
 ## Interpretation / next decision
 
 A measured drop in automatic false positives with increased review cases is *not* an unequivocal quality victory. Report the exact held-out costs, especially true-positive auto links newly deferred. Threshold gates require an explicit product tradeoff and additional fixtures rather than retrofitting the heldout result into a tuned threshold.
