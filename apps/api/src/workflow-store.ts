@@ -977,7 +977,10 @@ export class WorkflowStore {
     if (!candidates.length) throw new WorkflowError("review_item_not_found", "Review item was not found.", 404);
     const hasSame = [...run.decisions.values()].some((decision) => decision.aRowId === aRowId && decision.humanDecision === "same_entity");
     const hasUnresolved = candidates.some((candidate) => !run.decisions.has(candidate.candidateId));
-    if (hasSame || !hasUnresolved) throw new WorkflowError("review_item_resolved", "Only an unresolved review item can be deferred.", 409);
+    const item = this.reviewQueue(run, run.result?.candidates ?? []).find((entry) => entry.aRowId === aRowId);
+    if (hasSame || !hasUnresolved || (item?.state !== "needs_review" && item?.state !== "deferred")) {
+      throw new WorkflowError("review_item_resolved", "Only an unresolved review item can be deferred.", 409);
+    }
     if (deferred) run.deferredARowIds.add(aRowId);
     else run.deferredARowIds.delete(aRowId);
     run.stage = "review";
@@ -994,7 +997,8 @@ export class WorkflowStore {
     if (decisions.some((decision, index) => !decision || decision.decisionId !== entry.decisionIds[index])) {
       throw new WorkflowError("undo_state_changed", "The recent decision can no longer be undone safely.", 409);
     }
-    const hasDependentResolution = entry.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution);
+    const hasDependentResolution = [...run.conflicts.values()].some((conflict) =>
+      entry.decisionIds.includes(conflict.identityDecisionId ?? "") && conflict.resolution !== null);
     if (hasDependentResolution) {
       throw new WorkflowError(
         "undo_blocked_by_resolutions",
@@ -1004,6 +1008,14 @@ export class WorkflowStore {
     }
     for (const candidateId of entry.candidateIds) run.decisions.delete(candidateId);
     for (const conflictId of entry.createdConflictIds) run.conflicts.delete(conflictId);
+    // A human SAME on an existing safe automatic link updates the conflict's
+    // identity provenance in-place. Undo must restore the system provenance.
+    for (const conflict of run.conflicts.values()) {
+      if (conflict.identityDecisionId && entry.decisionIds.includes(conflict.identityDecisionId)) {
+        conflict.identityDecisionId = null;
+        conflict.identitySource = "system_matcher";
+      }
+    }
     for (const aRowId of entry.deferredARowIds) run.deferredARowIds.add(aRowId);
     run.undoStack.pop();
     run.stage = "review";
@@ -1434,7 +1446,7 @@ export class WorkflowStore {
             ? "linked_automatically"
             : linked
               ? "other_candidate_linked"
-              : candidate.band === "needs_review"
+              : candidate.band === "needs_review" || !automaticIdentityCandidateIds(run.result.candidates).has(candidate.candidateId)
                 ? "candidate_awaiting_review"
                 : "alternative_not_selected";
     const evidence = candidate?.evidence ?? [];
@@ -1470,7 +1482,10 @@ export class WorkflowStore {
       candidateCount: ordered.length,
       matchScore: candidate?.matchScore ?? null,
       matchBand: candidate?.band ?? null,
-      hasCollision: candidate?.collision ?? false,
+      hasCollision: Boolean(candidate && (
+        candidate.collision || run.result.candidates.some((other) =>
+          other.bRowId === candidate.bRowId && other.aRowId !== candidate.aRowId))),
+
       strongContradiction: candidate?.strongContradiction ?? false,
       matcherVersion: run.result.matcherVersion,
       candidateEngineVersion: run.result.candidateEngineVersion,
@@ -1722,7 +1737,8 @@ export class WorkflowStore {
     const remaining = reviewQueue.filter((item) => item.state === "needs_review").length;
     const undoEntry = run.undoStack.at(-1);
     const undoDecision = undoEntry ? run.decisions.get(undoEntry.candidateIds[0]!) : undefined;
-    const undoBlocked = undoEntry?.createdConflictIds.some((conflictId) => run.conflicts.get(conflictId)?.resolution) ?? false;
+    const undoBlocked = undoEntry?.decisionIds.some((decisionId) =>
+      [...run.conflicts.values()].some((conflict) => conflict.identityDecisionId === decisionId && conflict.resolution !== null)) ?? false;
     const effectiveCandidateIds = new Set(effectiveLinks.map((candidate) => candidate.candidateId));
     const visibleConflicts = [...run.conflicts.values()].filter((conflict) => effectiveCandidateIds.has(conflict.candidateId));
     const readiness: TrustedExportReadiness = {
