@@ -2,7 +2,7 @@ import type { CandidatePair } from "@samewise/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
-  automaticIdentityCandidateIds,
+  experimentalPropagatedAutomaticIdentityCandidateIds,
   conservativeAutomaticIdentityCandidateIds,
 } from "../src/identity-selection.js";
 
@@ -26,13 +26,13 @@ describe("SW-023 safe one-to-one automatic recovery", () => {
       pair("A2", "B1", { band: "needs_review", rank: 2 }),
     ];
     expect([...conservativeAutomaticIdentityCandidateIds(pairs)]).toEqual(["A2:B2"]);
-    expect([...automaticIdentityCandidateIds(pairs)].sort()).toEqual(["A1:B1", "A2:B2"]);
-    expect([...automaticIdentityCandidateIds([...pairs].reverse())].sort()).toEqual(["A1:B1", "A2:B2"]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs)].sort()).toEqual(["A1:B1", "A2:B2"]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds([...pairs].reverse())].sort()).toEqual(["A1:B1", "A2:B2"]);
   });
 
   it("does not choose a winner between two competing automatic claims for the same B", () => {
     const pairs = [pair("A1", "B1"), pair("A2", "B1")];
-    expect([...automaticIdentityCandidateIds(pairs)]).toEqual([]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs)]).toEqual([]);
   });
 
   it("does not force a winner in a reciprocal cycle or unanchored alternative", () => {
@@ -41,8 +41,8 @@ describe("SW-023 safe one-to-one automatic recovery", () => {
       pair("A1", "B2", { band: "needs_review", rank: 2 }),
       pair("A2", "B1", { band: "needs_review", rank: 2 }),
     ];
-    expect([...automaticIdentityCandidateIds(cycle)]).toEqual([]);
-    expect([...automaticIdentityCandidateIds([pair("A1", "B1"), pair("A2", "B1", {
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(cycle)]).toEqual([]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds([pair("A1", "B1"), pair("A2", "B1", {
       band: "needs_review", rank: 1,
     })])]).toEqual([]);
   });
@@ -53,14 +53,14 @@ describe("SW-023 safe one-to-one automatic recovery", () => {
       pair("A2", "B2"), pair("A2", "B1", { band: "needs_review", rank: 2 }),
       pair("A3", "B3"), pair("A3", "B2", { band: "needs_review", rank: 2 }),
     ];
-    expect([...automaticIdentityCandidateIds(pairs)].sort()).toEqual(["A1:B1", "A2:B2", "A3:B3"]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs)].sort()).toEqual(["A1:B1", "A2:B2", "A3:B3"]);
   });
 
   it("retains collision hints and duplicate rank-1 proposals as fail-closed gates", () => {
     const collisions = [pair("A1", "B1", { collision: true }), pair("A2", "B2")];
-    expect([...automaticIdentityCandidateIds(collisions)]).toEqual(["A2:B2"]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(collisions)]).toEqual(["A2:B2"]);
     const badRank = [pair("A1", "B1"), pair("A1", "B2")];
-    expect([...automaticIdentityCandidateIds(badRank)]).toEqual([]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(badRank)]).toEqual([]);
   });
 
   it("does not recover a dependent link after a human rejects its supporting anchor", () => {
@@ -69,13 +69,13 @@ describe("SW-023 safe one-to-one automatic recovery", () => {
       pair("A2", "B2"),
       pair("A2", "B1", { band: "needs_review", rank: 2 }),
     ];
-    expect([...automaticIdentityCandidateIds(pairs, {
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs, {
       excludedCandidateIds: new Set(["A2:B2"]),
     })]).toEqual([]);
-    expect([...automaticIdentityCandidateIds(pairs, {
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs, {
       reservedBRowIds: new Set(["B2"]),
     })]).toEqual([]);
-    expect([...automaticIdentityCandidateIds(pairs, {
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs, {
       reservedARowIds: new Set(["A2"]),
     })]).toEqual([]);
   });
@@ -86,8 +86,8 @@ describe("SW-023 safe one-to-one automatic recovery", () => {
       pairs.push(pair(`A${i}`, `B${i}`));
       if (i) pairs.push(pair(`A${i}`, `B${i - 1}`, { band: "needs_review", rank: 2 }));
     }
-    const a = automaticIdentityCandidateIds(pairs);
-    const b = automaticIdentityCandidateIds([...pairs].reverse());
+    const a = experimentalPropagatedAutomaticIdentityCandidateIds(pairs);
+    const b = experimentalPropagatedAutomaticIdentityCandidateIds([...pairs].reverse());
     expect(a.size).toBe(100);
     expect([...a].sort()).toEqual([...b].sort());
     const byId = new Map(pairs.map((candidate) => [candidate.candidateId, candidate]));
