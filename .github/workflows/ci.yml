@@ -74,5 +74,8 @@ jobs:
       - name: Benchmark SW-022 held-out identity assignments
         run: pnpm benchmark:sw022
 
+      - name: Benchmark SW-023 one-to-one recovery
+        run: pnpm benchmark:sw023
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
