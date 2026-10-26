@@ -79,6 +79,12 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const [detailRequestVersion, setDetailRequestVersion] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   const [openCollisionBId, setOpenCollisionBId] = useState<string | null>(null);
+  // Lock synchronously: two keyboard/click events can precede React's parent
+  // busy-state render. The server still independently validates every decision.
+  const mutationInFlight = useRef(false);
+  const [localBusy, setLocalBusy] = useState(false);
+  const actionBusy = busy || localBusy;
+  const pinnedCandidateId = useRef<string | null>(initialCandidateId ?? null);
   const detailCache = useRef(new Map<string, CandidateEvidenceDetail>());
   const decisionHeadingRef = useRef<HTMLHeadingElement>(null);
 
@@ -111,8 +117,15 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
       .then((loaded) => {
         if (!active) return;
         setPage(loaded);
-        const selectionIsOnPage = loaded.items.some((item) => item.candidates.some((candidate) => candidate.candidateId === selectedCandidateId));
-        if (!selectionIsOnPage) setSelectedCandidateId(loaded.items[0] ? preferredCandidate(loaded.items[0]) : null);
+        // A contender opened from an exact B collision group need not appear
+        // on the current queue page. Preserve it through queue refetch/undo.
+        // Functional state avoids races with an in-flight older queue request.
+        setSelectedCandidateId((current) => {
+          const visible = loaded.items.some(item => item.candidates.some(candidate => candidate.candidateId === current));
+          return visible || current === pinnedCandidateId.current
+            ? current
+            : (loaded.items[0] ? preferredCandidate(loaded.items[0]) : null);
+        });
       })
       .catch((caught) => { if (active) setQueueError(caught instanceof Error ? caught.message : "The review queue could not be loaded."); });
     return () => { active = false; };
@@ -150,7 +163,24 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
 
   useEffect(() => { if (selectedCandidate) decisionHeadingRef.current?.focus(); }, [selectedCandidate?.candidateId]);
 
-  function selectItem(item: ReviewQueueProjectionItem) { setSelectedCandidateId(preferredCandidate(item)); }
+  function selectItem(item: ReviewQueueProjectionItem) {
+    pinnedCandidateId.current = null;
+    setSelectedCandidateId(preferredCandidate(item));
+  }
+  function inspectOutsideQueue(candidateId: string) {
+    pinnedCandidateId.current = candidateId;
+    setSelectedCandidateId(candidateId);
+  }
+  async function guardedMutation(work: () => Promise<RunSummary | null>): Promise<RunSummary | null> {
+    if (mutationInFlight.current || busy) return null;
+    mutationInFlight.current = true;
+    setLocalBusy(true);
+    try { return await work(); }
+    finally {
+      mutationInFlight.current = false;
+      setLocalBusy(false);
+    }
+  }
 
   function viewDeferredCases() { setFilter("deferred"); }
 
@@ -172,22 +202,23 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   }
 
   async function decide(decision: "same_entity" | "different_entity") {
-    if (!selectedCandidateId || !selectedCandidate || busy || candidateDecision
+    if (!selectedCandidateId || !selectedCandidate || actionBusy || candidateDecision
       || (decision === "same_entity" && (detail?.effectiveCollisionARowIds.length ?? 0) > 0)) return;
     const previousA = selectedCandidate.aRowId;
     const previousB = selectedCandidate.bRowId;
     const nextAlternative = decision === "different_entity" ? alternatives.find((candidate) => candidate.candidateId !== selectedCandidateId && !candidate.humanDecision) : null;
-    const updated = await onDecision(selectedCandidateId, decision);
+    const updated = await guardedMutation(() => onDecision(selectedCandidateId, decision));
     if (!updated) return;
     detailCache.current.clear();
     setDetailRequestVersion((value) => value + 1);
     setAnnouncement(`${decision === "same_entity" ? "Same entity" : "Different entities"} recorded for ${previousA} and ${previousB}.`);
+    pinnedCandidateId.current = null;
     if (nextAlternative) setSelectedCandidateId(nextAlternative.candidateId); else advanceFromCurrent();
   }
 
   async function deferCurrent(nextDeferred: boolean) {
-    if (!selectedARowId || busy) return;
-    const updated = await onDefer(selectedARowId, nextDeferred);
+    if (!selectedARowId || actionBusy) return;
+    const updated = await guardedMutation(() => onDefer(selectedARowId, nextDeferred));
     if (!updated) return;
     if (selectedCandidateId) detailCache.current.delete(selectedCandidateId);
     setAnnouncement(`${selectedARowId} ${nextDeferred ? "deferred" : "returned to the active review queue"}.`);
@@ -195,19 +226,19 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   }
 
   async function undoRecent() {
-    if (!run.reviewUndo?.canUndo || busy) return;
+    if (!run.reviewUndo?.canUndo || actionBusy) return;
     const undone = run.reviewUndo;
-    const updated = await onUndo();
+    const updated = await guardedMutation(onUndo);
     if (!updated) return;
     detailCache.current.clear();
     setDetailRequestVersion((value) => value + 1);
-    setSelectedCandidateId(undone.candidateId);
+    inspectOutsideQueue(undone.candidateId);
     setAnnouncement(`Review decision for ${undone.aRowId} and ${undone.bRowId} was undone.`);
   }
 
   async function applyBatch(group: ReviewGroupSummary) {
-    if (!group.suggestedDecision || !batchConfirmed || busy) return;
-    const updated = await onBatchDecision(group.groupId, group.suggestedDecision);
+    if (!group.suggestedDecision || !batchConfirmed || actionBusy) return;
+    const updated = await guardedMutation(() => onBatchDecision(group.groupId, group.suggestedDecision!));
     if (!updated) return;
     detailCache.current.clear();
     setDetailRequestVersion((value) => value + 1);
@@ -218,7 +249,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey || busy || detailLoading) return;
+      if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey || actionBusy || detailLoading) return;
       const key = event.key.toLocaleLowerCase();
       if (key === "s") { event.preventDefault(); void decide("same_entity"); }
       else if (key === "d") { event.preventDefault(); void decide("different_entity"); }
@@ -226,17 +257,17 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
       else if (key === "u" && run.reviewUndo?.canUndo) { event.preventDefault(); void undoRecent(); }
       else if (key === "j" || event.key === "ArrowDown") { event.preventDefault(); selectRelative(1); }
       else if (key === "k" || event.key === "ArrowUp") { event.preventDefault(); selectRelative(-1); }
-      else if (/^[1-3]$/.test(key)) { const candidate = alternatives[Number(key) - 1]; if (candidate) { event.preventDefault(); setSelectedCandidateId(candidate.candidateId); } }
+      else if (/^[1-3]$/.test(key)) { const candidate = alternatives[Number(key) - 1]; if (candidate) { event.preventDefault(); inspectOutsideQueue(candidate.candidateId); } }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [alternatives, busy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page]);
+  }, [alternatives, actionBusy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page]);
 
-  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={busy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { setSelectedCandidateId(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
+  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={actionBusy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { inspectOutsideQueue(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
 
   return <section className="review-product" aria-labelledby="review-workspace-title">
     <header className="review-product-header"><div><p className="eyebrow">Step 3 · Review matches</p><h1 id="review-workspace-title">Could these be the same entity?</h1><p>Compare the source records, then make the identity decision. Values are merged later.</p><button type="button" className="secondary" onClick={() => setViewMode("groups")}>Back to grouped review</button></div><div className="review-progress" aria-label="Overall review progress"><span><strong>{run.reviewProgress.reviewed}</strong> Reviewed</span><span><strong>{run.reviewProgress.remaining}</strong> Remaining</span><span><strong>{run.reviewProgress.deferred}</strong> Deferred</span><div aria-hidden="true"><i style={{ width: `${run.reviewProgress.total ? (run.reviewProgress.reviewed / run.reviewProgress.total) * 100 : 0}%` }} /></div></div></header>
-    {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last review: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.aRowId} ↔ {run.reviewUndo.bRowId}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void undoRecent()} disabled={busy}>Undo <kbd>U</kbd></button> : <span role="status">Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
+    {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last review: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.aRowId} ↔ {run.reviewUndo.bRowId}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void undoRecent()} disabled={actionBusy}>Undo <kbd>U</kbd></button> : <span role="status">Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
     {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 && <div className="review-complete" role="status"><h2>Identity review complete</h2><p>All uncertain matches have been decided.</p><button type="button" className="primary" onClick={onGoResolution}>Continue to Merge values</button></div>}
     {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred > 0 && <div className="review-complete" role="status"><h2>{run.reviewProgress.deferred} deferred decisions remain</h2><button type="button" className="primary" onClick={viewDeferredCases}>Review deferred</button></div>}
     <p className="sr-only" aria-live="polite" role="status">{announcement}</p>
@@ -254,12 +285,12 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
           <header className="case-heading"><div><span className={`queue-state state-${selectedState}`}>{selectedState.replaceAll("_", " ")}</span><h2 ref={decisionHeadingRef} tabIndex={-1}>Could {selectedCandidate.aRowId} and {selectedCandidate.bRowId} be the same entity?</h2></div><details className="score-block"><summary>Show technical evidence</summary><small>Evidence score</small><strong>{selectedCandidate.matchScore.toFixed(3)}</strong><span>Candidate rank {selectedCandidate.rank} of {alternatives.length} · matcher {run.matcherVersion}</span></details></header>
           {(detail.collisionARowIds.length > 0 || selectedCandidate.collision) && <aside className="collision-warning" aria-label="Candidate collision warning"><strong>Competing possible match</strong><p>{selectedCandidate.bRowId} is also plausible for {detail.collisionARowIds.join(", ") || "another Dataset A record"}.{detail.effectiveCollisionARowIds.length ? ` It is already linked to ${detail.effectiveCollisionARowIds.join(", ")}.` : ""}</p><div className="collision-links">{detail.collisionARowIds.map((aRowId) => { const competingItem = page?.items.find((item) => item.aRowId === aRowId); return competingItem ? <button type="button" key={aRowId} onClick={() => selectItem(competingItem)}>Inspect competing case {aRowId}</button> : null; })}</div><small>{detail.effectiveCollisionARowIds.length > 0
             ? "This B record is already linked to another A record. SAME is disabled; inspect or undo that prior identity decision before confirming a competing link."
-            : "Samewise keeps every plausible alternative visible and never overwrites another human decision automatically."}</small><CollisionInspector runId={run.runId} bRowId={selectedCandidate.bRowId} currentCandidateId={selectedCandidate.candidateId} defaultExpanded={openCollisionBId === selectedCandidate.bRowId} onExpandedChange={(open) => setOpenCollisionBId(open ? selectedCandidate.bRowId : null)} revision={`${run.reviewProgress.reviewed}:${run.reviewProgress.remaining}:${run.reviewProgress.deferred}:${run.reviewUndo?.decisionId ?? ""}`} onInspectCandidate={setSelectedCandidateId} /></aside>}
+            : "Samewise keeps every plausible alternative visible and never overwrites another human decision automatically."}</small><CollisionInspector runId={run.runId} bRowId={selectedCandidate.bRowId} currentCandidateId={selectedCandidate.candidateId} defaultExpanded={openCollisionBId === selectedCandidate.bRowId} onExpandedChange={(open) => setOpenCollisionBId(open ? selectedCandidate.bRowId : null)} revision={`${run.reviewProgress.reviewed}:${run.reviewProgress.remaining}:${run.reviewProgress.deferred}:${run.reviewUndo?.decisionId ?? ""}`} onInspectCandidate={inspectOutsideQueue} /></aside>}
           {alternatives.length > 1 && <section className="candidate-switcher" aria-labelledby="candidate-options-title"><header><h3 id="candidate-options-title">{alternatives.length - 1} other candidate{alternatives.length === 2 ? " is" : "s are"} plausible</h3><span>Selection alone never records a decision.</span></header><div role="list" aria-label="Dataset B candidate alternatives">{alternatives.map((candidate) => <CandidateOption key={candidate.candidateId} candidate={candidate} selected={candidate.candidateId === selectedCandidate.candidateId} onSelect={() => setSelectedCandidateId(candidate.candidateId)} />)}</div></section>}
           <div className="evidence-hierarchy" aria-label="Why Samewise is unsure"><div className="positive"><small>What agrees</small><strong>{[...selectedCandidate.evidence].sort((left, right) => right.positiveContribution - left.positiveContribution)[0]?.label ?? "No strong agreement"}</strong><span>{[...selectedCandidate.evidence].sort((left, right) => right.positiveContribution - left.positiveContribution)[0]?.explanation}</span></div><div className="negative"><small>Why Samewise is unsure</small><strong>{uncertaintyHeading(selectedCandidate, alternatives.length)}</strong><span>{uncertaintySentence(selectedCandidate, alternatives.length)}</span></div></div>
           <section className="entity-comparison" aria-labelledby="field-evidence-title"><header><h3 id="field-evidence-title">Compare source records</h3><span>Dataset A</span><span>Dataset B</span></header>{selectedCandidate.evidence.map((evidence) => <article className={`field-evidence evidence-${evidence.evidenceClass}`} key={evidence.mappingId}><div><strong>{evidence.label}</strong><span className="evidence-state">{evidenceStateLabel(selectedCandidate, evidence.mappingId)}</span></div><div><span className="dataset-label dataset-a">Dataset A</span><strong>{evidence.aValue || "— Missing"}</strong></div><div><span className="dataset-label dataset-b">Dataset B</span><strong>{evidence.bValue || "— Missing"}</strong></div><details><summary>Show technical evidence</summary><p>{evidence.explanation}</p><dl><div><dt>Field kind</dt><dd>{evidence.fieldKind}</dd></div><div><dt>Contribution</dt><dd>{evidence.contribution.toFixed(3)}</dd></div><div><dt>Weight</dt><dd>{evidence.weight.toFixed(3)}</dd></div>{evidence.features.map((feature) => <div key={feature.name}><dt>{feature.name.replaceAll("_", " ")}</dt><dd>{feature.value.toFixed(3)}</dd></div>)}</dl></details></article>)}</section>
           <details className="raw-records"><summary>All raw source fields</summary><div><RawRecord title={`Dataset A · ${selectedCandidate.aRowId}`} record={selectedCandidate.aRecord} /><RawRecord title={`Dataset B · ${selectedCandidate.bRowId}`} record={selectedCandidate.bRecord} /></div></details>
-          <footer className="review-actions" aria-label="Identity review actions"><div><span>Matcher {run.matcherVersion}</span><button type="button" className="shortcut-help" aria-label="Keyboard shortcuts: S same, D different, E defer, U undo, J and K navigate, 1 through 3 select candidates">Shortcuts <kbd>S</kbd> <kbd>D</kbd> <kbd>E</kbd> <kbd>U</kbd> <kbd>J/K</kbd> <kbd>1–3</kbd></button></div>{deferred ? <button type="button" className="secondary" onClick={() => void deferCurrent(false)} disabled={busy}>Return to review</button> : <button type="button" className="secondary" onClick={() => void deferCurrent(true)} disabled={busy || selectedState !== "needs_review"}>Defer / skip <kbd>E</kbd></button>}<button type="button" className="different" aria-label="Different entities" onClick={() => void decide("different_entity")} disabled={busy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match"}>Different entities <kbd>D</kbd></button><button type="button" className="same" aria-label="Same entity" onClick={() => void decide("same_entity")} disabled={busy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match" || detail.effectiveCollisionARowIds.length > 0}>Same entity <kbd>S</kbd></button></footer>
+          <footer className="review-actions" aria-label="Identity review actions"><div><span>Matcher {run.matcherVersion}</span><button type="button" className="shortcut-help" aria-label="Keyboard shortcuts: S same, D different, E defer, U undo, J and K navigate, 1 through 3 select candidates">Shortcuts <kbd>S</kbd> <kbd>D</kbd> <kbd>E</kbd> <kbd>U</kbd> <kbd>J/K</kbd> <kbd>1–3</kbd></button></div>{deferred ? <button type="button" className="secondary" onClick={() => void deferCurrent(false)} disabled={actionBusy}>Return to review</button> : <button type="button" className="secondary" onClick={() => void deferCurrent(true)} disabled={actionBusy || selectedState !== "needs_review"}>Defer / skip <kbd>E</kbd></button>}<button type="button" className="different" aria-label="Different entities" onClick={() => void decide("different_entity")} disabled={actionBusy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match"}>Different entities <kbd>D</kbd></button><button type="button" className="same" aria-label="Same entity" onClick={() => void decide("same_entity")} disabled={actionBusy || !!candidateDecision || selectedState === "reviewed_same" || selectedState === "auto_match" || detail.effectiveCollisionARowIds.length > 0}>Same entity <kbd>S</kbd></button></footer>
           {detail.conflicts.length > 0 && <div className="post-identity-conflicts"><span><strong>{detail.conflicts.length} field conflict{detail.conflicts.length === 1 ? "" : "s"}</strong> available after identity was established. Zero values were selected automatically.</span><button type="button" onClick={onGoResolution}>Resolve values separately</button></div>}
         </> : !detailLoading && !detailError && (run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 ? null : deferredEmptyState ? <div className="review-complete"><h2>{run.reviewProgress.deferred} review case{run.reviewProgress.deferred === 1 ? " is" : "s are"} deferred</h2><p>Deferred cases are still part of this reconciliation. Use the queue action to view them.</p></div> : <div className="review-complete"><h2>No active review case</h2><p>Change the queue filter or page to inspect another item.</p></div>)}
       </section>
@@ -326,7 +357,7 @@ function ReviewGroupsLanding({ run, groups, preview, error, selectedGroupId, bat
   const workload = groups?.workload;
   return <section className="review-product review-groups-landing" aria-labelledby="review-groups-title">
     <header className="review-product-header"><div><p className="eyebrow">Step 3 · Review matches</p><h1 id="review-groups-title">Matching review</h1><p>Samewise grouped repeated evidence patterns so you can preview and handle safe repetitions without clicking every case.</p></div><div className="review-progress"><span><strong>{run.reviewProgress.reviewed}</strong> Reviewed</span><span><strong>{run.reviewProgress.remaining}</strong> Remaining</span><span><strong>{run.reviewProgress.deferred}</strong> Deferred</span></div></header>
-    {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last action: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.affectedCount} case{run.reviewUndo.affectedCount === 1 ? "" : "s"}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void onUndo()} disabled={busy}>Undo batch</button> : <span>Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
+    {run.reviewUndo && <div className={`undo-banner ${run.reviewUndo.canUndo ? "" : "blocked"}`}><span>Last action: <strong>{run.reviewUndo.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</strong> · {run.reviewUndo.affectedCount} case{run.reviewUndo.affectedCount === 1 ? "" : "s"}</span>{run.reviewUndo.canUndo ? <button type="button" onClick={() => void onUndo()} disabled={actionBusy}>Undo batch</button> : <span>Undo blocked: {run.reviewUndo.blockedReason}</span>}</div>}
     {error && <div className="warning" role="alert">{error}</div>}
     {workload ? <div className="review-workload-summary" aria-label="Review workload summary"><article><strong>{workload.quickDecisions}</strong><span>Quick decisions</span></article><article><strong>{workload.competingCandidates}</strong><span>Competing candidates</span></article><article><strong>{workload.individualReview + workload.strongContradictions + workload.lowInformationNoise}</strong><span>Individual review</span></article><article><strong>{workload.deferred}</strong><span>Deferred</span></article></div> : <p role="status">Analyzing deterministic review patterns…</p>}
     {run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0 ? <div className="review-complete" role="status"><h2>Identity review complete</h2><p>All uncertain matches have been decided.</p><button type="button" className="primary" onClick={onGoResolution}>Continue to Merge values</button><button type="button" className="secondary" onClick={onOpenAll}>Inspect reviewed matches</button></div> : <div className="review-group-layout">
