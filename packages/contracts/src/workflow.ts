@@ -478,6 +478,7 @@ export const RunViewSchema = z.object({
   }).strict().nullable(),
   matcherVersion: z.literal(MATCHER_VERSION).nullable(),
   assignmentPolicyVersion: z.literal(ASSIGNMENT_POLICY_VERSION).optional(),
+  assignmentPolicyOrigin: z.enum(["explicit", "legacy_unversioned_fallback"]).optional(),
   matcherProvenance: MatcherProvenanceSchema.nullable(),
   summary: ResultSummarySchema.nullable(),
   candidates: z.array(CandidatePairSchema),
