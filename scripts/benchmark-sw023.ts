@@ -16,6 +16,7 @@ import {
 import { createMatcherRunner } from "../apps/api/src/matcher-process.js";
 import {
   analyzeRecoveryImpact,
+  diagnoseAutomaticDeferrals,
   type IdentityTruthFixture,
 } from "../apps/api/src/one-to-one-benchmark.js";
 import { automaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds } from "../apps/api/src/identity-selection.js";
@@ -54,6 +55,7 @@ async function runOne(fixture: string) {
   }));
   const matcherWallMs = performance.now() - started;
   const impact = analyzeRecoveryImpact(result.candidates, truth);
+  const deferralDiagnostics = diagnoseAutomaticDeferrals(result.candidates);
   // Warm both implementations, then measure each 51 times on the same input.
   const legacyTimes: number[] = [];
   const recoveryTimes: number[] = [];
@@ -91,6 +93,7 @@ async function runOne(fixture: string) {
       note: "Selector medians measure in-process selection only; Python subprocess wall time is measured once. Not production SLOs.",
     },
     ...impact,
+    deferralDiagnostics,
   };
 }
 
