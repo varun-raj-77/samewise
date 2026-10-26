@@ -87,6 +87,7 @@ interface DatasetArtifact {
 interface RunState {
   runId: string;
   assignmentPolicyVersion: AssignmentPolicyVersion;
+  assignmentPolicyOrigin: "explicit" | "legacy_unversioned_fallback";
   stage: RunView["stage"];
   datasets: Partial<Record<DatasetSide, DatasetArtifact>>;
   mappings: ManualMapping[];
@@ -120,6 +121,7 @@ interface PersistedDatasetArtifact {
 interface PersistedRunState {
   runId: string;
   assignmentPolicyVersion?: AssignmentPolicyVersion;
+  assignmentPolicyOrigin?: "explicit" | "legacy_unversioned_fallback";
   stage: RunView["stage"];
   datasets: Partial<Record<DatasetSide, PersistedDatasetArtifact>>;
   mappings: ManualMapping[];
@@ -166,8 +168,17 @@ function parsePersistedRunState(value: unknown, expectedRunId: string): Persiste
   if (state.assignmentPolicyVersion !== undefined && state.assignmentPolicyVersion !== ASSIGNMENT_POLICY_VERSION) {
     throw new Error(`Persisted run ${expectedRunId} uses an unsupported identity-assignment policy.`);
   }
-  // Pre-SW-024 snapshots omit this field. They were computed with the
-  // conservative SW-021 policy, so the same historical semantics apply.
+  // Pre-SW-024 snapshots do not prove which historical selector produced
+  // their result. Keep today's conservative SW-021 fallback but explicitly
+  // mark its provenance as inferred, rather than fabricating a past version.
+  if (state.assignmentPolicyOrigin !== undefined
+    && state.assignmentPolicyOrigin !== "explicit"
+    && state.assignmentPolicyOrigin !== "legacy_unversioned_fallback") {
+    throw new Error(`Persisted run ${expectedRunId} has invalid assignment-policy provenance.`);
+  }
+  if (state.assignmentPolicyVersion === undefined && state.assignmentPolicyOrigin !== undefined) {
+    throw new Error(`Persisted run ${expectedRunId} has an unpinned assignment policy.`);
+  }
   if (state.matchJob !== undefined) {
     MatchJobSchema.parse(state.matchJob);
     if (state.matchJob.runId !== expectedRunId) throw new Error("Persisted matcher job belongs to another run.");
@@ -438,6 +449,7 @@ export class WorkflowStore {
     return {
       runId: run.runId,
       assignmentPolicyVersion: run.assignmentPolicyVersion,
+      assignmentPolicyOrigin: run.assignmentPolicyOrigin,
       stage: run.stage,
       datasets,
       mappings: run.mappings,
@@ -489,6 +501,7 @@ export class WorkflowStore {
     this.runs.set(state.runId, {
       runId: state.runId,
       assignmentPolicyVersion: state.assignmentPolicyVersion ?? ASSIGNMENT_POLICY_VERSION,
+      assignmentPolicyOrigin: state.assignmentPolicyOrigin ?? (state.assignmentPolicyVersion ? "explicit" : "legacy_unversioned_fallback"),
       stage: state.stage,
       datasets,
       mappings: state.mappings,
@@ -511,6 +524,7 @@ export class WorkflowStore {
     const run: RunState = {
       runId: `run-${randomUUID()}`,
       assignmentPolicyVersion: ASSIGNMENT_POLICY_VERSION,
+      assignmentPolicyOrigin: "explicit",
       stage: "upload",
       datasets: {},
       mappings: [],
@@ -1652,6 +1666,7 @@ export class WorkflowStore {
       projectionVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
       runId: view.runId,
       assignmentPolicyVersion: view.assignmentPolicyVersion,
+      assignmentPolicyOrigin: view.assignmentPolicyOrigin,
       stage: view.stage,
       datasets: view.datasets,
       mappings: view.mappings,
@@ -1746,6 +1761,7 @@ export class WorkflowStore {
       contractVersion: WORKFLOW_CONTRACT_VERSION,
       runId: run.runId,
       assignmentPolicyVersion: run.assignmentPolicyVersion,
+      assignmentPolicyOrigin: run.assignmentPolicyOrigin,
       stage: run.stage,
       datasets: {
         ...(run.datasets.A ? { A: run.datasets.A.profile } : {}),
