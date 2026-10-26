@@ -86,7 +86,19 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const actionBusy = busy || localBusy;
   const pinnedCandidateId = useRef<string | null>(initialCandidateId ?? null);
   const detailCache = useRef(new Map<string, CandidateEvidenceDetail>());
+  const previousRunProjection = useRef(run);
   const decisionHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // A successful action or an authoritative reload after HTTP 409 can change
+  // the identity owner while the selected candidate ID stays the same. Never
+  // serve candidate evidence cached under the previous run projection.
+  useEffect(() => {
+    if (previousRunProjection.current === run) return;
+    previousRunProjection.current = run;
+    detailCache.current.clear();
+    setDetail(null);
+    setDetailRequestVersion((value) => value + 1);
+  }, [run]);
 
   useEffect(() => {
     if (viewMode !== "groups") return;
