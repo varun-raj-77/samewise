@@ -36,10 +36,6 @@ function counters<K extends string>(keys: readonly K[]): Record<K, number> {
   return Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
 }
 
-function pairKey(aRowId: string, bRowId: string) {
-  return JSON.stringify([aRowId, bRowId]);
-}
-
 /**
  * Observational diagnosis, never an identity decision. The scorer/assignment
  * sees no hidden truth and no per-row ground truth enters the algorithm.
@@ -68,7 +64,12 @@ export function analyzeReviewDemand(
   generated.forEach(validPair);
   retained.forEach(validPair);
 
-  const generatedKeys = new Set(generated.map(p => pairKey(p.aRowId, p.bRowId)));
+  const generatedByA = new Map<string, Set<string>>();
+  for (const pair of generated) {
+    const ids = generatedByA.get(pair.aRowId) ?? new Set<string>();
+    ids.add(pair.bRowId);
+    generatedByA.set(pair.aRowId, ids);
+  }
   const retainedByA = new Map<string, CandidatePair[]>();
   const aOwnersByB = new Map<string, Set<string>>();
   for (const pair of retained) {
@@ -98,6 +99,13 @@ export function analyzeReviewDemand(
     return "unique_cross_source_identity";
   };
   const hasTruePair = (aRowId: string, bRowId: string) => aById.get(aRowId) === bById.get(bRowId);
+  const hasGeneratedTruePair = (aRowId: string) => {
+    const entity = aById.get(aRowId);
+    for (const bRowId of generatedByA.get(aRowId) ?? []) {
+      if (bById.get(bRowId) === entity) return true;
+    }
+    return false;
+  };
   let reviewed = 0;
   for (const aRowId of aById.keys()) {
     const options = retainedByA.get(aRowId);
@@ -129,7 +137,7 @@ export function analyzeReviewDemand(
     if (!crossSourceTrue) evidence = "no_cross_source_identity";
     else if (top && hasTruePair(aRowId, top.bRowId)) evidence = "top_rank_true";
     else if (options.some(pair => hasTruePair(aRowId, pair.bRowId))) evidence = "retained_true_alternative";
-    else if (generated.some(pair => pair.aRowId === aRowId && hasTruePair(pair.aRowId, pair.bRowId))) evidence = "generated_true_not_retained";
+    else if (hasGeneratedTruePair(aRowId)) evidence = "generated_true_not_retained";
     else evidence = "true_not_generated";
     const truthClass = truthClassFor(aRowId);
     byCause[cause] += 1;
