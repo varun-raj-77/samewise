@@ -31,7 +31,9 @@ A second independent decomposition groups review rows by hidden truth class:
 
 A third, also mutually exclusive, assigns where the **true correspondence** is in the matcher evidence: correct top-ranked pair, lower-ranked retained true alternative, generated but not retained true pair, truth pair never generated, or no truth match. Cross-tabulations of reason × truth class and reason × truth evidence provide counts, not unvalidated predictions about safety.
 
-A further overlapping **matcher gate** breakdown inspects the configured score threshold, minimum runner-up margin, strong contradiction, and matcher's own collision flag among locally deferred top pairs. These flags may co-occur and cannot be summed; the matcher does not expose the exact agreement-field count through the public candidate contract, so it is not fabricated.\n\nThe diagnostics also enumerate A rows with **no retained candidates** separately, to avoid conflating unmatched records with queued human reviews. Every category reconciles to exactly the production selector's candidate-bearing review count. Any mismatch fails the benchmark.
+A further overlapping **matcher gate** breakdown inspects the configured score threshold, minimum runner-up margin, strong contradiction, and matcher's own collision flag among locally deferred top pairs. These flags may co-occur and cannot be summed; the matcher does not expose the exact agreement-field count through the public candidate contract, so it is not fabricated.
+
+The diagnostics also enumerate A rows with **no retained candidates** separately, to avoid conflating unmatched records with queued human reviews. Every category reconciles to exactly the production selector's candidate-bearing review count. Any mismatch fails the benchmark.
 
 ## Measured CI #282 results — actual matcher on synthetic data
 
