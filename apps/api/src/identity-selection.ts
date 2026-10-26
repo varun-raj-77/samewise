@@ -1,6 +1,24 @@
 import type { CandidatePair } from "@samewise/contracts";
 
 /**
+ * Each persisted run pins its assignment semantics separately from matcher
+ * scoring. This is the only supported live version; unknown future/legacy
+ * versions must not be reinterpreted as the current selector.
+ */
+export const ASSIGNMENT_POLICY_VERSION = "assignment-one-to-one-conservative-v1" as const;
+export type AssignmentPolicyVersion = typeof ASSIGNMENT_POLICY_VERSION;
+
+export function automaticCandidatesForPolicy(
+  candidates: CandidatePair[],
+  policyVersion: string,
+): Set<string> {
+  if (policyVersion !== ASSIGNMENT_POLICY_VERSION) {
+    throw new Error("Unsupported historical identity-assignment policy version.");
+  }
+  return automaticIdentityCandidateIds(candidates);
+}
+
+/**
  * SW-021's product selector: a scored pair is not a global assignment.
  * Every retained candidate is considered when detecting B-side competition.
  * This module is imported by both the live product and SW-022 benchmark so
