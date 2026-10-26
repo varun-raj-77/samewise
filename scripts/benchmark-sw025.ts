@@ -86,7 +86,7 @@ async function runScenario(
   const truthBytes = await readFile(truthPath);
   const truthPayload = JSON.parse(truthBytes.toString("utf8")) as IdentityTruthFixture;
   const metrics = measureActualMatcherStages(truthPayload, generatedPayload.candidates, matcherOutput.candidates);
-  const diagnostic = reviewDiagnostics ? analyzeReviewDemand(truthPayload, generatedPayload.candidates, matcherOutput.candidates) : null;
+  const diagnostic = reviewDiagnostics ? analyzeReviewDemand(truthPayload, generatedPayload.candidates, matcherOutput.candidates, matcherOutput.matcherConfig) : null;
   if (diagnostic && diagnostic.denominators.reviewRoutedARows !== metrics.assignment.reviewRoutedARows) throw new Error("Review diagnostics disagrees with production selector metrics.");
   if (generatedPayload.aRowCount !== metrics.rowCounts.a || generatedPayload.bRowCount !== metrics.rowCounts.b) {
     throw new Error("Candidate stage row counts disagree with frozen truth.");
