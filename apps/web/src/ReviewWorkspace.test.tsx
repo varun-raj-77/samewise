@@ -146,13 +146,19 @@ describe("bounded review workspace", () => {
             : detail();
       return Promise.resolve(new Response(JSON.stringify(response), {status:200,headers:{"Content-Type":"application/json"}}));
     }));
-    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+    const rendered = render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
       onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
     fireEvent.click(await screen.findByRole("button",{name:"Inspect all competing candidates"}));
     expect(await screen.findByRole("button",{name:"Inspect A2 candidate for B1"})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Inspect A2 candidate for B1"}));
     expect(await screen.findByRole("heading",{name:"Could A2 and B1 be the same entity?"})).toBeInTheDocument();
     expect(screen.getByRole("button",{name:"Hide competing candidates"})).toBeInTheDocument();
+    // A server queue refresh still contains only A1. A2 was opened via
+    // collision context and must not be silently replaced with A1.
+    rendered.rerender(<ReviewWorkspace run={run({reviewProgress:{total:2,reviewed:1,remaining:1,deferred:0}})}
+      busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
+    await waitFor(() => expect(screen.getByRole("heading",{name:"Could A2 and B1 be the same entity?"})).toBeInTheDocument());
     expect(onDecision).not.toHaveBeenCalled();
   });
 
@@ -163,6 +169,22 @@ describe("bounded review workspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Select candidate rank 2/ }));
     expect(await screen.findByRole("heading", { name: "Could A1 and B2 be the same entity?" })).toBeInTheDocument();
     expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-028 sends only one human decision under rapid mixed mouse and keyboard activation", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    let finish!: (updated: RunSummary) => void;
+    const onDecision = vi.fn(() => new Promise<RunSummary>(resolve => { finish = resolve; }));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+    fireEvent.click(screen.getByRole("button", { name: "Different entities" }));
+    fireEvent.click(screen.getByRole("button", { name: "Different entities" }));
+    fireEvent.keyDown(window, { key: "d" });
+    expect(onDecision).toHaveBeenCalledTimes(1);
+    expect(onDecision).toHaveBeenCalledWith("c11", "different_entity");
+    await act(async () => { finish(run()); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Different entities" })).toBeEnabled());
   });
 
   it("keeps SAME, DIFFERENT, defer, and undo keyboard actions wired", async () => {
