@@ -80,5 +80,8 @@ jobs:
       - name: Evaluate SW-025 new actual matcher fixtures
         run: pnpm benchmark:sw025
 
+      - name: Diagnose SW-026 duplicate-heavy matcher review demand
+        run: pnpm benchmark:sw026
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
