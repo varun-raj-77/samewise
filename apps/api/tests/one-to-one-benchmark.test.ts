@@ -1,9 +1,11 @@
 import type { CandidatePair } from "@samewise/contracts";
 import { describe, expect, it } from "vitest";
 
-import { automaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "../src/identity-selection.js";
+import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "../src/identity-selection.js";
 import {
   analyzeOneToOneImpact,
+  analyzeRecoveryImpact,
+  diagnoseAutomaticDeferrals,
   measureSelectionRuntime,
   type IdentityTruthFixture,
 } from "../src/one-to-one-benchmark.js";
@@ -64,7 +66,7 @@ describe("SW-022 production selector vs frozen pre-SW-021 baseline", () => {
   it("treats a weaker retained alternative as contention, not as grounds for forced assignment", () => {
     const candidates = [pair("A1", "B1"), pair("A2", "B2"), pair("A2", "B1", "needs_review", 2)];
     expect([...legacyAutomaticIdentityCandidateIds(candidates)]).toHaveLength(2);
-    expect([...automaticIdentityCandidateIds(candidates)]).toEqual(["candidate-A2-B2"]);
+    expect([...conservativeAutomaticIdentityCandidateIds(candidates)]).toEqual(["candidate-A2-B2"]);
     const comparison = analyzeOneToOneImpact(candidates, fixture);
     expect(comparison.baseline.autoAssignedPairs).toBe(2);
     expect(comparison.oneToOne.autoAssignedPairs).toBe(1);
@@ -84,6 +86,47 @@ describe("SW-022 production selector vs frozen pre-SW-021 baseline", () => {
     expect(impact.denominators.retainedCandidatePairRecall).toBe(1);
     expect(impact.baseline.autoMatchRecallPerMatchableARow).toBe(1);
     expect(impact.oneToOne.autoMatchRecallPerMatchableARow).toBe(0);
+  });
+
+  it("measures SW-023's one recovered correct anchor independently from the frozen SW-021 comparison", () => {
+    const candidates = [
+      pair("A1", "B1"), pair("A2", "B2"),
+      pair("A2", "B1", "needs_review", 2),
+    ];
+    const impact = analyzeRecoveryImpact(candidates, fixture);
+    expect(impact.sw021).toMatchObject({
+      autoAssignedPairs: 1, trueAutoPairs: 1, falseAutoPairs: 0,
+      reviewRoutedARows: 1,
+    });
+    expect(impact.sw023).toMatchObject({
+      autoAssignedPairs: 2, trueAutoPairs: 2, falseAutoPairs: 0,
+      reviewRoutedARows: 0, duplicateBClaims: 0,
+    });
+    expect(impact.delta).toMatchObject({
+      autoAssignedPairs: 1, trueAutoPairs: 1, falseAutoPairs: 0,
+      reviewRoutedARows: -1, duplicateBClaims: 0,
+    });
+    expect(impact.denominators.retainedCandidatePairRecall).toBe(1);
+  });
+
+  it("keeps genuine automatic B conflicts unresolved rather than improving metrics by forcing a winner", () => {
+    const impact = analyzeRecoveryImpact([pair("A1", "B1"), pair("A2", "B1")], fixture);
+    expect(impact.sw021.autoAssignedPairs).toBe(0);
+    expect(impact.sw023.autoAssignedPairs).toBe(0);
+    expect(impact.delta.reviewRoutedARows).toBe(0);
+  });
+
+  it("attributes ambiguous automatic deferrals without double-counting overlap", () => {
+    const candidates = [
+      pair("A1", "B1"), pair("A2", "B2"), pair("A2", "B1", "needs_review", 2),
+      pair("A3", "B3", "auto_match", 1, true),
+    ];
+    expect(diagnoseAutomaticDeferrals(candidates)).toMatchObject({
+      initiallyAutoProposedPairs: 3, conservativeAutoAssignedPairs: 1,
+      deferredLegacyAutoPairs: 2, deferredWithCollisionHint: 1,
+      deferredWithSharedB: 1, deferredWithBothCollisionAndSharedB: 0,
+      recoveredFromDeferred: 1, stillDeferred: 1,
+    });
   });
 
   it("does not manufacture precision when no pair was automatically matched", () => {

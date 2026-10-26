@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 
 import type { CandidatePair } from "@samewise/contracts";
 
-import { automaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
+import { experimentalPropagatedAutomaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
 
 export const ONE_TO_ONE_BENCHMARK_VERSION = "one-to-one-impact-v1";
 
@@ -149,7 +149,7 @@ export function analyzeOneToOneImpact(candidates: CandidatePair[], fixture: Iden
   const retainedTruePairs = [...truthPairs].filter((pair) => retainedPairs.has(pair)).length;
   const baseline = metrics(selectOnePerA(candidates, legacyAutomaticIdentityCandidateIds(candidates)),
     allCandidateARows, truthA, truthB, matchableA);
-  const oneToOne = metrics(selectOnePerA(candidates, automaticIdentityCandidateIds(candidates)),
+  const oneToOne = metrics(selectOnePerA(candidates, conservativeAutomaticIdentityCandidateIds(candidates)),
     allCandidateARows, truthA, truthB, matchableA);
   if (oneToOne.duplicateBClaims !== 0 || oneToOne.falseAutoPairs > baseline.falseAutoPairs) {
     throw new Error("One-to-one selector violated the benchmark's safety invariants.");
@@ -209,7 +209,7 @@ export function measureSelectionRuntime(candidates: CandidatePair[], repetitions
     legacyAutomaticIdentityCandidateIds(candidates);
     const baselineDuration = performance.now() - baselineStart;
     const gatedStart = performance.now();
-    automaticIdentityCandidateIds(candidates);
+    conservativeAutomaticIdentityCandidateIds(candidates);
     const gatedDuration = performance.now() - gatedStart;
     if (i >= 5) {
       baselineTimes.push(baselineDuration);
@@ -220,5 +220,73 @@ export function measureSelectionRuntime(candidates: CandidatePair[], repetitions
     baselineMedianMs: median(baselineTimes),
     oneToOneMedianMs: median(gatedTimes),
     repetitions,
+  };
+}
+
+/**
+ * SW-023 comparison extends (but does not rewrite) frozen SW-022 metrics.
+ * Both policies see the exact same candidate list, and truth is isolated here.
+ */
+export function analyzeRecoveryImpact(candidates: CandidatePair[], fixture: IdentityTruthFixture) {
+  const frozen = analyzeOneToOneImpact(candidates, fixture);
+  const truthA = new Map(fixture.source_a.map((row) => [row.source_row_id, row.canonical_entity_id]));
+  const truthB = new Map(fixture.source_b.map((row) => [row.source_row_id, row.canonical_entity_id]));
+  const entitiesInB = new Set(truthB.values());
+  const matchableA = new Set(
+    [...truthA].filter(([, entity]) => entitiesInB.has(entity)).map(([aRowId]) => aRowId),
+  );
+  const candidateARows = new Set(candidates.map((pair) => pair.aRowId));
+  const recovered = metrics(
+    selectOnePerA(candidates, experimentalPropagatedAutomaticIdentityCandidateIds(candidates)),
+    candidateARows, truthA, truthB, matchableA,
+  );
+  if (recovered.duplicateBClaims !== 0 || recovered.autoAssignedARows < frozen.oneToOne.autoAssignedARows) {
+    throw new Error("Recovery violated unique-B ownership or discarded an existing anchor.");
+  }
+  return {
+    benchmarkVersion: "one-to-one-recovery-v1" as const,
+    denominators: frozen.denominators,
+    sw021: frozen.oneToOne,
+    sw023: recovered,
+    delta: {
+      autoAssignedPairs: recovered.autoAssignedPairs - frozen.oneToOne.autoAssignedPairs,
+      trueAutoPairs: recovered.trueAutoPairs - frozen.oneToOne.trueAutoPairs,
+      falseAutoPairs: recovered.falseAutoPairs - frozen.oneToOne.falseAutoPairs,
+      reviewRoutedARows: recovered.reviewRoutedARows - frozen.oneToOne.reviewRoutedARows,
+      reviewRateAllARows: recovered.reviewRateAllARows - frozen.oneToOne.reviewRateAllARows,
+      reviewRateMatchableARows: recovered.reviewRateMatchableARows - frozen.oneToOne.reviewRateMatchableARows,
+      duplicateBClaims: recovered.duplicateBClaims - frozen.oneToOne.duplicateBClaims,
+    },
+  };
+}
+
+/** Diagnostic only: reasons can overlap, so category totals must not be summed. */
+export function diagnoseAutomaticDeferrals(candidates: CandidatePair[]) {
+  const before = legacyAutomaticIdentityCandidateIds(candidates);
+  const conservative = conservativeAutomaticIdentityCandidateIds(candidates);
+  const recovery = experimentalPropagatedAutomaticIdentityCandidateIds(candidates);
+  const ownersByB = new Map<string, Set<string>>();
+  const firstRankCountByA = new Map<string, number>();
+  for (const pair of candidates) {
+    const set = ownersByB.get(pair.bRowId) ?? new Set<string>();
+    set.add(pair.aRowId);
+    ownersByB.set(pair.bRowId, set);
+    if (pair.rank === 1 && pair.band === "auto_match") {
+      firstRankCountByA.set(pair.aRowId, (firstRankCountByA.get(pair.aRowId) ?? 0) + 1);
+    }
+  }
+  const excluded = candidates.filter((pair) => before.has(pair.candidateId) && !conservative.has(pair.candidateId));
+  return {
+    initiallyAutoProposedPairs: before.size,
+    conservativeAutoAssignedPairs: conservative.size,
+    deferredLegacyAutoPairs: excluded.length,
+    deferredWithCollisionHint: excluded.filter((pair) => pair.collision).length,
+    deferredWithSharedB: excluded.filter((pair) => (ownersByB.get(pair.bRowId)?.size ?? 0) > 1).length,
+    deferredWithBothCollisionAndSharedB: excluded.filter((pair) =>
+      pair.collision && (ownersByB.get(pair.bRowId)?.size ?? 0) > 1).length,
+    deferredWithDuplicateRankOne: excluded.filter((pair) =>
+      (firstRankCountByA.get(pair.aRowId) ?? 0) !== 1).length,
+    recoveredFromDeferred: excluded.filter((pair) => recovery.has(pair.candidateId)).length,
+    stillDeferred: excluded.filter((pair) => !recovery.has(pair.candidateId)).length,
   };
 }
