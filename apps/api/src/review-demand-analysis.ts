@@ -13,7 +13,6 @@ const LOCAL_MATCHER_GATES = [
   "matcher_collision_flag",
   "no_observable_blocker",
 ] as const;
-type LocalGate = (typeof LOCAL_MATCHER_GATES)[number];
 
 function numericDecisionRules(config: unknown) {
   if (config === null || typeof config !== "object" || Array.isArray(config)) return null;
