@@ -259,3 +259,34 @@ export function analyzeRecoveryImpact(candidates: CandidatePair[], fixture: Iden
     },
   };
 }
+
+/** Diagnostic only: reasons can overlap, so category totals must not be summed. */
+export function diagnoseAutomaticDeferrals(candidates: CandidatePair[]) {
+  const before = legacyAutomaticIdentityCandidateIds(candidates);
+  const conservative = conservativeAutomaticIdentityCandidateIds(candidates);
+  const recovery = automaticIdentityCandidateIds(candidates);
+  const ownersByB = new Map<string, Set<string>>();
+  const firstRankCountByA = new Map<string, number>();
+  for (const pair of candidates) {
+    const set = ownersByB.get(pair.bRowId) ?? new Set<string>();
+    set.add(pair.aRowId);
+    ownersByB.set(pair.bRowId, set);
+    if (pair.rank === 1 && pair.band === "auto_match") {
+      firstRankCountByA.set(pair.aRowId, (firstRankCountByA.get(pair.aRowId) ?? 0) + 1);
+    }
+  }
+  const excluded = candidates.filter((pair) => before.has(pair.candidateId) && !conservative.has(pair.candidateId));
+  return {
+    initiallyAutoProposedPairs: before.size,
+    conservativeAutoAssignedPairs: conservative.size,
+    deferredLegacyAutoPairs: excluded.length,
+    deferredWithCollisionHint: excluded.filter((pair) => pair.collision).length,
+    deferredWithSharedB: excluded.filter((pair) => (ownersByB.get(pair.bRowId)?.size ?? 0) > 1).length,
+    deferredWithBothCollisionAndSharedB: excluded.filter((pair) =>
+      pair.collision && (ownersByB.get(pair.bRowId)?.size ?? 0) > 1).length,
+    deferredWithDuplicateRankOne: excluded.filter((pair) =>
+      (firstRankCountByA.get(pair.aRowId) ?? 0) !== 1).length,
+    recoveredFromDeferred: excluded.filter((pair) => recovery.has(pair.candidateId)).length,
+    stillDeferred: excluded.filter((pair) => !recovery.has(pair.candidateId)).length,
+  };
+}
