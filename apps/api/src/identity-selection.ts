@@ -1,11 +1,10 @@
-import type { CandidatePair } from "@samewise/contracts";
+import { ASSIGNMENT_POLICY_VERSION, type CandidatePair } from "@samewise/contracts";
 
 /**
  * Each persisted run pins its assignment semantics separately from matcher
  * scoring. This is the only supported live version; unknown future/legacy
  * versions must not be reinterpreted as the current selector.
  */
-export const ASSIGNMENT_POLICY_VERSION = "assignment-one-to-one-conservative-v1" as const;
 export type AssignmentPolicyVersion = typeof ASSIGNMENT_POLICY_VERSION;
 
 export function automaticCandidatesForPolicy(
