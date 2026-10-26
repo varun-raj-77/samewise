@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   CandidateEvidenceDetailSchema,
+  CollisionContextPageSchema,
   IdentityExplanationSchema,
   BatchIdentityDecisionInputSchema,
   BatchIdentityDecisionResponseSchema,
@@ -342,6 +343,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       throw new WorkflowError("invalid_request", "Provide a valid Dataset A row ID and optional Dataset B row ID.");
     }
     return IdentityExplanationSchema.parse(store.identityExplanation(runId, aRowId, query.bRowId as string | undefined));
+  });
+
+  app.get("/api/runs/:runId/collision-context", async (request) => {
+    const { runId } = routeParams(request.params);
+    const query = request.query as { bRowId?: unknown };
+    if (!runId || typeof query?.bRowId !== "string"
+      || query.bRowId.length < 1 || query.bRowId.length > 200) {
+      throw new WorkflowError("invalid_request", "A valid Dataset B row ID is required.");
+    }
+    const { offset, limit } = pageQuery(request.query);
+    return CollisionContextPageSchema.parse(store.collisionContextPage(runId, query.bRowId, offset, Math.min(limit, 50)));
   });
 
   app.get("/api/runs/:runId/candidates/:candidateId", async (request) => {
