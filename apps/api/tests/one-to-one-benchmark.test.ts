@@ -1,7 +1,7 @@
 import type { CandidatePair } from "@samewise/contracts";
 import { describe, expect, it } from "vitest";
 
-import { automaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "../src/identity-selection.js";
+import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "../src/identity-selection.js";
 import {
   analyzeOneToOneImpact,
   measureSelectionRuntime,
@@ -64,7 +64,7 @@ describe("SW-022 production selector vs frozen pre-SW-021 baseline", () => {
   it("treats a weaker retained alternative as contention, not as grounds for forced assignment", () => {
     const candidates = [pair("A1", "B1"), pair("A2", "B2"), pair("A2", "B1", "needs_review", 2)];
     expect([...legacyAutomaticIdentityCandidateIds(candidates)]).toHaveLength(2);
-    expect([...automaticIdentityCandidateIds(candidates)]).toEqual(["candidate-A2-B2"]);
+    expect([...conservativeAutomaticIdentityCandidateIds(candidates)]).toEqual(["candidate-A2-B2"]);
     const comparison = analyzeOneToOneImpact(candidates, fixture);
     expect(comparison.baseline.autoAssignedPairs).toBe(2);
     expect(comparison.oneToOne.autoAssignedPairs).toBe(1);
