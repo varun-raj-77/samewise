@@ -48,11 +48,11 @@ The key counterexample is `uncontested_but_wrong`: **a unique B assignment remai
 
 Matcher, candidate engine and mapping versions already exist but do not identify the **post-scoring assignment rule**. We now pin the separate `assignmentPolicyVersion` to each run's persisted state, with the closed value `assignment-one-to-one-conservative-v1`.
 
-- Every new run persists that value. The strict public run summary and view expose it as provenance without changing matching decisions.
-- Historical pre-SW-024 snapshots with the field absent are unambiguously interpreted using the same SW-021 conservative rule under which they were created. The read path does not rewrite their bytes; a future normal mutation writes the explicit pin.
+- Every new run persists that value with `assignmentPolicyOrigin: explicit`. The strict run summary and view expose both fields as provenance without changing matching decisions.
+- Historical pre-SW-024 snapshots with the field absent are **not provably tied to their original policy**. The live system preserves the current SW-021 fallback and marks those run projections `assignmentPolicyOrigin: legacy_unversioned_fallback` rather than inventing provenance. Reads do not rewrite stored bytes; a later normal mutation preserves the inferred-origin marker while writing an explicit fallback version.
 - A snapshot containing an unrecognized policy version **fails closed on restore**. No silent fallback to the newest selector.
 - Both active output selection and export use the pinned selector; version validation is centralized at `automaticCandidatesForPolicy`. No future migration may change `assignment-one-to-one-conservative-v1` semantics retroactively.
-- Do **not** equate version-pinning with universal reproducibility: code/config hashes, exact dependency versions and human judgment provenance still matter.
+- Do **not** equate version-pinning with universal reproducibility: code/config hashes, exact dependency versions and human judgment provenance still matter. Old unversioned results cannot be proven to use their original historical assignment rules unless independent earlier run evidence exists.
 
 Important: A future assignment implementation requires a **new** version identifier and an explicit migration/new-run decision. Version-pinning does not authorize changing existing human decisions or re-exporting old runs using new semantics.
 
