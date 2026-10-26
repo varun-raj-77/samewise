@@ -46,6 +46,33 @@ Output is `evaluation/reports/sw-025/latest-ci.json`, printed in CI as well. Thi
 - There are no production matcher changes, new AI calls, user source mutations, changed field-survivorship behavior, database updates, manual deployment, or Railway access.
 - Performance and correctness observed in these three synthetic cohorts must not be advertised as a production SLA or statistically representative precision/recall.
 
+## Observed synthetic CI benchmark
+
+The actual [GitHub Actions #258](https://github.com/varun-raj-77/samewise/actions/runs/40371251794) completed the Python fixture generator, pre-scoring candidate generator, production matcher and global one-to-one selection. The exact machine-generated JSON, including all input SHA-256 fingerprints, is preserved at [`observed-ci-258.json`](../evaluation/reports/sw-025/observed-ci-258.json).
+
+| Actual stage/outcome | Moderate distinct | High corruption | Duplicate dense |
+|---|---:|---:|---:|
+| Dataset A / B rows | 161 / 161 | 171 / 171 | 197 / 197 |
+| Cross-source true pair links | 140 | 159 | 206 |
+| Pre-scoring generated candidates | 848 | 979 | 1,164 |
+| **Pre-scoring candidate recall** | **140/140 (100%)** | **159/159 (100%)** | **206/206 (100%)** |
+| Candidate pair reduction vs A×B | 96.73% | 96.65% | 97.00% |
+| True pairs retained post-score | 140 | 157 | 206 |
+| Retained-pair recall | 100% | 98.74% | 100% |
+| Correct automatic assigned links | 112 | 88 | 76 |
+| Incorrect automatic assigned links | 0 | 0 | 0 |
+| Auto precision, *on this fixture only* | 112/112 | 88/88 | 76/76 |
+| Candidate-bearing A rows routed to review | 25 | 58 | 87 |
+| Review rate / all A rows | **15.53%** | **33.92%** | **44.16%** |
+| Duplicate B auto assignments | 0 | 0 | 0 |
+| Python matcher subprocess wall time | ~635 ms | ~656 ms | ~765 ms |
+
+All numbers are **observed synthetic-fixture results, not production accuracy, SLAs, or representative industry-wide precision**. The three cohorts reuse the established synthetic organization's naming grammar and normalization-friendly contact/location fields, even though they have different seeds and corruption levels. The consistently perfect *upstream* candidate recall should therefore be treated as a dataset-design limitation to challenge, not a universal guarantee of the candidate engine.
+
+Two genuine truth pairs in the high-corruption fixture were generated upstream but absent from retained scored alternatives. This metric does **not** identify whether the loss came from scoring thresholds, ranking or alternative pruning; that requires a further diagnostic pass.
+
+**Product-shaping conclusion:** the main measured weakness on these cohorts is review burden, particularly with duplicates (44.16% of A rows), rather than candidate generation missing links. Relaxing global uniqueness is not justified. Next evaluate actual matcher behavior on different **realistic schema families, correlated missing identifiers, duplicated business entities, and manually adjudicated difficult cases**, then compare safe review-rate improvement under fixed precision and candidate recall constraints.
+
 ## Decision after measurement
 
 Do not ship a new automatic assignment algorithm just to improve review-rate optics. Use these results alongside independent manual-label adversarial cases to determine whether candidate misses, post-score pruning, ranking, or one-to-one conservative assignment actually accounts for missed true links. Preserve human decisions and versioned identity semantics when proposing future changes.
