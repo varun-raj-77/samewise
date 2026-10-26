@@ -71,5 +71,8 @@ jobs:
           SAMEWISE_TEST_DATABASE_URL: postgres://samewise:samewise_ci@localhost:5432/samewise_test
         run: pnpm verify
 
+      - name: Benchmark SW-022 held-out identity assignments
+        run: pnpm benchmark:sw022
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
