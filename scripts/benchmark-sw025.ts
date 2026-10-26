@@ -62,9 +62,9 @@ async function runScenario(
   const bPath = join(csvRoot, "dataset_b.csv");
   const truthPath = join(scratch, "fixtures/ground-truth/organizations", fixtureName, "identity_truth.json");
   const stageOutputPath = join(scratch, "candidate-stage-" + scenario + ".json");
-  const [aBytes, bBytes, truthBytes] = await Promise.all([
-    readFile(aPath), readFile(bPath), readFile(truthPath),
-  ]);
+  // Treat labels as held-out evaluation input: neither candidate generation
+  // nor the product matcher can read the truth file through their requests.
+  const [aBytes, bBytes] = await Promise.all([readFile(aPath), readFile(bPath)]);
   const candidateStageWallMs = callPython(python, [
     "candidates", "generate", "--a", aPath, "--b", bPath,
     "--mappings", mappingPath, "--output", stageOutputPath,
@@ -80,6 +80,8 @@ async function runScenario(
   if (generatedPayload.engineVersion !== matcherOutput.candidateEngineVersion) {
     throw new Error("Candidate generation stage and product matcher used different engine versions.");
   }
+  // Load hidden labels only after both independent matcher invocations ended.
+  const truthBytes = await readFile(truthPath);
   const truthPayload = JSON.parse(truthBytes.toString("utf8")) as IdentityTruthFixture;
   const metrics = measureActualMatcherStages(truthPayload, generatedPayload.candidates, matcherOutput.candidates);
   if (generatedPayload.aRowCount !== metrics.rowCounts.a || generatedPayload.bRowCount !== metrics.rowCounts.b) {
