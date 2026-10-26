@@ -332,11 +332,7 @@ function selectedIdentityLinks(
     links.push({ candidate, decision });
   }
   const rejected = new Set(decisions.filter((item) => item.humanDecision === "different_entity").map((item) => item.candidateId));
-  const automatic = automaticIdentityCandidateIds(candidates, {
-    excludedCandidateIds: rejected,
-    reservedARowIds: confirmedA,
-    reservedBRowIds: claimedB,
-  });
+  const automatic = automaticIdentityCandidateIds(candidates);
   for (const candidate of candidates) {
     if (!automatic.has(candidate.candidateId) || confirmedA.has(candidate.aRowId)
       || claimedB.has(candidate.bRowId) || rejected.has(candidate.candidateId)) continue;
@@ -1425,9 +1421,7 @@ export class WorkflowStore {
             ? "linked_automatically"
             : linked
               ? "other_candidate_linked"
-              : candidate.band === "needs_review" || !new Set(selectedIdentityLinks(run.result.candidates, [...run.decisions.values()])
-                .filter((item) => item.decision === null).map((item) => item.candidate.candidateId))
-                .has(candidate.candidateId)
+              : candidate.band === "needs_review" || !automaticIdentityCandidateIds(run.result.candidates).has(candidate.candidateId)
                 ? "candidate_awaiting_review"
                 : "alternative_not_selected";
     const evidence = candidate?.evidence ?? [];
@@ -1792,9 +1786,7 @@ export class WorkflowStore {
       groups.set(candidate.aRowId, group);
     }
     const decisions = [...run.decisions.values()];
-    const eligibleAutomatic = new Set(selectedIdentityLinks(candidates, decisions)
-      .filter((item) => item.decision === null)
-      .map((item) => item.candidate.candidateId));
+    const eligibleAutomatic = automaticIdentityCandidateIds(candidates);
     const queue: ReviewQueueItem[] = [];
     let sourceOrder = 0;
     for (const [aRowId, unsorted] of groups) {
