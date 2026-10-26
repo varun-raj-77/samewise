@@ -198,8 +198,10 @@ describe("bounded review workspace", () => {
     await act(async () => { await Promise.resolve(); });
     fireEvent.keyDown(window, { key: "s" });
     await waitFor(() => expect(onDecision).toHaveBeenCalledWith("c11", "same_entity"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Defer \/ skip/ })).toBeEnabled());
     fireEvent.keyDown(window, { key: "e" });
     await waitFor(() => expect(onDefer).toHaveBeenCalledWith("A1", true));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Undo/ })).toBeEnabled());
     fireEvent.keyDown(window, { key: "u" });
     await waitFor(() => expect(onUndo).toHaveBeenCalled());
   });
