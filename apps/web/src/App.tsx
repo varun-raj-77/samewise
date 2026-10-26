@@ -285,23 +285,40 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     }, "results");
   }
 
+  // A 409 means another action may have changed the run. Reload the
+  // authoritative projection but never silently retry a human decision.
+  async function parseReviewMutation(response: Response): Promise<RunSummary> {
+    if (response.status === 409 && run) {
+      try {
+        const fresh = await parseRun(await fetch(`/api/runs/${encodeURIComponent(run.runId)}`));
+        setRun(fresh);
+      } catch {
+        // Preserve the original mutation error; the user can retry a refresh.
+      }
+    }
+    return parseRun(response);
+  }
+
   function review(candidateId: string) { setSelectedCandidateId(candidateId); setScreen("review"); }
   async function decide(candidateId: string, decision: "same_entity" | "different_entity") {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/candidates/${candidateId}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/candidates/${encodeURIComponent(candidateId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) }).then(parseReviewMutation));
   }
   async function setDeferred(aRowId: string, deferred: boolean) {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/review-items/${encodeURIComponent(aRowId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deferred }) }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/review-items/${encodeURIComponent(aRowId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deferred }) }).then(parseReviewMutation));
   }
   async function undoReview() {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/review-undo`, { method: "POST" }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/review-undo`, { method: "POST" }).then(parseReviewMutation));
   }
   async function batchDecide(groupId: string, decision: "same_entity" | "different_entity") {
     if (!run) return null;
     return action(async () => {
       const response = await fetch(`/api/runs/${run.runId}/review-groups/${encodeURIComponent(groupId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, confirmed: true }) });
+      if (response.status === 409) {
+        try { setRun(await parseRun(await fetch(`/api/runs/${encodeURIComponent(run.runId)}`))); } catch { /* Retain the original conflict error. */ }
+      }
       if (!response.ok) { const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null; throw new Error(payload?.error?.message ?? "The batch decision could not be applied."); }
       return BatchIdentityDecisionResponseSchema.parse(await response.json()).run;
     });
