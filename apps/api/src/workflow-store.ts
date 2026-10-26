@@ -6,6 +6,7 @@ import {
   EXPORT_SNAPSHOT_VERSION,
   CONFIRMED_MAPPINGS_VERSION,
   REVIEW_SIGNATURE_VERSION,
+  ASSIGNMENT_POLICY_VERSION,
   MATCHER_VERSION,
   RECONCILIATION_EXPORT_VERSION,
   RUN_MANIFEST_VERSION,
@@ -58,7 +59,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
-import { ASSIGNMENT_POLICY_VERSION, automaticCandidatesForPolicy, type AssignmentPolicyVersion } from "./identity-selection.js";
+import { automaticCandidatesForPolicy, type AssignmentPolicyVersion } from "./identity-selection.js";
 import { RunRevisionConflictError, type PendingSourceWrite, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
