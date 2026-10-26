@@ -187,7 +187,7 @@ export function evaluateReviewStudy(input: unknown) {
     analysisVersion: REVIEW_STUDY_VERSION,
     taskSetId,
     labeledCases: truth.size,
-    observationsAreRecorded: true,
+    hasRecordedSessions: sessions.length > 0,
     arms: byArm,
     sameCaseCoverageAcrossArms: sameCaseCoverage,
     interpretation: "Descriptive observations only. No causal speedup or accuracy claim is supported without controlled assignment and representative reviewers.",
