@@ -60,6 +60,7 @@ export function CollisionInspector({ runId, bRowId, currentCandidateId, revision
         <header>
           <strong>{page.distinctARowCount} Dataset A record{page.distinctARowCount === 1 ? "" : "s"} retain {page.bRowId}</strong>
           <span>{page.claimedByARowId ? `Currently linked to ${page.claimedByARowId}` : "No identity link established for this B record"}</span>
+          <span>{Object.entries(page.bIdentity).filter(([,value]) => value).slice(0, 2).map(([name, value]) => `${name}: ${value}`).join(" · ") || "No mapped B identity value"}</span>
         </header>
         <p>Candidate rankings show evidence, not a confirmed winner. Open a case to inspect fields and make its identity decision separately.</p>
         <ol>
@@ -67,6 +68,7 @@ export function CollisionInspector({ runId, bRowId, currentCandidateId, revision
             <div><strong>{item.aRowId}</strong><span>Rank {item.candidate.rank} · Score {item.candidate.matchScore.toFixed(3)}</span></div>
             <p>{Object.entries(item.aIdentity).filter(([,value]) => value).slice(0, 2).map(([name, value]) => `${name}: ${value}`).join(" · ") || "No mapped identity value"}</p>
             <small>{item.candidate.strongestPositive ? `${item.candidate.strongestPositive.label} agrees` : "Limited positive evidence"}{item.candidate.strongestContradiction ? ` · ${item.candidate.strongestContradiction.label} conflicts` : ""}</small>
+            {item.candidate.humanDecision && <small>Recorded human decision: {item.candidate.humanDecision.humanDecision === "same_entity" ? "SAME" : "DIFFERENT"}</small>}
             <div className="collision-contender-status">
               <span>{item.identityStatus === "linked_here" ? `Linked to this B (${item.linkSource === "human" ? "human confirmed" : "matcher"})`
                 : item.identityStatus === "linked_elsewhere" ? `Already linked to ${item.linkedElsewhereBRowId}`
