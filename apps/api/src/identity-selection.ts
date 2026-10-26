@@ -41,7 +41,16 @@ export function conservativeAutomaticIdentityCandidateIds(candidates: CandidateP
  * changed. Only eligible auto proposals can be promoted. Every accepted A
  * and B appears at most once. Human decisions remain authoritative elsewhere.
  */
-export function automaticIdentityCandidateIds(candidates: CandidatePair[]): Set<string> {
+export interface AutomaticSelectionConstraints {
+  excludedCandidateIds?: ReadonlySet<string>;
+  reservedARowIds?: ReadonlySet<string>;
+  reservedBRowIds?: ReadonlySet<string>;
+}
+
+export function automaticIdentityCandidateIds(
+  candidates: CandidatePair[],
+  constraints: AutomaticSelectionConstraints = {},
+): Set<string> {
   const ownerARowsByB = new Map<string, Set<string>>();
   const candidateBsByA = new Map<string, Set<string>>();
   const autoProposalsByA = new Map<string, CandidatePair[]>();
@@ -63,7 +72,10 @@ export function automaticIdentityCandidateIds(candidates: CandidatePair[]): Set<
   for (const proposed of autoProposalsByA.values()) {
     // Preserve SW-021's fail-closed handling of malformed duplicate rank 1
     // and explicit matcher collision flags.
-    if (proposed.length !== 1 || proposed[0]!.collision) continue;
+    if (proposed.length !== 1 || proposed[0]!.collision
+      || constraints.excludedCandidateIds?.has(proposed[0]!.candidateId)
+      || constraints.reservedARowIds?.has(proposed[0]!.aRowId)
+      || constraints.reservedBRowIds?.has(proposed[0]!.bRowId)) continue;
     const candidate = proposed[0]!;
     const byB = candidatesByB.get(candidate.bRowId) ?? [];
     byB.push(candidate);
