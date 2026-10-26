@@ -24,6 +24,26 @@ The fixture contains **no real users or uploaded records**. It stores only minim
 
 Pooled precision is calculated from pooled numerator/denominator, never averaged across scenario percentages. Undefined precision is `null`. A few deliberately difficult, hand-authored cases are not a representative sample, so the aggregate must **not** be advertised as predictive product precision.
 
+## Observed CI evidence — hand-authored challenge cases
+
+Independent [GitHub Actions #232](https://github.com/varun-raj-77/samewise/actions/runs/40359114749) passed the verification suite, heldout SW-022 rerun, SW-024 challenge evaluation and production web build. The exact JSON was preserved at [`observed-ci-232.json`](../evaluation/reports/sw-024/observed-ci-232.json) with SHA-256 fingerprint of the constructed input catalog.
+
+| Across the 12 deliberately difficult synthetic cases | Pre-SW-021 | SW-021 conservative |
+|---|---:|---:|
+| A rows across scenarios | 20 | 20 |
+| B rows across scenarios | 20 | 20 |
+| Correct automatic links | 13 | 3 |
+| Incorrect automatic links | 3 | 2 |
+| Duplicate B claims | 2 | 0 |
+| A rows requiring review | 3 | 14 |
+| Automatic precision **inside this constructed collection only** | 13/16 | 3/5 |
+
+All 12 scenarios were manually designed to expose potential failure modes; their aggregate precision is **not a statistical estimate**, a calibrated probability, or a representative sample of uploads. The 18/20 retained true-pair coverage likewise measures only hand-authored final pair lists, not real Python blocking quality. Comparison isolates **assignment** after scoring; it must not be framed as a matcher precision claim.
+
+The key counterexample is `uncontested_but_wrong`: **a unique B assignment remains an incorrect identity link**. Therefore one-to-one integrity alone cannot compensate for wrongly scored candidates. Conversely, cases like `harmless_secondary_alternative` show that treating all lower-ranked alternatives as globally dangerous can defer a true positive unnecessarily.
+
+**Decision:** Keep SW-021's unique-B invariant and explicit review for unresolved conflicts; do not promote SW-023 on the basis of a single recovered holdout link. Before modifying the production selector, create a larger, independently labeled *real matcher-input* suite and benchmark the entire candidate/scoring/assignment pipeline with duplicate-aware evaluation.
+
 ## Scope B — per-run identity assignment-policy version
 
 Matcher, candidate engine and mapping versions already exist but do not identify the **post-scoring assignment rule**. We now pin the separate `assignmentPolicyVersion` to each run's persisted state, with the closed value `assignment-one-to-one-conservative-v1`.
