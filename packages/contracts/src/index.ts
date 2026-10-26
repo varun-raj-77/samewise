@@ -62,6 +62,7 @@ export {
 } from "./survivorship.js";
 export {
   CandidatePairSchema,
+  ASSIGNMENT_POLICY_VERSION,
   BatchIdentityDecisionInputSchema,
   BatchIdentityDecisionResponseSchema,
   CandidateEvidenceDetailSchema,
