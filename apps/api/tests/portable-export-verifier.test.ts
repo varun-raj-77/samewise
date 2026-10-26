@@ -9,7 +9,7 @@ import {
   verifyPortableExport,
 } from "../src/portable-export-verifier.js";
 
-function dataset(side: "A" | "B") {
+function dataset<Side extends "A" | "B">(side: Side) {
   return {
     contractVersion: "1.0.0" as const,
     datasetId: `dataset-${side}`,
@@ -28,7 +28,7 @@ function view(ready = true): RunView {
     stage: "export",
     datasets: { A: dataset("A"), B: dataset("B") },
     mappings: [{ mappingId: "label", label: "Label", aColumn: "label", bColumn: "label", useForMatching: false, includeInMerge: true, normalizer: "text" }],
-    mappingVersion: "confirmed-v1",
+    mappingVersion: "confirmed-mappings-v3",
     semanticMappingProvenance: null,
     matcherVersion: "explainable-matcher-v0.3.0",
     matcherProvenance: {
@@ -103,7 +103,7 @@ describe("SW-030 portable export verifier", () => {
   it("rejects a same-length single-byte CSV modification", () => {
     const { manifest, files } = fixture();
     const changed = files.map((file) => ({ ...file, bytes: Buffer.from(file.bytes) }));
-    changed[0]!.bytes[10] ^= 1;
+    changed[0]!.bytes[10] = changed[0]!.bytes[10]! ^ 1;
     expectFailure(() => verifyPortableExport(manifest, changed), "sha256_mismatch");
   });
 
@@ -161,7 +161,7 @@ describe("SW-030 portable export verifier", () => {
     // A party controlling BOTH the bytes and manifest can recompute the unkeyed SHA-256.
     // This verifier guarantees consistency, not publisher authenticity or identity truth.
     const changed = files.map((file) => ({ ...file, bytes: Buffer.from(file.bytes) }));
-    changed[0]!.bytes[0] ^= 1;
+    changed[0]!.bytes[0] = changed[0]!.bytes[0]! ^ 1;
     manifest.export.artifacts[0]!.sha256 = createHash("sha256").update(changed[0]!.bytes).digest("hex");
     expect(verifyPortableExport(manifest, changed).status).toBe("trusted_ready");
   });
