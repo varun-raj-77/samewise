@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   experimentalPropagatedAutomaticIdentityCandidateIds,
+  automaticIdentityCandidateIds,
   conservativeAutomaticIdentityCandidateIds,
 } from "../src/identity-selection.js";
 
@@ -19,6 +20,19 @@ function pair(
 }
 
 describe("SW-023 safe one-to-one automatic recovery", () => {
+  it("keeps the live selector pinned to SW-021 while the alternative is experimental", () => {
+    const pairs = [
+      pair("A1", "B1"), pair("A2", "B2"),
+      pair("A2", "B1", { band: "needs_review", rank: 2 }),
+    ];
+    expect([...automaticIdentityCandidateIds(pairs)]).toEqual(
+      [...conservativeAutomaticIdentityCandidateIds(pairs)],
+    );
+    expect([...automaticIdentityCandidateIds(pairs)]).toEqual(["A2:B2"]);
+    expect([...experimentalPropagatedAutomaticIdentityCandidateIds(pairs)].sort())
+      .toEqual(["A1:B1", "A2:B2"]);
+  });
+
   it("recovers an auto pair when its only competitor is anchored to a different unique B", () => {
     const pairs = [
       pair("A1", "B1"),
