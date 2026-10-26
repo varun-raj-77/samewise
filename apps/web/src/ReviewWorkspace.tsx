@@ -164,10 +164,12 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   useEffect(() => { if (selectedCandidate) decisionHeadingRef.current?.focus(); }, [selectedCandidate?.candidateId]);
 
   function selectItem(item: ReviewQueueProjectionItem) {
+    if (mutationInFlight.current) return;
     pinnedCandidateId.current = null;
     setSelectedCandidateId(preferredCandidate(item));
   }
   function inspectOutsideQueue(candidateId: string) {
+    if (mutationInFlight.current) return;
     pinnedCandidateId.current = candidateId;
     setSelectedCandidateId(candidateId);
   }
@@ -176,6 +178,10 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     mutationInFlight.current = true;
     setLocalBusy(true);
     try { return await work(); }
+    catch {
+      setAnnouncement("Review action could not be confirmed. Refresh run state before retrying.");
+      return null;
+    }
     finally {
       mutationInFlight.current = false;
       setLocalBusy(false);
@@ -189,8 +195,8 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     if (!items.length) return;
     const index = Math.max(0, items.findIndex((item) => item.aRowId === selectedARowId));
     const nextIndex = index + delta;
-    if (nextIndex < 0 && page?.page.previousOffset != null) { setOffset(page.page.previousOffset); return; }
-    if (nextIndex >= items.length && page?.page.nextOffset != null) { setOffset(page.page.nextOffset); return; }
+    if (nextIndex < 0 && page?.page.previousOffset != null) { pinnedCandidateId.current = null; setOffset(page.page.previousOffset); return; }
+    if (nextIndex >= items.length && page?.page.nextOffset != null) { pinnedCandidateId.current = null; setOffset(page.page.nextOffset); return; }
     selectItem(items[(nextIndex + items.length) % items.length]!);
   }
 
@@ -232,7 +238,8 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     if (!updated) return;
     detailCache.current.clear();
     setDetailRequestVersion((value) => value + 1);
-    inspectOutsideQueue(undone.candidateId);
+    pinnedCandidateId.current = undone.candidateId;
+    setSelectedCandidateId(undone.candidateId);
     setAnnouncement(`Review decision for ${undone.aRowId} and ${undone.bRowId} was undone.`);
   }
 
@@ -274,9 +281,9 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     <div className="review-layout">
       <aside className="review-queue" aria-labelledby="review-queue-title">
         <div className="review-queue-heading"><h2 id="review-queue-title">Review queue</h2><span>{page ? `${page.page.returned} visible / ${page.page.total} filtered / ${run.reviewProgress.total} total` : "Loading…"}</span></div>
-        <label className="queue-search"><span className="sr-only">Search review queue</span><input type="search" placeholder="Search row ID or name" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-        <div className="queue-controls"><label><span>Show {run.reviewProgress.deferred > 0 && <em>{run.reviewProgress.deferred} deferred</em>}</span><select aria-label="Filter review queue" value={filter} onChange={(event) => setFilter(event.target.value as ReviewFilter)}><option value="unresolved">Active unresolved</option><option value="all">All review items</option><option value="deferred">Deferred ({run.reviewProgress.deferred})</option><option value="collision">Has collision</option><option value="contradiction">Has contradiction</option><option value="multiple">Multiple candidates</option></select></label><label><span>Sort</span><select aria-label="Sort review queue" value={sort} onChange={(event) => setSort(event.target.value as ReviewSort)}><option value="ambiguity">Most ambiguous</option><option value="score_desc">Highest score</option><option value="score_asc">Lowest score</option><option value="candidate_count">Most candidates</option><option value="source">Source order</option></select></label></div>
-        {queueError ? <div className="warning" role="alert"><span>{queueError}</span><button type="button" onClick={() => setQueueRequestVersion((value) => value + 1)}>Retry</button></div> : page ? <>{page.items.length ? <VirtualReviewQueue items={page.items} selectedARowId={selectedARowId} onSelect={selectItem} pageKey={`${run.runId}:${offset}:${filter}:${sort}:${deferredQuery}`} /> : deferredEmptyState ? <div className="deferred-queue-empty"><strong>{run.reviewProgress.deferred} review case{run.reviewProgress.deferred === 1 ? " is" : "s are"} deferred</strong><p>Deferred cases are still part of this reconciliation.</p><button type="button" className="secondary" onClick={viewDeferredCases}>View deferred cases</button></div> : <p className="empty">No review items match this view.</p>}<div className="actions" aria-label="Review queue pagination"><button type="button" className="secondary" disabled={page.page.previousOffset === null} onClick={() => setOffset(page.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={page.page.nextOffset === null} onClick={() => setOffset(page.page.nextOffset ?? offset)}>Next</button></div></> : <p role="status">Loading review queue…</p>}
+        <label className="queue-search"><span className="sr-only">Search review queue</span><input type="search" placeholder="Search row ID or name" value={query} onChange={(event) => { pinnedCandidateId.current = null; setQuery(event.target.value); }} /></label>
+        <div className="queue-controls"><label><span>Show {run.reviewProgress.deferred > 0 && <em>{run.reviewProgress.deferred} deferred</em>}</span><select aria-label="Filter review queue" value={filter} onChange={(event) => { pinnedCandidateId.current = null; setFilter(event.target.value as ReviewFilter); }}><option value="unresolved">Active unresolved</option><option value="all">All review items</option><option value="deferred">Deferred ({run.reviewProgress.deferred})</option><option value="collision">Has collision</option><option value="contradiction">Has contradiction</option><option value="multiple">Multiple candidates</option></select></label><label><span>Sort</span><select aria-label="Sort review queue" value={sort} onChange={(event) => { pinnedCandidateId.current = null; setSort(event.target.value as ReviewSort); }}><option value="ambiguity">Most ambiguous</option><option value="score_desc">Highest score</option><option value="score_asc">Lowest score</option><option value="candidate_count">Most candidates</option><option value="source">Source order</option></select></label></div>
+        {queueError ? <div className="warning" role="alert"><span>{queueError}</span><button type="button" onClick={() => setQueueRequestVersion((value) => value + 1)}>Retry</button></div> : page ? <>{page.items.length ? <VirtualReviewQueue items={page.items} selectedARowId={selectedARowId} onSelect={selectItem} pageKey={`${run.runId}:${offset}:${filter}:${sort}:${deferredQuery}`} /> : deferredEmptyState ? <div className="deferred-queue-empty"><strong>{run.reviewProgress.deferred} review case{run.reviewProgress.deferred === 1 ? " is" : "s are"} deferred</strong><p>Deferred cases are still part of this reconciliation.</p><button type="button" className="secondary" onClick={viewDeferredCases}>View deferred cases</button></div> : <p className="empty">No review items match this view.</p>}<div className="actions" aria-label="Review queue pagination"><button type="button" className="secondary" disabled={page.page.previousOffset === null} onClick={() => { pinnedCandidateId.current = null; setOffset(page.page.previousOffset ?? 0); }}>Previous</button><button type="button" className="secondary" disabled={page.page.nextOffset === null} onClick={() => { pinnedCandidateId.current = null; setOffset(page.page.nextOffset ?? offset); }}>Next</button></div></> : <p role="status">Loading review queue…</p>}
       </aside>
       <section className="review-case" aria-label="Selected identity case">
         {detailLoading && <div className="review-complete" role="status"><h2>Loading candidate evidence…</h2><p>The queue remains available while full evidence is fetched.</p></div>}
