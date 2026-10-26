@@ -8,6 +8,7 @@ import {
 export const WORKFLOW_CONTRACT_VERSION = "1.0.0" as const;
 export const WORKFLOW_PROJECTION_CONTRACT_VERSION = "1.0.0" as const;
 export const MATCHER_VERSION = "explainable-matcher-v0.3.0" as const;
+export const ASSIGNMENT_POLICY_VERSION = "assignment-one-to-one-conservative-v1" as const;
 export const CANDIDATE_ENGINE_VERSION = "candidate-engine-v0.4.0" as const;
 export const BLOCKING_NORMALIZATION_VERSION = "blocking-normalization-v0.1.0" as const;
 export const FEATURE_PIPELINE_VERSION = "feature-pipeline-v0.2.0" as const;
@@ -476,6 +477,7 @@ export const RunViewSchema = z.object({
     responseId: z.string().min(1),
   }).strict().nullable(),
   matcherVersion: z.literal(MATCHER_VERSION).nullable(),
+  assignmentPolicyVersion: z.literal(ASSIGNMENT_POLICY_VERSION).optional(),
   matcherProvenance: MatcherProvenanceSchema.nullable(),
   summary: ResultSummarySchema.nullable(),
   candidates: z.array(CandidatePairSchema),
