@@ -74,5 +74,8 @@ jobs:
       - name: Benchmark SW-022 held-out identity assignments
         run: pnpm benchmark:sw022
 
+      - name: Evaluate SW-024 independent collision truth scenarios
+        run: pnpm benchmark:sw024
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build

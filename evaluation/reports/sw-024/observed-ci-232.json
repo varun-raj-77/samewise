@@ -1,0 +1,682 @@
+{
+  "sourceSha256": "c23a2984746cdddb4ec7b520a5f53f916a1646cd7b1ca6a34e5001dbe8315635",
+  "labelBasis": "Hand-authored synthetic identity labels. No matcher run, no AI, no sampled user records.",
+  "evaluationVersion": "collision-evaluation-v1",
+  "fixtureOrigin": "independently_hand_authored_synthetic_candidate_graphs",
+  "scope": "Hand-authored synthetic candidate graphs only. Not a matcher quality or production precision benchmark.",
+  "scenarioCount": 12,
+  "policyVersion": "assignment-one-to-one-conservative-v1",
+  "cases": [
+    {
+      "id": "competing_auto_one_false",
+      "description": "Two high-scoring A records claim one B; only one candidate is truly the same entity.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 2,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 3,
+        "retainedTruePairs": 2,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 2,
+        "retainedPairReductionFraction": 0.25
+      },
+      "legacy": {
+        "autoAssignedARows": 2,
+        "autoAssignedPairs": 2,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 1,
+        "autoMatchPrecision": 0.5,
+        "autoMatchRecallPerMatchableARow": 0.5,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 1
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -2,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": -1,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": -1
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 1,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 1
+      }
+    },
+    {
+      "id": "harmless_secondary_alternative",
+      "description": "Two correct independent auto pairs; A2 also retains B1 as a lower-ranked alternative.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 2,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 3,
+        "retainedTruePairs": 2,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 2,
+        "retainedPairReductionFraction": 0.25
+      },
+      "legacy": {
+        "autoAssignedARows": 2,
+        "autoAssignedPairs": 2,
+        "trueAutoPairs": 2,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.5,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.5,
+        "reviewRateMatchableARows": 0.5,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -1,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.5,
+        "reviewRateMatchableARows": 0.5,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "reciprocal_ambiguous_cycle",
+      "description": "Two correct rank-one proposals but reciprocal lower-ranked alternatives make a cycle.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 2,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 4,
+        "retainedTruePairs": 2,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 2,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 2,
+        "autoAssignedPairs": 2,
+        "trueAutoPairs": 2,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -2,
+        "trueAutoPairs": -2,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 2,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "low_score_competitor_to_good_link",
+      "description": "An otherwise safe automatic pair is contested by another A's explicitly review-only proposal.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 2,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 3,
+        "retainedTruePairs": 2,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 2,
+        "retainedPairReductionFraction": 0.25
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.5,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.5,
+        "reviewRateMatchableARows": 0.5,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -1,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.5,
+        "reviewRateMatchableARows": 0.5,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "uncontested_but_wrong",
+      "description": "Uniqueness cannot detect an incorrect top-scoring auto identity.",
+      "denominators": {
+        "sourceARows": 1,
+        "sourceBRows": 2,
+        "matchableARows": 1,
+        "truthCrossSourcePairs": 1,
+        "retainedCandidatePairs": 2,
+        "retainedTruePairs": 1,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 1,
+        "autoMatchPrecision": 0,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 1,
+        "autoMatchPrecision": 0,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 0,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "duplicate_canonical_identity",
+      "description": "Two actual A occurrences of the same entity correctly correspond to one B; strict one-to-one cannot retain both.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 1,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 2,
+        "retainedTruePairs": 2,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 2,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 2,
+        "autoAssignedPairs": 2,
+        "trueAutoPairs": 2,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 1
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -2,
+        "trueAutoPairs": -2,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": -1
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 1,
+        "correctAutomaticLinksDeferred": 2,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "explicit_collision_hint",
+      "description": "One candidate carries a matcher collision hint even without other retained candidates.",
+      "denominators": {
+        "sourceARows": 1,
+        "sourceBRows": 1,
+        "matchableARows": 1,
+        "truthCrossSourcePairs": 1,
+        "retainedCandidatePairs": 1,
+        "retainedTruePairs": 1,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -1,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "review_only_no_automatic",
+      "description": "No candidate is above the automatic threshold.",
+      "denominators": {
+        "sourceARows": 1,
+        "sourceBRows": 1,
+        "matchableARows": 1,
+        "truthCrossSourcePairs": 1,
+        "retainedCandidatePairs": 1,
+        "retainedTruePairs": 1,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 0,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "uncontested_exact",
+      "description": "An unambiguous correctly scored rank-one link must remain automatic.",
+      "denominators": {
+        "sourceARows": 1,
+        "sourceBRows": 1,
+        "matchableARows": 1,
+        "truthCrossSourcePairs": 1,
+        "retainedCandidatePairs": 1,
+        "retainedTruePairs": 1,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 0,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "malformed_double_rank_one",
+      "description": "Two rank-one automatic proposals for one A must not both be accepted.",
+      "denominators": {
+        "sourceARows": 1,
+        "sourceBRows": 2,
+        "matchableARows": 1,
+        "truthCrossSourcePairs": 1,
+        "retainedCandidatePairs": 2,
+        "retainedTruePairs": 1,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 1,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 0,
+        "autoAssignedPairs": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": null,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -1,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 1,
+        "reviewRateMatchableARows": 1,
+        "autoMatchPrecision": null,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "false_proposals_with_no_true_retained_pair",
+      "description": "Both A and B contain matching entities, but the only scored candidate pair is wrong.",
+      "denominators": {
+        "sourceARows": 2,
+        "sourceBRows": 2,
+        "matchableARows": 2,
+        "truthCrossSourcePairs": 2,
+        "retainedCandidatePairs": 1,
+        "retainedTruePairs": 0,
+        "retainedCandidatePairRecall": 0,
+        "aRowsWithRetainedCandidates": 1,
+        "retainedPairReductionFraction": 0.75
+      },
+      "legacy": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 1,
+        "autoMatchPrecision": 0,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 1,
+        "autoMatchPrecision": 0,
+        "autoMatchRecallPerMatchableARow": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": 0,
+        "trueAutoPairs": 0,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 0,
+        "reviewRateAllARows": 0,
+        "reviewRateMatchableARows": 0,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 0,
+        "falseAutomaticLinksDeferred": 0
+      }
+    },
+    {
+      "id": "many_to_one_truth_vs_record_uniqueness",
+      "description": "Legitimately duplicate canonical entity records need an explicit many-to-one mode; this run uses one-to-one.",
+      "denominators": {
+        "sourceARows": 3,
+        "sourceBRows": 2,
+        "matchableARows": 3,
+        "truthCrossSourcePairs": 3,
+        "retainedCandidatePairs": 3,
+        "retainedTruePairs": 3,
+        "retainedCandidatePairRecall": 1,
+        "aRowsWithRetainedCandidates": 3,
+        "retainedPairReductionFraction": 0.5
+      },
+      "legacy": {
+        "autoAssignedARows": 2,
+        "autoAssignedPairs": 2,
+        "trueAutoPairs": 2,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.6666666666666666,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.3333333333333333,
+        "reviewRateMatchableARows": 0.3333333333333333,
+        "duplicateBClaims": 0
+      },
+      "conservative": {
+        "autoAssignedARows": 1,
+        "autoAssignedPairs": 1,
+        "trueAutoPairs": 1,
+        "falseAutoPairs": 0,
+        "autoMatchPrecision": 1,
+        "autoMatchRecallPerMatchableARow": 0.3333333333333333,
+        "reviewRoutedARows": 2,
+        "reviewRateAllARows": 0.6666666666666666,
+        "reviewRateMatchableARows": 0.6666666666666666,
+        "duplicateBClaims": 0
+      },
+      "delta": {
+        "autoAssignedARows": -1,
+        "trueAutoPairs": -1,
+        "falseAutoPairs": 0,
+        "reviewRoutedARows": 1,
+        "reviewRateAllARows": 0.3333333333333333,
+        "reviewRateMatchableARows": 0.3333333333333333,
+        "autoMatchPrecision": 0,
+        "duplicateBClaims": 0
+      },
+      "outcomes": {
+        "duplicateBClaimsEliminated": 0,
+        "correctAutomaticLinksDeferred": 1,
+        "falseAutomaticLinksDeferred": 0
+      }
+    }
+  ],
+  "aggregate": {
+    "sourceARows": 20,
+    "sourceBRows": 20,
+    "truthCrossSourcePairs": 20,
+    "retainedTruePairs": 18,
+    "retainedCandidatePairRecall": 0.9,
+    "legacy": {
+      "autoAssignedPairs": 16,
+      "trueAutoPairs": 13,
+      "falseAutoPairs": 3,
+      "precision": 0.8125,
+      "reviewRoutedARows": 3,
+      "duplicateBClaims": 2
+    },
+    "conservative": {
+      "autoAssignedPairs": 5,
+      "trueAutoPairs": 3,
+      "falseAutoPairs": 2,
+      "precision": 0.6,
+      "reviewRoutedARows": 14,
+      "duplicateBClaims": 0
+    }
+  }
+}

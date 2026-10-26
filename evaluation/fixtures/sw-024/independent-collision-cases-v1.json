@@ -1,0 +1,495 @@
+{
+  "fixtureVersion": "collision-evaluation-v1",
+  "origin": "independently_hand_authored_synthetic_candidate_graphs",
+  "note": "These are synthetic candidate graphs with manually specified ground-truth entity IDs. They do not originate from the matcher; matchScore/precision beyond assignment semantics are not evaluated.",
+  "cases": [
+    {
+      "id": "competing_auto_one_false",
+      "description": "Two high-scoring A records claim one B; only one candidate is truly the same entity.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B2",
+          "aRowId": "A2",
+          "bRowId": "B2",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "harmless_secondary_alternative",
+      "description": "Two correct independent auto pairs; A2 also retains B1 as a lower-ranked alternative.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B2",
+          "aRowId": "A2",
+          "bRowId": "B2",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "reciprocal_ambiguous_cycle",
+      "description": "Two correct rank-one proposals but reciprocal lower-ranked alternatives make a cycle.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A1--B2",
+          "aRowId": "A1",
+          "bRowId": "B2",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B2",
+          "aRowId": "A2",
+          "bRowId": "B2",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "low_score_competitor_to_good_link",
+      "description": "An otherwise safe automatic pair is contested by another A's explicitly review-only proposal.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "needs_review",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B2",
+          "aRowId": "A2",
+          "bRowId": "B2",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "uncontested_but_wrong",
+      "description": "Uniqueness cannot detect an incorrect top-scoring auto identity.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e2"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e1"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A1--B2",
+          "aRowId": "A1",
+          "bRowId": "B2",
+          "band": "needs_review",
+          "rank": 2,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "duplicate_canonical_identity",
+      "description": "Two actual A occurrences of the same entity correctly correspond to one B; strict one-to-one cannot retain both.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "explicit_collision_hint",
+      "description": "One candidate carries a matcher collision hint even without other retained candidates.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": true
+        }
+      ]
+    },
+    {
+      "id": "review_only_no_automatic",
+      "description": "No candidate is above the automatic threshold.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "needs_review",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "uncontested_exact",
+      "description": "An unambiguous correctly scored rank-one link must remain automatic.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "malformed_double_rank_one",
+      "description": "Two rank-one automatic proposals for one A must not both be accepted.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A1--B2",
+          "aRowId": "A1",
+          "bRowId": "B2",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "false_proposals_with_no_true_retained_pair",
+      "description": "Both A and B contain matching entities, but the only scored candidate pair is wrong.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B2",
+          "aRowId": "A1",
+          "bRowId": "B2",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    },
+    {
+      "id": "many_to_one_truth_vs_record_uniqueness",
+      "description": "Legitimately duplicate canonical entity records need an explicit many-to-one mode; this run uses one-to-one.",
+      "sourceA": [
+        {
+          "rowId": "A1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A2",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "A3",
+          "entityId": "e2"
+        }
+      ],
+      "sourceB": [
+        {
+          "rowId": "B1",
+          "entityId": "e1"
+        },
+        {
+          "rowId": "B2",
+          "entityId": "e2"
+        }
+      ],
+      "candidates": [
+        {
+          "candidateId": "A1--B1",
+          "aRowId": "A1",
+          "bRowId": "B1",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A2--B1",
+          "aRowId": "A2",
+          "bRowId": "B1",
+          "band": "needs_review",
+          "rank": 1,
+          "collision": false
+        },
+        {
+          "candidateId": "A3--B2",
+          "aRowId": "A3",
+          "bRowId": "B2",
+          "band": "auto_match",
+          "rank": 1,
+          "collision": false
+        }
+      ]
+    }
+  ]
+}
