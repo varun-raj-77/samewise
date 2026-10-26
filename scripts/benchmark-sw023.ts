@@ -19,7 +19,7 @@ import {
   diagnoseAutomaticDeferrals,
   type IdentityTruthFixture,
 } from "../apps/api/src/one-to-one-benchmark.js";
-import { automaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds } from "../apps/api/src/identity-selection.js";
+import { experimentalPropagatedAutomaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds } from "../apps/api/src/identity-selection.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtures = ["organizations-dev-v1", "organizations-matcher-holdout-1200-v1"];
@@ -63,7 +63,7 @@ async function runOne(fixture: string) {
     const t0 = performance.now();
     conservativeAutomaticIdentityCandidateIds(result.candidates);
     const t1 = performance.now();
-    automaticIdentityCandidateIds(result.candidates);
+    experimentalPropagatedAutomaticIdentityCandidateIds(result.candidates);
     const t2 = performance.now();
     if (i >= 5) { legacyTimes.push(t1 - t0); recoveryTimes.push(t2 - t1); }
   }
