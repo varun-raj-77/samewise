@@ -58,7 +58,7 @@ import {
 } from "@samewise/contracts";
 
 import type { MatcherRunner } from "./matcher-process.js";
-import { automaticIdentityCandidateIds } from "./identity-selection.js";
+import { ASSIGNMENT_POLICY_VERSION, automaticCandidatesForPolicy, type AssignmentPolicyVersion } from "./identity-selection.js";
 import { RunRevisionConflictError, type PendingSourceWrite, type PersistedRunStateEnvelope, type RunRepository } from "./run-repository.js";
 import {
   buildMetadataFirstInput,
@@ -85,6 +85,7 @@ interface DatasetArtifact {
 
 interface RunState {
   runId: string;
+  assignmentPolicyVersion: AssignmentPolicyVersion;
   stage: RunView["stage"];
   datasets: Partial<Record<DatasetSide, DatasetArtifact>>;
   mappings: ManualMapping[];
@@ -117,6 +118,7 @@ interface PersistedDatasetArtifact {
 
 interface PersistedRunState {
   runId: string;
+  assignmentPolicyVersion?: AssignmentPolicyVersion;
   stage: RunView["stage"];
   datasets: Partial<Record<DatasetSide, PersistedDatasetArtifact>>;
   mappings: ManualMapping[];
@@ -160,6 +162,11 @@ function parsePersistedRunState(value: unknown, expectedRunId: string): Persiste
   ) {
     throw new Error(`Persisted run ${expectedRunId} uses an invalid state shape.`);
   }
+  if (state.assignmentPolicyVersion !== undefined && state.assignmentPolicyVersion !== ASSIGNMENT_POLICY_VERSION) {
+    throw new Error(`Persisted run ${expectedRunId} uses an unsupported identity-assignment policy.`);
+  }
+  // Pre-SW-024 snapshots omit this field. They were computed with the
+  // conservative SW-021 policy, so the same historical semantics apply.
   if (state.matchJob !== undefined) {
     MatchJobSchema.parse(state.matchJob);
     if (state.matchJob.runId !== expectedRunId) throw new Error("Persisted matcher job belongs to another run.");
@@ -312,6 +319,7 @@ function summarizeReviewGroup(entries: { item: ReviewQueueItem; candidate: Candi
 function selectedIdentityLinks(
   candidates: CandidatePair[],
   decisions: IdentityDecision[],
+  policyVersion: AssignmentPolicyVersion,
 ): { candidate: CandidatePair; decision: IdentityDecision | null }[] {
   const candidateById = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
   const confirmedA = new Set<string>();
@@ -332,7 +340,7 @@ function selectedIdentityLinks(
     links.push({ candidate, decision });
   }
   const rejected = new Set(decisions.filter((item) => item.humanDecision === "different_entity").map((item) => item.candidateId));
-  const automatic = automaticIdentityCandidateIds(candidates);
+  const automatic = automaticCandidatesForPolicy(candidates, policyVersion);
   for (const candidate of candidates) {
     if (!automatic.has(candidate.candidateId) || confirmedA.has(candidate.aRowId)
       || claimedB.has(candidate.bRowId) || rejected.has(candidate.candidateId)) continue;
@@ -428,6 +436,7 @@ export class WorkflowStore {
     if (run.datasets.B) datasets.B = { profile: run.datasets.B.profile };
     return {
       runId: run.runId,
+      assignmentPolicyVersion: run.assignmentPolicyVersion,
       stage: run.stage,
       datasets,
       mappings: run.mappings,
@@ -478,6 +487,7 @@ export class WorkflowStore {
     this.persistedRevisions.set(state.runId, envelope.revision);
     this.runs.set(state.runId, {
       runId: state.runId,
+      assignmentPolicyVersion: state.assignmentPolicyVersion ?? ASSIGNMENT_POLICY_VERSION,
       stage: state.stage,
       datasets,
       mappings: state.mappings,
@@ -499,6 +509,7 @@ export class WorkflowStore {
   createRun(): RunSummary {
     const run: RunState = {
       runId: `run-${randomUUID()}`,
+      assignmentPolicyVersion: ASSIGNMENT_POLICY_VERSION,
       stage: "upload",
       datasets: {},
       mappings: [],
@@ -727,7 +738,7 @@ export class WorkflowStore {
     run.previewedRuleIds.clear();
     run.mergePlanRevision += 1;
     run.rulesApplied = false;
-    for (const { candidate } of selectedIdentityLinks(run.result.candidates, [])) {
+    for (const { candidate } of selectedIdentityLinks(run.result.candidates, [], run.assignmentPolicyVersion)) {
       for (const conflict of comparisonConflicts(run, candidate, null, "system_matcher")) run.conflicts.set(conflict.conflictId, conflict);
     }
     run.stage = "results";
@@ -1421,7 +1432,7 @@ export class WorkflowStore {
             ? "linked_automatically"
             : linked
               ? "other_candidate_linked"
-              : candidate.band === "needs_review" || !automaticIdentityCandidateIds(run.result.candidates).has(candidate.candidateId)
+              : candidate.band === "needs_review" || !automaticCandidatesForPolicy(run.result.candidates, run.assignmentPolicyVersion).has(candidate.candidateId)
                 ? "candidate_awaiting_review"
                 : "alternative_not_selected";
     const evidence = candidate?.evidence ?? [];
@@ -1526,7 +1537,7 @@ export class WorkflowStore {
   }
 
   private effectiveLinks(run: RunState): CandidatePair[] {
-    return selectedIdentityLinks(run.result?.candidates ?? [], [...run.decisions.values()])
+    return selectedIdentityLinks(run.result?.candidates ?? [], [...run.decisions.values()], run.assignmentPolicyVersion)
       .map((link) => link.candidate);
   }
 
@@ -1639,6 +1650,7 @@ export class WorkflowStore {
       contractVersion: view.contractVersion,
       projectionVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
       runId: view.runId,
+      assignmentPolicyVersion: view.assignmentPolicyVersion,
       stage: view.stage,
       datasets: view.datasets,
       mappings: view.mappings,
@@ -1732,6 +1744,7 @@ export class WorkflowStore {
     return {
       contractVersion: WORKFLOW_CONTRACT_VERSION,
       runId: run.runId,
+      assignmentPolicyVersion: run.assignmentPolicyVersion,
       stage: run.stage,
       datasets: {
         ...(run.datasets.A ? { A: run.datasets.A.profile } : {}),
@@ -1786,7 +1799,7 @@ export class WorkflowStore {
       groups.set(candidate.aRowId, group);
     }
     const decisions = [...run.decisions.values()];
-    const eligibleAutomatic = automaticIdentityCandidateIds(candidates);
+    const eligibleAutomatic = automaticCandidatesForPolicy(candidates, run.assignmentPolicyVersion);
     const queue: ReviewQueueItem[] = [];
     let sourceOrder = 0;
     for (const [aRowId, unsorted] of groups) {
@@ -1878,7 +1891,7 @@ function csv(rows: string[][]): string {
 function compareIds(left: string, right: string): number { return left.localeCompare(right, "en"); }
 
 function effectiveLinks(view: RunView) {
-  return selectedIdentityLinks(view.candidates, view.decisions)
+  return selectedIdentityLinks(view.candidates, view.decisions, view.assignmentPolicyVersion ?? ASSIGNMENT_POLICY_VERSION)
     .map(({ candidate, decision }) => ({
       candidate, source: decision ? "human" : "system_matcher", decision,
     }))
