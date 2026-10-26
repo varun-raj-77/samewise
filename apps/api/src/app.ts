@@ -550,10 +550,31 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return { ...result, run: RunSummarySchema.parse(result.run) };
   });
 
+  // Pin separately downloaded CSVs and manifest to the SAME authoritative
+  // in-memory run state. We deliberately do not retain historical snapshots:
+  // a changed run fails closed with 409 instead of silently mixing artifacts.
+  function checkedExportSnapshot(runId: string, rawQuery: unknown) {
+    const query = rawQuery as { expectedSnapshot?: unknown } | null;
+    const expectedSnapshot = query?.expectedSnapshot;
+    if (expectedSnapshot !== undefined &&
+      (typeof expectedSnapshot !== "string" || !/^[a-f0-9]{64}$/.test(expectedSnapshot))) {
+      throw new WorkflowError("invalid_export_snapshot", "Expected export snapshot must be a 64-character lowercase SHA-256.");
+    }
+    const snapshot = store.exportSnapshot(runId);
+    const snapshotSha = snapshot.manifest.value.run.snapshot.authoritativeStateSha256;
+    if (expectedSnapshot !== undefined && expectedSnapshot !== snapshotSha) {
+      throw new WorkflowError("stale_export_snapshot", "This run changed since the previous export. Download a new manifest and all associated CSVs.", 409);
+    }
+    return { snapshot, snapshotSha };
+  }
+
   app.get("/api/runs/:runId/export", async (request, reply) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const artifact = store.exportSnapshot(runId).reconciliation;
+    reply.header("Cache-Control", "no-store");
+    const { snapshot, snapshotSha } = checkedExportSnapshot(runId, request.query);
+    const artifact = snapshot.reconciliation;
+    reply.header("X-Samewise-Export-Snapshot", snapshotSha);
     app.log.info({ runId, stage: "export" }, "reconciliation export created");
     reply.header("Content-Type", "text/csv; charset=utf-8");
     reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
@@ -563,12 +584,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.get("/api/runs/:runId/trusted-export", async (request, reply) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const artifact = store.exportSnapshot(runId).trusted;
+    reply.header("Cache-Control", "no-store");
+    const { snapshot, snapshotSha } = checkedExportSnapshot(runId, request.query);
+    const artifact = snapshot.trusted;
     if (!artifact) {
       const view = store.get(runId);
       throw new WorkflowError("trusted_export_not_ready", `Trusted merged output is blocked: ${view.trustedExportReadiness.blockers.join(" ")}`, 409);
     }
     app.log.info({ runId, stage: "trusted_export" }, "trusted merged export created");
+    reply.header("X-Samewise-Export-Snapshot", snapshotSha);
     reply.header("Content-Type", "text/csv; charset=utf-8");
     reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
     return artifact.content;
@@ -577,8 +601,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.get("/api/runs/:runId/manifest", async (request, reply) => {
     const { runId } = routeParams(request.params);
     if (!runId) throw new WorkflowError("invalid_request", "Run ID is required.");
-    const artifact = store.exportSnapshot(runId).manifest;
+    reply.header("Cache-Control", "no-store");
+    const { snapshot, snapshotSha } = checkedExportSnapshot(runId, request.query);
+    const artifact = snapshot.manifest;
     RunManifestSchema.parse(artifact.value);
+    reply.header("X-Samewise-Export-Snapshot", snapshotSha);
     app.log.info({ runId, stage: "manifest_export" }, "run provenance manifest created");
     reply.header("Content-Type", "application/json; charset=utf-8");
     reply.header("Content-Disposition", `attachment; filename="${artifact.filename}"`);
