@@ -58,7 +58,7 @@ describe("SW-029 offline reviewer-efficiency evaluation", () => {
     const result = evaluateReviewStudy(sample());
     expect(result).toMatchObject({
       analysisVersion: REVIEW_STUDY_VERSION, taskSetId: "synthetic-collision-tasks-v1",
-      labeledCases: 3, observationsAreRecorded: true, sameCaseCoverageAcrossArms: true,
+      labeledCases: 3, hasRecordedSessions: true, sameCaseCoverageAcrossArms: true,
     });
     expect(result.arms[0]).toMatchObject({
       arm: "standard_queue", sessions: 1, reviewers: 1,
@@ -81,6 +81,7 @@ describe("SW-029 offline reviewer-efficiency evaluation", () => {
     const source = sample();
     const result = evaluateReviewStudy({ ...source, sessions: [] });
     expect(result.sameCaseCoverageAcrossArms).toBe(false);
+    expect(result.hasRecordedSessions).toBe(false);
     for (const arm of result.arms) {
       expect(arm).toMatchObject({
         sessions: 0, reviewers: 0, casesObserved: 0, decisions: 0, skipped: 0,
