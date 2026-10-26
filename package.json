@@ -19,6 +19,7 @@
     "benchmark:sw022": "pnpm --filter @samewise/api exec tsx ../../scripts/benchmark-sw022.ts",
     "benchmark:sw024": "pnpm --filter @samewise/api exec tsx ../../scripts/benchmark-sw024.ts",
     "benchmark:sw025": "pnpm --filter @samewise/api exec tsx ../../scripts/benchmark-sw025.ts",
+    "benchmark:sw026": "pnpm --filter @samewise/api exec tsx ../../scripts/benchmark-sw025.ts --review-demand",
     "acceptance:sw003": "node apps/web/e2e/sw003-closeout.mjs",
     "acceptance:sw004": "node apps/web/e2e/sw004-closeout.mjs",
     "acceptance:sw006": "node apps/web/e2e/sw006-closeout.mjs",
