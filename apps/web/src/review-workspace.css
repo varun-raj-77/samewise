@@ -69,6 +69,26 @@ kbd { padding: 2px 5px; border: 1px solid var(--border-strong); border-bottom-wi
 .collision-links { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0; }
 .collision-links button { padding: 4px 7px; border: 1px solid rgba(245,158,11,.45); border-radius: 5px; background: rgba(245,158,11,.08); color: var(--semantic-warning); font-size: 9px; }
 
+/* SW-027: inspect exact B-side contention without implying an automatic winner. */
+.collision-inspector { display: grid; gap: 10px; margin-top: 12px; }
+.collision-inspector > button { justify-self: start; min-height: 34px; padding: 6px 11px; font-size: 11px; }
+.collision-inspector-panel { display: grid; gap: 11px; max-height: 530px; overflow-y: auto; padding: 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-1); }
+.collision-inspector-panel > header { display: grid; gap: 4px; }
+.collision-inspector-panel > header strong { color: var(--text-primary); font-size: 12px; }
+.collision-inspector-panel > header span, .collision-inspector-panel > p { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.collision-inspector-panel ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.collision-inspector-panel li { display: grid; gap: 5px; min-width: 0; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-2); }
+.collision-inspector-panel li > div:first-child { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.collision-inspector-panel li strong { color: var(--text-primary); }
+.collision-inspector-panel li span, .collision-inspector-panel li small { color: var(--text-muted); font-size: 10px; }
+.collision-inspector-panel li p { overflow-wrap: anywhere; font-size: 11px; }
+.collision-contender-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.collision-contender-status button { min-height: 30px; padding: 5px 9px; border: 1px solid var(--accent-primary); border-radius: 5px; background: var(--accent-soft); color: var(--text-primary); font-size: 10px; }
+.collision-contender-status button:disabled { border-color: var(--border-subtle); background: var(--surface-1); color: var(--text-muted); }
+.collision-inspector-pagination { display: flex; flex-wrap: wrap; gap: 8px; }
+.collision-inspector-pagination button { min-height: 30px; padding: 5px 8px; font-size: 10px; }
+.collision-page-info { color: var(--text-muted); font-size: 10px; }
+
 .candidate-switcher { padding: 14px 16px 0; }
 .candidate-switcher > header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .candidate-switcher h3, .entity-comparison h3 { margin: 0; font-size: 13px; }
