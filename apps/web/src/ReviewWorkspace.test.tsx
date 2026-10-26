@@ -171,6 +171,29 @@ describe("bounded review workspace", () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
+  it("SW-028 refetches stale candidate evidence after an authoritative run refresh", async () => {
+    let linkedElsewhere = false;
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.includes("/review?") ? reviewPage()
+        : { ...detail(), effectiveCollisionARowIds: linkedElsewhere ? ["A2"] : [] };
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const props = { busy: false, onDecision: noop, onBatchDecision: noopBatch,
+      onDefer: noop, onUndo: noop, onGoResolution: vi.fn() };
+    const rendered = render(<ReviewWorkspace run={run()} {...props} />);
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Same entity" })).toBeEnabled();
+
+    // Another reviewer linked B1 to A2; the authoritative run changes but
+    // the inspected candidate ID does not. Cached evidence must be discarded.
+    linkedElsewhere = true;
+    rendered.rerender(<ReviewWorkspace run={run({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 } })} {...props} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Same entity" })).toBeDisabled());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/candidates/c11")).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("SW-028 sends only one human decision under rapid mixed mouse and keyboard activation", async () => {
     vi.stubGlobal("fetch", fetchSuccess());
     let finish!: (updated: RunSummary) => void;
