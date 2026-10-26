@@ -103,6 +103,29 @@ describe("SW-026 review-demand accounting", () => {
     expect(result.reviewedByTruthClass.unique_cross_source_identity).toBe(1);
   });
 
+  it("counts independent local threshold, margin, contradiction and collision evidence without treating overlaps as separate reviews", () => {
+    const first = {
+      ...pair("A1", "B1", "needs_review"), matchScore: 0.47,
+      runnerUpMargin: 0.02, strongContradiction: true, collision: true,
+    };
+    const second = {
+      ...pair("A2", "B2", "needs_review"), matchScore: 0.8,
+      runnerUpMargin: 0.01, strongContradiction: false,
+    };
+    const analysis = analyzeReviewDemand(truth, generated([first, second]), [first, second], {
+      decisions: { autoMatchThreshold: 0.5, minimumTopCandidateMargin: 0.04 },
+    });
+    expect(analysis.denominators.reviewRoutedARows).toBe(2);
+    expect(analysis.reviewedByCause.matcher_needs_review).toBe(2);
+    expect(analysis.localMatcherGateEvidence).toMatchObject({
+      decisionRules: {autoMatchThreshold:0.5, minimumTopCandidateMargin:0.04},
+      flagsAmongMatcherNeedsReview: {
+        below_auto_score_threshold:1, below_minimum_top_margin:2,
+        strong_contradiction:1, matcher_collision_flag:1, no_observable_blocker:0,
+      },
+    });
+  });
+
   it("rejects candidates outside the truth fixture before producing misleading denominators", () => {
     expect(() => analyzeReviewDemand(truth,[{aRowId:"A9",bRowId:"B1"}],[]))
       .toThrow(/unknown source row/);
