@@ -6,6 +6,26 @@ import type { IdentityTruthFixture } from "./one-to-one-benchmark.js";
 
 export const REVIEW_DEMAND_ANALYSIS_VERSION = "review-demand-analysis-v1" as const;
 
+const LOCAL_MATCHER_GATES = [
+  "below_auto_score_threshold",
+  "below_minimum_top_margin",
+  "strong_contradiction",
+  "matcher_collision_flag",
+  "no_observable_blocker",
+] as const;
+type LocalGate = (typeof LOCAL_MATCHER_GATES)[number];
+
+function numericDecisionRules(config: unknown) {
+  if (config === null || typeof config !== "object" || Array.isArray(config)) return null;
+  const decisions = (config as Record<string, unknown>).decisions;
+  if (decisions === null || typeof decisions !== "object" || Array.isArray(decisions)) return null;
+  const raw = decisions as Record<string, unknown>;
+  const score = raw.autoMatchThreshold;
+  const margin = raw.minimumTopCandidateMargin;
+  if (typeof score !== "number" || !Number.isFinite(score) || typeof margin !== "number" || !Number.isFinite(margin)) return null;
+  return {autoMatchThreshold:score,minimumTopCandidateMargin:margin};
+}
+
 export const REVIEW_CAUSES = [
   "multiple_rank_one_automatic_proposals",
   "matcher_needs_review",
@@ -48,6 +68,7 @@ export function analyzeReviewDemand(
   truth: IdentityTruthFixture,
   generated: VisibleCandidate[],
   retained: CandidatePair[],
+  matcherConfig?: unknown,
 ) {
   const aById = new Map(truth.source_a.map(row => [row.source_row_id, row.canonical_entity_id]));
   const bById = new Map(truth.source_b.map(row => [row.source_row_id, row.canonical_entity_id]));
@@ -90,6 +111,8 @@ export function analyzeReviewDemand(
   const causeByTruthEvidence = Object.fromEntries(REVIEW_CAUSES.map(key => [key, counters(TRUTH_EVIDENCE)])) as Record<ReviewCause, Record<TruthEvidence, number>>;
   const examplesByCause = Object.fromEntries(REVIEW_CAUSES.map(key => [key, [] as string[]])) as Record<ReviewCause, string[]>;
   const noCandidateByTruthClass = counters(TRUTH_CLASSES);
+  const matcherDecisionRules = numericDecisionRules(matcherConfig);
+  const localGateFlags = counters(LOCAL_MATCHER_GATES);
 
   const truthClassFor = (aRowId: string): TruthClass => {
     const entity = aById.get(aRowId)!;
@@ -140,6 +163,17 @@ export function analyzeReviewDemand(
     else if (hasGeneratedTruePair(aRowId)) evidence = "generated_true_not_retained";
     else evidence = "true_not_generated";
     const truthClass = truthClassFor(aRowId);
+    if (cause === "matcher_needs_review" && top) {
+      const belowScore = matcherDecisionRules !== null && top.matchScore < matcherDecisionRules.autoMatchThreshold;
+      const belowMargin = matcherDecisionRules !== null && top.runnerUpMargin < matcherDecisionRules.minimumTopCandidateMargin;
+      if (belowScore) localGateFlags.below_auto_score_threshold += 1;
+      if (belowMargin) localGateFlags.below_minimum_top_margin += 1;
+      if (top.strongContradiction) localGateFlags.strong_contradiction += 1;
+      if (top.collision) localGateFlags.matcher_collision_flag += 1;
+      if (!belowScore && !belowMargin && !top.strongContradiction && !top.collision) {
+        localGateFlags.no_observable_blocker += 1;
+      }
+    }
     byCause[cause] += 1;
     byTruthClass[truthClass] += 1;
     byTruthEvidence[evidence] += 1;
@@ -173,6 +207,11 @@ export function analyzeReviewDemand(
     causeByTruthClass,
     causeByTruthEvidence,
     noCandidateByTruthClass,
+    localMatcherGateEvidence: {
+      decisionRules: matcherDecisionRules,
+      flagsAmongMatcherNeedsReview: localGateFlags,
+      note: "Overlapping flags: counts MUST NOT be summed. Agreement-field gate is not exported on CandidatePair and cannot be attributed definitively. Threshold-based counts are available only when matcher decision rules were supplied.",
+    },
     examplesByCause,
     caveats: [
       "Ground truth diagnoses review demand after matching; it is never passed to the matcher.",
