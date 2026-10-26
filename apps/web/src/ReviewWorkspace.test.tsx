@@ -121,6 +121,41 @@ describe("bounded review workspace", () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
+  it("SW-027 inspects a competing A row not on the current queue page while preserving the B context and recording no decision", async () => {
+    const onDecision = vi.fn(async () => run());
+    const other = { ...candidates[0]!, candidateId:"c21", aRowId:"A2",
+      aRecord:{name:"North Acme"}, collision:true, matchScore:0.74 };
+    const baseItem = {aRowId:"A1",aIdentity:{name:"Acme"}, candidate:summaries[0],
+      identityStatus:"unresolved",linkSource:null,linkedElsewhereBRowId:null};
+    const secondItem = {aRowId:"A2",aIdentity:{name:"North Acme"},
+      candidate:{...summaries[0],candidateId:"c21",matchScore:0.74},
+      identityStatus:"unresolved",linkSource:null,linkedElsewhereBRowId:null};
+    const payload = {
+      contractVersion:"1.0.0",runId:"run-review",bRowId:"B1",bIdentity:{organization:"Acme Inc"},
+      distinctARowCount:2,claimedByARowId:null,items:[baseItem,secondItem],
+      page:{offset:0,limit:20,total:2,returned:2,nextOffset:null,previousOffset:null},
+      ordering:"rank_score_a_id",
+      note:"Retained alternatives are not confirmed identities. Inspect each candidate before making any identity decision.",
+    };
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url=String(input);
+      const response = url.includes("/collision-context?") ? payload
+        : url.includes("/review?") ? reviewPage()
+          : url.endsWith("/candidates/c21")
+            ? {...detail(),candidate:other,collisionARowIds:["A1"],alternatives:[{...summaries[0],candidateId:"c21"}]}
+            : detail();
+      return Promise.resolve(new Response(JSON.stringify(response), {status:200,headers:{"Content-Type":"application/json"}}));
+    }));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
+    fireEvent.click(await screen.findByRole("button",{name:"Inspect all competing candidates"}));
+    expect(await screen.findByRole("button",{name:"Inspect A2 candidate for B1"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Inspect A2 candidate for B1"}));
+    expect(await screen.findByRole("heading",{name:"Could A2 and B1 be the same entity?"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Hide competing candidates"})).toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
   it("switches candidate rank without recording a decision", async () => {
     vi.stubGlobal("fetch", fetchSuccess());
     const onDecision = vi.fn(async () => run());
