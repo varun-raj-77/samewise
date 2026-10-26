@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 
 import type { CandidatePair } from "@samewise/contracts";
 
-import { automaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
+import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
 
 export const ONE_TO_ONE_BENCHMARK_VERSION = "one-to-one-impact-v1";
 
@@ -149,7 +149,7 @@ export function analyzeOneToOneImpact(candidates: CandidatePair[], fixture: Iden
   const retainedTruePairs = [...truthPairs].filter((pair) => retainedPairs.has(pair)).length;
   const baseline = metrics(selectOnePerA(candidates, legacyAutomaticIdentityCandidateIds(candidates)),
     allCandidateARows, truthA, truthB, matchableA);
-  const oneToOne = metrics(selectOnePerA(candidates, automaticIdentityCandidateIds(candidates)),
+  const oneToOne = metrics(selectOnePerA(candidates, conservativeAutomaticIdentityCandidateIds(candidates)),
     allCandidateARows, truthA, truthB, matchableA);
   if (oneToOne.duplicateBClaims !== 0 || oneToOne.falseAutoPairs > baseline.falseAutoPairs) {
     throw new Error("One-to-one selector violated the benchmark's safety invariants.");
@@ -209,7 +209,7 @@ export function measureSelectionRuntime(candidates: CandidatePair[], repetitions
     legacyAutomaticIdentityCandidateIds(candidates);
     const baselineDuration = performance.now() - baselineStart;
     const gatedStart = performance.now();
-    automaticIdentityCandidateIds(candidates);
+    conservativeAutomaticIdentityCandidateIds(candidates);
     const gatedDuration = performance.now() - gatedStart;
     if (i >= 5) {
       baselineTimes.push(baselineDuration);
