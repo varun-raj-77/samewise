@@ -665,6 +665,53 @@ describe("SW-003 API workflow", () => {
     expect(summary.summary).toEqual({ matched: 0, needsReview: 2, onlyA: 0, onlyB: 1 });
   });
 
+  it("recovers a chain of unique automatic links, then safely withdraws dependent links after rejection", async () => {
+    const base = baseMatcherResult();
+    const top = base.candidates[0]!;
+    const a1 = { ...top, band: "auto_match" as const };
+    const a2 = {
+      ...top, candidateId: "candidate-2-2", aRowId: "A2", bRowId: "B2",
+      aRecord: { id: "A2", name: "Other", status: "active" },
+      bRecord: { id: "B2", organization: "Other", status: "active" },
+      band: "auto_match" as const,
+    };
+    const alternative = {
+      ...a2, candidateId: "candidate-2-1", bRowId: "B1", rank: 2,
+      bRecord: top.bRecord, band: "needs_review" as const,
+    };
+    matcherResultOverride = { ...base, candidates: [a1, a2, alternative] };
+    const { runId, result } = await setup();
+    expect(result.summary).toMatchObject({ matched: 2, needsReview: 0 });
+    expect(result.trustedExportReadiness.eligibleConfirmedCount).toBe(2);
+    expect((await reviewPage(runId)).items).toHaveLength(0);
+    expect((await conflictPage(runId)).items.every((item) => item.identitySource === "system_matcher")).toBe(true);
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/runs/${runId}/candidates/candidate-2-2/decisions`,
+      payload: { decision: "different_entity" },
+    });
+    expect(rejected.statusCode).toBe(200);
+    const changed = RunSummarySchema.parse(rejected.json());
+    expect(changed.summary).toMatchObject({ matched: 0, needsReview: 2 });
+    expect(changed.trustedExportReadiness.ready).toBe(false);
+    const reviews = await reviewPage(runId);
+    expect(reviews.items.map((item) => item.aRowId).sort()).toEqual(["A1", "A2"]);
+    const after = IdentityExplanationSchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}/identity-explanations/A1`,
+    })).json());
+    expect(after.reasonCode).toBe("candidate_awaiting_review");
+    expect(after.linkedBRowId).toBeNull();
+
+    const undo = await app.inject({ method: "POST", url: `/api/runs/${runId}/review-undo` });
+    expect(undo.statusCode).toBe(200);
+    expect(RunSummarySchema.parse(undo.json()).summary).toMatchObject({ matched: 2, needsReview: 0 });
+    const trustedBlocked = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+    // The identity chain is restored, but any comparison-field conflict still
+    // requires explicit survivorship before a trusted output is available.
+    expect(trustedBlocked.statusCode).toBe(409);
+  });
+
   it("demotes competing automatic links to explicit review without mutating matcher evidence", async () => {
     const base = baseMatcherResult();
     const first = { ...base.candidates[0]!, band: "auto_match" as const, collision: false };
