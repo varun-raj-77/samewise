@@ -27,8 +27,9 @@ describe("SW-024 saved run assignment policy version", () => {
     apps.push(app);
     const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
     expect(created.assignmentPolicyVersion).toBe(ASSIGNMENT_POLICY_VERSION);
+    expect(created.assignmentPolicyOrigin).toBe("explicit");
     const state = await runRepository.loadState(created.runId);
-    expect(state?.state).toMatchObject({ assignmentPolicyVersion: ASSIGNMENT_POLICY_VERSION });
+    expect(state?.state).toMatchObject({ assignmentPolicyVersion: ASSIGNMENT_POLICY_VERSION, assignmentPolicyOrigin: "explicit" });
   });
 
   it("reopens pre-SW-024 snapshots with their actual historical SW-021 semantics, without changing stored bytes", async () => {
@@ -43,6 +44,7 @@ describe("SW-024 saved run assignment policy version", () => {
     expect(response.statusCode).toBe(200);
     const run = RunSummarySchema.parse(response.json());
     expect(run.assignmentPolicyVersion).toBe(ASSIGNMENT_POLICY_VERSION);
+    expect(run.assignmentPolicyOrigin).toBe("legacy_unversioned_fallback");
     expect(await runRepository.loadState(runId)).toEqual(before);
   });
 
