@@ -5,6 +5,7 @@ import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandi
 import {
   analyzeOneToOneImpact,
   analyzeRecoveryImpact,
+  diagnoseAutomaticDeferrals,
   measureSelectionRuntime,
   type IdentityTruthFixture,
 } from "../src/one-to-one-benchmark.js";
@@ -113,6 +114,19 @@ describe("SW-022 production selector vs frozen pre-SW-021 baseline", () => {
     expect(impact.sw021.autoAssignedPairs).toBe(0);
     expect(impact.sw023.autoAssignedPairs).toBe(0);
     expect(impact.delta.reviewRoutedARows).toBe(0);
+  });
+
+  it("attributes ambiguous automatic deferrals without double-counting overlap", () => {
+    const candidates = [
+      pair("A1", "B1"), pair("A2", "B2"), pair("A2", "B1", "needs_review", 2),
+      pair("A3", "B3", "auto_match", 1, true),
+    ];
+    expect(diagnoseAutomaticDeferrals(candidates)).toMatchObject({
+      initiallyAutoProposedPairs: 3, conservativeAutoAssignedPairs: 1,
+      deferredLegacyAutoPairs: 2, deferredWithCollisionHint: 1,
+      deferredWithSharedB: 1, deferredWithBothCollisionAndSharedB: 0,
+      recoveredFromDeferred: 1, stillDeferred: 1,
+    });
   });
 
   it("does not manufacture precision when no pair was automatically matched", () => {
