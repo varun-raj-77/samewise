@@ -122,7 +122,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
         // Functional state avoids races with an in-flight older queue request.
         setSelectedCandidateId((current) => {
           const visible = loaded.items.some(item => item.candidates.some(candidate => candidate.candidateId === current));
-          return visible || current === pinnedCandidateId.current
+          return visible || (current !== null && current === pinnedCandidateId.current)
             ? current
             : (loaded.items[0] ? preferredCandidate(loaded.items[0]) : null);
         });
