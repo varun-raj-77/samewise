@@ -77,5 +77,8 @@ jobs:
       - name: Evaluate SW-024 independent collision truth scenarios
         run: pnpm benchmark:sw024
 
+      - name: Evaluate SW-025 new actual matcher fixtures
+        run: pnpm benchmark:sw025
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
