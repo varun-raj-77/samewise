@@ -6,6 +6,8 @@ interface CollisionInspectorProps {
   bRowId: string;
   currentCandidateId: string;
   revision: string;
+  defaultExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
   onInspectCandidate: (candidateId: string) => void;
 }
 
@@ -20,8 +22,8 @@ async function fetchContext(runId: string, bRowId: string, offset: number): Prom
  * Inspect all retained A candidates for one B without granting selection any
  * decision authority. All decisions remain in ReviewWorkspace's guarded API.
  */
-export function CollisionInspector({ runId, bRowId, currentCandidateId, revision, onInspectCandidate }: CollisionInspectorProps) {
-  const [expanded, setExpanded] = useState(false);
+export function CollisionInspector({ runId, bRowId, currentCandidateId, revision, defaultExpanded = false, onExpandedChange, onInspectCandidate }: CollisionInspectorProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<CollisionContextPage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,11 +31,11 @@ export function CollisionInspector({ runId, bRowId, currentCandidateId, revision
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    setExpanded(false);
+    setExpanded(defaultExpanded);
     setOffset(0);
     setPage(null);
     setError(null);
-  }, [runId, bRowId]);
+  }, [runId, bRowId, defaultExpanded]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -48,7 +50,7 @@ export function CollisionInspector({ runId, bRowId, currentCandidateId, revision
   }, [expanded, runId, bRowId, offset, revision, retry]);
 
   return <div className="collision-inspector">
-    <button type="button" className="secondary" aria-expanded={expanded} onClick={() => setExpanded((wasOpen) => !wasOpen)}>
+    <button type="button" className="secondary" aria-expanded={expanded} onClick={() => { setExpanded(!expanded); onExpandedChange?.(!expanded); }}>
       {expanded ? "Hide competing candidates" : "Inspect all competing candidates"}
     </button>
     {expanded && <section aria-label={`Competing candidates for ${bRowId}`} className="collision-inspector-panel">
