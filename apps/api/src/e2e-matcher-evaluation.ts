@@ -1,4 +1,4 @@
-import type { CandidatePair } from "@samewise/contracts";
+import { ASSIGNMENT_POLICY_VERSION, type CandidatePair } from "@samewise/contracts";
 
 import { automaticIdentityCandidateIds } from "./identity-selection.js";
 import type { IdentityTruthFixture } from "./one-to-one-benchmark.js";
@@ -104,7 +104,7 @@ export function measureActualMatcherStages(
       retainedTopRankPrecision: ratio(topCorrect, top.length),
     },
     assignment: {
-      policy: "assignment-one-to-one-conservative-v1",
+      policy: ASSIGNMENT_POLICY_VERSION,
       autoAssignedPairs: selected.length,
       trueAutoAssignedPairs: trueAuto,
       falseAutoAssignedPairs: selected.length - trueAuto,
