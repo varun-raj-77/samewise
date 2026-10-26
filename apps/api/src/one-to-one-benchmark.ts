@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 
 import type { CandidatePair } from "@samewise/contracts";
 
-import { automaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
+import { experimentalPropagatedAutomaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
 
 export const ONE_TO_ONE_BENCHMARK_VERSION = "one-to-one-impact-v1";
 
@@ -237,7 +237,7 @@ export function analyzeRecoveryImpact(candidates: CandidatePair[], fixture: Iden
   );
   const candidateARows = new Set(candidates.map((pair) => pair.aRowId));
   const recovered = metrics(
-    selectOnePerA(candidates, automaticIdentityCandidateIds(candidates)),
+    selectOnePerA(candidates, experimentalPropagatedAutomaticIdentityCandidateIds(candidates)),
     candidateARows, truthA, truthB, matchableA,
   );
   if (recovered.duplicateBClaims !== 0 || recovered.autoAssignedARows < frozen.oneToOne.autoAssignedARows) {
@@ -264,7 +264,7 @@ export function analyzeRecoveryImpact(candidates: CandidatePair[], fixture: Iden
 export function diagnoseAutomaticDeferrals(candidates: CandidatePair[]) {
   const before = legacyAutomaticIdentityCandidateIds(candidates);
   const conservative = conservativeAutomaticIdentityCandidateIds(candidates);
-  const recovery = automaticIdentityCandidateIds(candidates);
+  const recovery = experimentalPropagatedAutomaticIdentityCandidateIds(candidates);
   const ownersByB = new Map<string, Set<string>>();
   const firstRankCountByA = new Map<string, number>();
   for (const pair of candidates) {
