@@ -163,6 +163,33 @@ describe("SW-003 API workflow", () => {
     expect((await app.inject({ method: "GET", url: base + "&offset=-1" })).statusCode).toBe(400);
   });
 
+  it("SW-027 labels other-B auto ownership without incorrectly claiming a contested alternative", async () => {
+    const base = baseMatcherResult();
+    const topA1 = { ...base.candidates[0]!, band: "auto_match" as const, collision: false };
+    const topA2 = { ...topA1, candidateId: "candidate-2-2", aRowId: "A2",
+      aRecord: { id: "A2", name: "Separate", status: "active" }, bRowId: "B2",
+      bRecord: { id: "B2", organization: "Separate", status: "active" } };
+    const alternate = { ...topA2, candidateId: "candidate-2-1", bRowId: "B1",
+      bRecord: topA1.bRecord, rank: 2, matchScore: 0.6, band: "needs_review" as const };
+    matcherResultOverride = { ...base, candidates: [topA1, topA2, alternate] };
+    const { runId } = await setup();
+    const b1 = CollisionContextPageSchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}/collision-context?bRowId=B1`,
+    })).json());
+    expect(b1.claimedByARowId).toBeNull();
+    expect(b1.items.find((item) => item.aRowId === "A1")?.identityStatus).toBe("unresolved");
+    expect(b1.items.find((item) => item.aRowId === "A2")).toMatchObject({
+      identityStatus: "linked_elsewhere", linkedElsewhereBRowId: "B2", linkSource: null,
+    });
+    const b2 = CollisionContextPageSchema.parse((await app.inject({
+      method: "GET", url: `/api/runs/${runId}/collision-context?bRowId=B2`,
+    })).json());
+    expect(b2).toMatchObject({
+      claimedByARowId: "A2", distinctARowCount: 1,
+      items: [{ aRowId: "A2", identityStatus: "linked_here", linkSource: "matcher" }],
+    });
+  });
+
   it("explains pending, human-rejected and human-confirmed pairs using only recorded evidence", async () => {
     const { runId } = await setup();
     const url = `/api/runs/${runId}/identity-explanations/A1`;
