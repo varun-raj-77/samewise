@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 
 import type { CandidatePair } from "@samewise/contracts";
 
-import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
+import { automaticIdentityCandidateIds, conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "./identity-selection.js";
 
 export const ONE_TO_ONE_BENCHMARK_VERSION = "one-to-one-impact-v1";
 
@@ -220,5 +220,42 @@ export function measureSelectionRuntime(candidates: CandidatePair[], repetitions
     baselineMedianMs: median(baselineTimes),
     oneToOneMedianMs: median(gatedTimes),
     repetitions,
+  };
+}
+
+/**
+ * SW-023 comparison extends (but does not rewrite) frozen SW-022 metrics.
+ * Both policies see the exact same candidate list, and truth is isolated here.
+ */
+export function analyzeRecoveryImpact(candidates: CandidatePair[], fixture: IdentityTruthFixture) {
+  const frozen = analyzeOneToOneImpact(candidates, fixture);
+  const truthA = new Map(fixture.source_a.map((row) => [row.source_row_id, row.canonical_entity_id]));
+  const truthB = new Map(fixture.source_b.map((row) => [row.source_row_id, row.canonical_entity_id]));
+  const entitiesInB = new Set(truthB.values());
+  const matchableA = new Set(
+    [...truthA].filter(([, entity]) => entitiesInB.has(entity)).map(([aRowId]) => aRowId),
+  );
+  const candidateARows = new Set(candidates.map((pair) => pair.aRowId));
+  const recovered = metrics(
+    selectOnePerA(candidates, automaticIdentityCandidateIds(candidates)),
+    candidateARows, truthA, truthB, matchableA,
+  );
+  if (recovered.duplicateBClaims !== 0 || recovered.autoAssignedARows < frozen.oneToOne.autoAssignedARows) {
+    throw new Error("Recovery violated unique-B ownership or discarded an existing anchor.");
+  }
+  return {
+    benchmarkVersion: "one-to-one-recovery-v1" as const,
+    denominators: frozen.denominators,
+    sw021: frozen.oneToOne,
+    sw023: recovered,
+    delta: {
+      autoAssignedPairs: recovered.autoAssignedPairs - frozen.oneToOne.autoAssignedPairs,
+      trueAutoPairs: recovered.trueAutoPairs - frozen.oneToOne.trueAutoPairs,
+      falseAutoPairs: recovered.falseAutoPairs - frozen.oneToOne.falseAutoPairs,
+      reviewRoutedARows: recovered.reviewRoutedARows - frozen.oneToOne.reviewRoutedARows,
+      reviewRateAllARows: recovered.reviewRateAllARows - frozen.oneToOne.reviewRateAllARows,
+      reviewRateMatchableARows: recovered.reviewRateMatchableARows - frozen.oneToOne.reviewRateMatchableARows,
+      duplicateBClaims: recovered.duplicateBClaims - frozen.oneToOne.duplicateBClaims,
+    },
   };
 }
