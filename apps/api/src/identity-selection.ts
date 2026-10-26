@@ -47,7 +47,7 @@ export interface AutomaticSelectionConstraints {
   reservedBRowIds?: ReadonlySet<string>;
 }
 
-export function automaticIdentityCandidateIds(
+export function experimentalPropagatedAutomaticIdentityCandidateIds(
   candidates: CandidatePair[],
   constraints: AutomaticSelectionConstraints = {},
 ): Set<string> {
@@ -113,6 +113,15 @@ export function automaticIdentityCandidateIds(
     }
   }
   return selectedIds;
+}
+
+/**
+ * Production remains pinned to SW-021 until assignment policy versions are
+ * stored with runs. Reopening a historical snapshot must not silently change
+ * the identity result because an experimental algorithm was deployed.
+ */
+export function automaticIdentityCandidateIds(candidates: CandidatePair[]): Set<string> {
+  return conservativeAutomaticIdentityCandidateIds(candidates);
 }
 
 /** Frozen pre-SW-021 predicate; historical comparison only. */
