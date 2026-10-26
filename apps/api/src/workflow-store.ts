@@ -19,6 +19,7 @@ import {
   WORKFLOW_PROJECTION_CONTRACT_VERSION,
   inferSemanticFamily,
   type CandidateEvidenceDetail,
+  type CollisionContextPage,
   IDENTITY_EXPLANATION_VERSION,
   type IdentityExplanation,
   type BatchIdentityDecisionResponse,
@@ -1492,6 +1493,56 @@ export class WorkflowStore {
       retainedEvidenceCount: evidence.length,
       fieldEvidence: topEvidence,
       blockingRuleIds: [...new Set(candidate?.blockingEvidence.map((item) => item.blockerId) ?? [])].slice(0, 6),
+    };
+  }
+
+  /**
+   * Group by one contested Dataset B row, not by broad evidence signatures.
+   * This is a paged read-only projection; it never chooses a winning owner.
+   */
+  collisionContextPage(runId: string, bRowId: string, offset: number, limit: number): CollisionContextPage {
+    const run = this.requireRun(runId);
+    if (!run.result) throw new WorkflowError("run_not_matched", "Run the matcher before inspecting collisions.", 409);
+    const contenders = run.result.candidates
+      .filter((candidate) => candidate.bRowId === bRowId)
+      .sort((left, right) => left.rank - right.rank
+        || right.matchScore - left.matchScore
+        || left.aRowId.localeCompare(right.aRowId)
+        || left.candidateId.localeCompare(right.candidateId));
+    if (!contenders.length) throw new WorkflowError("collision_context_not_found", "No retained candidate refers to that Dataset B row.", 404);
+    const effective = this.effectiveLinks(run);
+    const linkedByA = new Map(effective.map((candidate) => [candidate.aRowId, candidate]));
+    const owner = effective.find((candidate) => candidate.bRowId === bRowId);
+    const projected = contenders.slice(offset, offset + limit).map((candidate) => {
+      const assigned = linkedByA.get(candidate.aRowId);
+      const decision = run.decisions.get(candidate.candidateId);
+      const identityStatus = assigned?.candidateId === candidate.candidateId
+        ? "linked_here" as const
+        : assigned ? "linked_elsewhere" as const
+        : decision?.humanDecision === "different_entity" ? "rejected_pair" as const
+        : "unresolved" as const;
+      return {
+        aRowId: candidate.aRowId,
+        aIdentity: this.identityRecord(run, candidate, "A"),
+        candidate: this.candidateSummary(run, candidate),
+        identityStatus,
+        linkSource: identityStatus === "linked_here"
+          ? (decision?.humanDecision === "same_entity" ? "human" as const : "matcher" as const)
+          : null,
+        linkedElsewhereBRowId: identityStatus === "linked_elsewhere" ? assigned!.bRowId : null,
+      };
+    });
+    return {
+      contractVersion: WORKFLOW_PROJECTION_CONTRACT_VERSION,
+      runId,
+      bRowId,
+      bIdentity: this.identityRecord(run, contenders[0]!, "B"),
+      distinctARowCount: new Set(contenders.map((candidate) => candidate.aRowId)).size,
+      claimedByARowId: owner?.aRowId ?? null,
+      items: projected,
+      page: pagination(contenders.length, offset, limit),
+      ordering: "rank_score_a_id",
+      note: "Retained alternatives are not confirmed identities. Inspect each candidate before making any identity decision.",
     };
   }
 
