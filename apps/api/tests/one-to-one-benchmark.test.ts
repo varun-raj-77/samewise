@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { conservativeAutomaticIdentityCandidateIds, legacyAutomaticIdentityCandidateIds } from "../src/identity-selection.js";
 import {
   analyzeOneToOneImpact,
+  analyzeRecoveryImpact,
   measureSelectionRuntime,
   type IdentityTruthFixture,
 } from "../src/one-to-one-benchmark.js";
@@ -84,6 +85,34 @@ describe("SW-022 production selector vs frozen pre-SW-021 baseline", () => {
     expect(impact.denominators.retainedCandidatePairRecall).toBe(1);
     expect(impact.baseline.autoMatchRecallPerMatchableARow).toBe(1);
     expect(impact.oneToOne.autoMatchRecallPerMatchableARow).toBe(0);
+  });
+
+  it("measures SW-023's one recovered correct anchor independently from the frozen SW-021 comparison", () => {
+    const candidates = [
+      pair("A1", "B1"), pair("A2", "B2"),
+      pair("A2", "B1", "needs_review", 2),
+    ];
+    const impact = analyzeRecoveryImpact(candidates, fixture);
+    expect(impact.sw021).toMatchObject({
+      autoAssignedPairs: 1, trueAutoPairs: 1, falseAutoPairs: 0,
+      reviewRoutedARows: 1,
+    });
+    expect(impact.sw023).toMatchObject({
+      autoAssignedPairs: 2, trueAutoPairs: 2, falseAutoPairs: 0,
+      reviewRoutedARows: 0, duplicateBClaims: 0,
+    });
+    expect(impact.delta).toMatchObject({
+      autoAssignedPairs: 1, trueAutoPairs: 1, falseAutoPairs: 0,
+      reviewRoutedARows: -1, duplicateBClaims: 0,
+    });
+    expect(impact.denominators.retainedCandidatePairRecall).toBe(1);
+  });
+
+  it("keeps genuine automatic B conflicts unresolved rather than improving metrics by forcing a winner", () => {
+    const impact = analyzeRecoveryImpact([pair("A1", "B1"), pair("A2", "B1")], fixture);
+    expect(impact.sw021.autoAssignedPairs).toBe(0);
+    expect(impact.sw023.autoAssignedPairs).toBe(0);
+    expect(impact.delta.reviewRoutedARows).toBe(0);
   });
 
   it("does not manufacture precision when no pair was automatically matched", () => {
