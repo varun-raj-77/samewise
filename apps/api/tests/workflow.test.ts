@@ -559,6 +559,98 @@ describe("SW-003 API workflow", () => {
     expect(readyManifest.export.artifacts[1]).toMatchObject({ version: TRUSTED_EXPORT_VERSION, sha256: createHash("sha256").update(trustedOne.body).digest("hex") });
   });
 
+  it("SW-031 pins separately downloaded manifest and reconciliation bytes to one authoritative run snapshot", async () => {
+    const { runId } = await setup();
+    const base = `/api/runs/${runId}`;
+    const manifestResponse = await app.inject({ method: "GET", url: `${base}/manifest` });
+    const sha = manifestResponse.headers["x-samewise-export-snapshot"];
+    expect(manifestResponse.statusCode).toBe(200);
+    expect(sha).toMatch(/^[a-f0-9]{64}$/);
+    expect(manifestResponse.headers["cache-control"]).toBe("no-store");
+    const manifest = RunManifestSchema.parse(manifestResponse.json());
+    expect(sha).toBe(manifest.run.snapshot.authoritativeStateSha256);
+
+    const report = await app.inject({ method: "GET", url: `${base}/export?expectedSnapshot=${sha}` });
+    expect(report.statusCode).toBe(200);
+    expect(report.headers["x-samewise-export-snapshot"]).toBe(sha);
+    expect(report.headers["cache-control"]).toBe("no-store");
+    expect(manifest.export.artifacts[0]?.sha256).toBe(createHash("sha256").update(report.body).digest("hex"));
+    const repeated = await app.inject({ method: "GET", url: `${base}/manifest?expectedSnapshot=${sha}` });
+    expect(repeated.statusCode).toBe(200);
+    expect(repeated.body).toBe(manifestResponse.body);
+  });
+
+  it("SW-031 returns 409 after a decision changes a previously pinned run state", async () => {
+    const { runId } = await setup();
+    const base = `/api/runs/${runId}`;
+    const previous = await app.inject({ method: "GET", url: `${base}/export` });
+    const oldSha = previous.headers["x-samewise-export-snapshot"];
+    expect(oldSha).toMatch(/^[a-f0-9]{64}$/);
+
+    const decided = await app.inject({ method: "POST", url: `${base}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } });
+    expect(decided.statusCode).toBe(200);
+
+    for (const endpoint of ["export", "manifest", "trusted-export"]) {
+      const stale = await app.inject({ method: "GET", url: `${base}/${endpoint}?expectedSnapshot=${oldSha}` });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json().error.code).toBe("stale_export_snapshot");
+      expect(stale.body).not.toContain("Acme Corp");
+    }
+    const freshManifest = await app.inject({ method: "GET", url: `${base}/manifest` });
+    const newSha = freshManifest.headers["x-samewise-export-snapshot"];
+    expect(newSha).not.toBe(oldSha);
+    expect(newSha).toBe(RunManifestSchema.parse(freshManifest.json()).run.snapshot.authoritativeStateSha256);
+    const freshReport = await app.inject({ method: "GET", url: `${base}/export?expectedSnapshot=${newSha}` });
+    expect(freshReport.statusCode).toBe(200);
+  });
+
+  it("SW-031 pins a ready trusted export, rejecting a stale token after a field-resolution change", async () => {
+    const { runId } = await setup();
+    const base = `/api/runs/${runId}`;
+    await app.inject({ method: "POST", url: `${base}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } });
+    const conflict = (await conflictPage(runId)).items[0]!;
+    const resolved = await app.inject({ method: "POST", url: `${base}/conflicts/${conflict.conflictId}/resolutions`, payload: { action: "use_a" } });
+    expect(resolved.statusCode).toBe(200);
+
+    const manifestResponse = await app.inject({ method: "GET", url: `${base}/manifest` });
+    const sha = manifestResponse.headers["x-samewise-export-snapshot"];
+    const manifest = RunManifestSchema.parse(manifestResponse.json());
+    expect(manifest.run.status).toBe("trusted_ready");
+    const trusted = await app.inject({ method: "GET", url: `${base}/trusted-export?expectedSnapshot=${sha}` });
+    expect(trusted.statusCode).toBe(200);
+    expect(trusted.headers["x-samewise-export-snapshot"]).toBe(sha);
+    expect(trusted.headers["cache-control"]).toBe("no-store");
+    expect(manifest.export.artifacts[1]?.sha256).toBe(createHash("sha256").update(trusted.body).digest("hex"));
+
+    const cleared = await app.inject({ method: "DELETE", url: `${base}/conflicts/${conflict.conflictId}/resolution` });
+    expect(cleared.statusCode).toBe(200);
+    const stale = await app.inject({ method: "GET", url: `${base}/trusted-export?expectedSnapshot=${sha}` });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().error.code).toBe("stale_export_snapshot");
+  });
+
+  it("SW-031 rejects malformed, duplicated and cross-run snapshot pins", async () => {
+    const { runId } = await setup();
+    const base = `/api/runs/${runId}`;
+    const wrongPins = ["not-a-sha", "", "A".repeat(64), "f".repeat(65)];
+    for (const pin of wrongPins) {
+      const response = await app.inject({ method: "GET", url: `${base}/manifest?expectedSnapshot=${pin}` });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe("invalid_export_snapshot");
+    }
+    const duplicated = await app.inject({
+      method: "GET", url: `${base}/export?expectedSnapshot=${"a".repeat(64)}&expectedSnapshot=${"b".repeat(64)}`,
+    });
+    expect(duplicated.statusCode).toBe(400);
+    expect(duplicated.json().error.code).toBe("invalid_export_snapshot");
+
+    const second = await setup();
+    const tokenFromFirst = (await app.inject({ method: "GET", url: `${base}/manifest` })).headers["x-samewise-export-snapshot"];
+    const crossRun = await app.inject({ method: "GET", url: `/api/runs/${second.runId}/export?expectedSnapshot=${tokenFromFirst}` });
+    expect(crossRun.statusCode).toBe(409);
+    expect(crossRun.json().error.code).toBe("stale_export_snapshot");
+  });
+
   it("exports human DIFFERENT and deferred identity as explicit audit states", async () => {
     const deferredRun = await setup();
     await app.inject({ method: "PATCH", url: `/api/runs/${deferredRun.runId}/review-items/A1`, payload: { deferred: true } });
