@@ -42,6 +42,8 @@ export function CollisionInspector({ runId, bRowId, currentCandidateId, revision
     let active = true;
     setLoading(true);
     setError(null);
+    // Hide outdated claim/decision details until the new authoritative page arrives.
+    setPage(null);
     void fetchContext(runId, bRowId, offset)
       .then((value) => { if (active) setPage(value); })
       .catch((caught) => { if (active) { setPage(null); setError(caught instanceof Error ? caught.message : "Collision details unavailable."); } })

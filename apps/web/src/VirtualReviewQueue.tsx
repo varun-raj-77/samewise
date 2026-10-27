@@ -8,12 +8,18 @@ interface VirtualReviewQueueProps {
   items: ReviewQueueProjectionItem[];
   selectedARowId: string | null;
   onSelect: (item: ReviewQueueProjectionItem) => void;
+  pageKey?: string;
 }
 
-export function VirtualReviewQueue({ items, selectedARowId, onSelect }: VirtualReviewQueueProps) {
+export function VirtualReviewQueue({ items, selectedARowId, onSelect, pageKey }: VirtualReviewQueueProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(620);
+  useEffect(() => {
+    // Previous page scroll positions otherwise leave fresh filtered pages blank.
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+    setScrollTop(0);
+  }, [pageKey]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -26,7 +32,7 @@ export function VirtualReviewQueue({ items, selectedARowId, onSelect }: VirtualR
     return () => observer.disconnect();
   }, []);
 
-  const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const start = Math.max(0, Math.min(Math.max(0, items.length - 1), Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN));
   const end = Math.min(items.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN);
   const visible = items.slice(start, end);
 

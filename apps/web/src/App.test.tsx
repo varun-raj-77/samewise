@@ -59,6 +59,37 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 describe("Samewise vertical slice", () => {
+  it("SW-028 refreshes authoritative run after a stale review 409 without retrying the identity decision", async () => {
+    const current = runView({stage:"review"});
+    const refreshed = runView({
+      stage:"review",
+      reviewProgress:{total:1,reviewed:1,remaining:0,deferred:0},
+      summary:{matched:0,needsReview:0,onlyA:3,onlyB:4},
+    });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch",vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url=String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/review?")) return new Response(JSON.stringify(reviewPage()),{status:200});
+      if (url.endsWith("/candidates/candidate-1-1") && !init?.method) {
+        return new Response(JSON.stringify(candidateDetail()),{status:200});
+      }
+      if (url.endsWith("/candidates/candidate-1-1/decisions")) {
+        return new Response(JSON.stringify({error:{code:"decision_exists",message:"This candidate already has a recorded decision."}}),{status:409});
+      }
+      if (url==="/api/runs/run-1" && !init?.method) {
+        return new Response(JSON.stringify(refreshed),{status:200});
+      }
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={current} initialScreen="review"/>);
+    fireEvent.click(await screen.findByRole("button",{name:"Different entities"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("already has a recorded decision");
+    expect(await screen.findByRole("heading",{name:"Identity review complete"})).toBeInTheDocument();
+    expect(requests.filter(request=>request.endsWith("/candidates/candidate-1-1/decisions"))).toHaveLength(1);
+    expect(requests).toContain("GET /api/runs/run-1");
+  });
+
   it("opens an accessible mobile menu, exposes workflow state, and closes after navigation", async () => {
     render(<App initialRun={runView()} initialScreen="results" />);
     const menuButton = screen.getByRole("button", { name: "Menu" });

@@ -35,4 +35,17 @@ describe("virtual review queue", () => {
     expect(onSelect).toHaveBeenCalledWith(items[95]);
     expect(screen.getAllByTestId("review-queue-row").length).toBeLessThan(30);
   });
+  it("resets scroll when filter/page changes and avoids rendering an empty smaller page", () => {
+    const onSelect = vi.fn();
+    const many = Array.from({ length: 5000 }, (_, i) => item(i));
+    const ui = render(<VirtualReviewQueue items={many} pageKey="unresolved:0" selectedARowId={null} onSelect={onSelect} />);
+    const viewport = screen.getByTestId("review-queue-viewport");
+    fireEvent.scroll(viewport, { target: { scrollTop: 460000 } });
+    expect(screen.queryByRole("button", { name: /A00000,/ })).not.toBeInTheDocument();
+    ui.rerender(<VirtualReviewQueue items={many.slice(0, 12)} pageKey="collision:50" selectedARowId="A00000" onSelect={onSelect} />);
+    expect(screen.getAllByTestId("review-queue-row")).toHaveLength(12);
+    expect(screen.getByRole("button", { name: /A00000,/ })).toHaveAttribute("aria-current", "true");
+    expect(viewport.scrollTop).toBe(0);
+  });
+
 });
