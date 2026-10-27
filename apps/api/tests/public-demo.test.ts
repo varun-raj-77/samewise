@@ -5,11 +5,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ConflictPageSchema, ReviewQueuePageSchema, RunSummarySchema, type ManualMapping } from "@samewise/contracts";
+import { ConflictPageSchema, ReviewQueuePageSchema, RunManifestSchema, RunSummarySchema, type ManualMapping } from "@samewise/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import { createMatcherRunner } from "../src/matcher-process.js";
+import { verifyPortableExport } from "../src/portable-export-verifier.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const python = process.platform === "win32"
@@ -92,6 +93,52 @@ describe.skipIf(!existsSync(python))("public demo fixture with the frozen matche
     }
     afterReview = RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${created.runId}` })).json());
     expect(afterReview.trustedExportReadiness.ready).toBe(true);
-    expect((await app.inject({ method: "GET", url: `/api/runs/${created.runId}/trusted-export` })).statusCode).toBe(200);
+    // Recreate all three real exported artifacts from one immutable source+decision snapshot.
+    const baseUrl = `/api/runs/${created.runId}`;
+    const manifestResponse = await app.inject({ method: "GET", url: `${baseUrl}/manifest` });
+    expect(manifestResponse.statusCode).toBe(200);
+    const snapshotPin = manifestResponse.headers["x-samewise-export-snapshot"];
+    expect(snapshotPin).toMatch(/^[a-f0-9]{64}$/);
+    if (typeof snapshotPin !== "string") throw new Error("Missing export snapshot pin.");
+    const manifest = RunManifestSchema.parse(manifestResponse.json());
+    expect(manifest.run.snapshot.authoritativeStateSha256).toBe(snapshotPin);
+    expect(manifest.run.status).toBe("trusted_ready");
+    expect(manifest.identity.humanSameCount).toBeGreaterThanOrEqual(1);
+    expect(manifest.survivorship.unresolvedConflictCount).toBe(0);
+    expect(manifest.sourceDatasets.A.sha256).toBe(createHash("sha256").update(bytesA).digest("hex"));
+    expect(manifest.sourceDatasets.B.sha256).toBe(createHash("sha256").update(bytesB).digest("hex"));
+
+    const reportResponse = await app.inject({ method: "GET", url: `${baseUrl}/export?expectedSnapshot=${snapshotPin}` });
+    const trustedResponse = await app.inject({ method: "GET", url: `${baseUrl}/trusted-export?expectedSnapshot=${snapshotPin}` });
+    for (const response of [reportResponse, trustedResponse]) {
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["x-samewise-export-snapshot"]).toBe(snapshotPin);
+      expect(response.headers["cache-control"]).toBe("no-store");
+    }
+    const filename = (response: typeof reportResponse) => {
+      const disposition = response.headers["content-disposition"];
+      const matched = typeof disposition === "string" ? /filename="([A-Za-z0-9._-]+)"/.exec(disposition) : null;
+      if (!matched?.[1]) throw new Error("Export did not provide a canonical filename.");
+      return matched[1];
+    };
+    const verified = verifyPortableExport(manifest, [
+      { filename: filename(reportResponse), bytes: Buffer.from(reportResponse.body, "utf8") },
+      { filename: filename(trustedResponse), bytes: Buffer.from(trustedResponse.body, "utf8") },
+    ]);
+    expect(verified.status).toBe("trusted_ready");
+    expect(verified.verified.map((item) => item.kind)).toEqual(["reconciliation_report", "trusted_merged_output"]);
+
+    // A later resolution edit must invalidate the old pin for every export endpoint.
+    const changed = await app.inject({
+      method: "POST",
+      url: `${baseUrl}/conflicts/${conflicts.items[0]!.conflictId}/resolutions`,
+      payload: { action: "use_b", replace: true },
+    });
+    expect(changed.statusCode).toBe(200);
+    for (const endpoint of ["export", "trusted-export", "manifest"]) {
+      const stale = await app.inject({ method: "GET", url: `${baseUrl}/${endpoint}?expectedSnapshot=${snapshotPin}` });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json()).toMatchObject({ error: { code: "stale_export_snapshot" } });
+    }
   }, 30_000);
 });
