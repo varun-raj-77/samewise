@@ -146,13 +146,19 @@ describe("bounded review workspace", () => {
             : detail();
       return Promise.resolve(new Response(JSON.stringify(response), {status:200,headers:{"Content-Type":"application/json"}}));
     }));
-    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+    const rendered = render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
       onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
     fireEvent.click(await screen.findByRole("button",{name:"Inspect all competing candidates"}));
     expect(await screen.findByRole("button",{name:"Inspect A2 candidate for B1"})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Inspect A2 candidate for B1"}));
     expect(await screen.findByRole("heading",{name:"Could A2 and B1 be the same entity?"})).toBeInTheDocument();
     expect(screen.getByRole("button",{name:"Hide competing candidates"})).toBeInTheDocument();
+    // A server queue refresh still contains only A1. A2 was opened via
+    // collision context and must not be silently replaced with A1.
+    rendered.rerender(<ReviewWorkspace run={run({reviewProgress:{total:2,reviewed:1,remaining:1,deferred:0}})}
+      busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
+    await waitFor(() => expect(screen.getByRole("heading",{name:"Could A2 and B1 be the same entity?"})).toBeInTheDocument());
     expect(onDecision).not.toHaveBeenCalled();
   });
 
@@ -163,6 +169,45 @@ describe("bounded review workspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Select candidate rank 2/ }));
     expect(await screen.findByRole("heading", { name: "Could A1 and B2 be the same entity?" })).toBeInTheDocument();
     expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-028 refetches stale candidate evidence after an authoritative run refresh", async () => {
+    let linkedElsewhere = false;
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.includes("/review?") ? reviewPage()
+        : { ...detail(), effectiveCollisionARowIds: linkedElsewhere ? ["A2"] : [] };
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const props = { busy: false, onDecision: noop, onBatchDecision: noopBatch,
+      onDefer: noop, onUndo: noop, onGoResolution: vi.fn() };
+    const rendered = render(<ReviewWorkspace run={run()} {...props} />);
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Same entity" })).toBeEnabled();
+
+    // Another reviewer linked B1 to A2; the authoritative run changes but
+    // the inspected candidate ID does not. Cached evidence must be discarded.
+    linkedElsewhere = true;
+    rendered.rerender(<ReviewWorkspace run={run({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 } })} {...props} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Same entity" })).toBeDisabled());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/candidates/c11")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("SW-028 sends only one human decision under rapid mixed mouse and keyboard activation", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    let finish!: (updated: RunSummary) => void;
+    const onDecision = vi.fn(() => new Promise<RunSummary>(resolve => { finish = resolve; }));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()}/>);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+    fireEvent.click(screen.getByRole("button", { name: "Different entities" }));
+    fireEvent.click(screen.getByRole("button", { name: "Different entities" }));
+    fireEvent.keyDown(window, { key: "d" });
+    expect(onDecision).toHaveBeenCalledTimes(1);
+    expect(onDecision).toHaveBeenCalledWith("c11", "different_entity");
+    await act(async () => { finish(run()); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Different entities" })).toBeEnabled());
   });
 
   it("keeps SAME, DIFFERENT, defer, and undo keyboard actions wired", async () => {
@@ -176,8 +221,10 @@ describe("bounded review workspace", () => {
     await act(async () => { await Promise.resolve(); });
     fireEvent.keyDown(window, { key: "s" });
     await waitFor(() => expect(onDecision).toHaveBeenCalledWith("c11", "same_entity"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Defer \/ skip/ })).toBeEnabled());
     fireEvent.keyDown(window, { key: "e" });
     await waitFor(() => expect(onDefer).toHaveBeenCalledWith("A1", true));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Undo/ })).toBeEnabled());
     fireEvent.keyDown(window, { key: "u" });
     await waitFor(() => expect(onUndo).toHaveBeenCalled());
   });

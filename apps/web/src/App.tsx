@@ -72,6 +72,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const uploadInFlight = useRef(false);
   const sampleInFlight = useRef(false);
+  const downloadInFlight = useRef(false);
+  const exportSnapshotPin = useRef<{ runId: string; sha256: string } | null>(null);
   const newRunButton = useRef<HTMLButtonElement>(null);
   const newRunDialog = useRef<HTMLDialogElement>(null);
   const cancelNewRunButton = useRef<HTMLButtonElement>(null);
@@ -285,40 +287,86 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     }, "results");
   }
 
+  // A 409 means another action may have changed the run. Reload the
+  // authoritative projection but never silently retry a human decision.
+  async function parseReviewMutation(response: Response): Promise<RunSummary> {
+    if (response.status === 409 && run) {
+      try {
+        const fresh = await parseRun(await fetch(`/api/runs/${encodeURIComponent(run.runId)}`));
+        setRun(fresh);
+      } catch {
+        // Preserve the original mutation error; the user can retry a refresh.
+      }
+    }
+    return parseRun(response);
+  }
+
   function review(candidateId: string) { setSelectedCandidateId(candidateId); setScreen("review"); }
   async function decide(candidateId: string, decision: "same_entity" | "different_entity") {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/candidates/${candidateId}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/candidates/${encodeURIComponent(candidateId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) }).then(parseReviewMutation));
   }
   async function setDeferred(aRowId: string, deferred: boolean) {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/review-items/${encodeURIComponent(aRowId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deferred }) }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/review-items/${encodeURIComponent(aRowId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deferred }) }).then(parseReviewMutation));
   }
   async function undoReview() {
     if (!run) return null;
-    return action(() => fetch(`/api/runs/${run.runId}/review-undo`, { method: "POST" }).then(parseRun));
+    return action(() => fetch(`/api/runs/${run.runId}/review-undo`, { method: "POST" }).then(parseReviewMutation));
   }
   async function batchDecide(groupId: string, decision: "same_entity" | "different_entity") {
     if (!run) return null;
     return action(async () => {
       const response = await fetch(`/api/runs/${run.runId}/review-groups/${encodeURIComponent(groupId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, confirmed: true }) });
+      if (response.status === 409) {
+        try { setRun(await parseRun(await fetch(`/api/runs/${encodeURIComponent(run.runId)}`))); } catch { /* Retain the original conflict error. */ }
+      }
       if (!response.ok) { const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null; throw new Error(payload?.error?.message ?? "The batch decision could not be applied."); }
       return BatchIdentityDecisionResponseSchema.parse(await response.json()).run;
     });
   }
   async function downloadExport(kind: "reconciliation" | "trusted" | "manifest") {
-    if (!run) return;
+    if (!run || downloadInFlight.current) return;
+    downloadInFlight.current = true;
     setBusy(true); setError(null);
     try {
       const endpoint = kind === "trusted" ? "trusted-export" : kind === "manifest" ? "manifest" : "export";
-      const response = await fetch(`/api/runs/${run.runId}/${endpoint}`);
-      if (!response.ok) { const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null; throw new Error(payload?.error?.message ?? "Export could not be created."); }
-      const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a");
+      const previousPin = exportSnapshotPin.current?.runId === run.runId ? exportSnapshotPin.current.sha256 : null;
+      const expected = previousPin ? `?expectedSnapshot=${previousPin}` : "";
+      const response = await fetch(`/api/runs/${run.runId}/${endpoint}${expected}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+        if (response.status === 409 && payload?.error?.code === "stale_export_snapshot") {
+          exportSnapshotPin.current = null;
+          throw new Error("This run changed since an earlier export. Download all report files again so they describe the same run state.");
+        }
+        throw new Error(payload?.error?.message ?? "Export could not be created.");
+      }
+      const responsePin = response.headers.get("X-Samewise-Export-Snapshot");
+      if (responsePin !== null && !/^[a-f0-9]{64}$/.test(responsePin)) {
+        throw new Error("The export server returned an invalid snapshot identifier.");
+      }
+      // Never mix previously pinned files with an unpinned or different response.
+      // Older API deployments omit this header and retain legacy one-file behavior.
+      if (previousPin && responsePin !== previousPin) {
+        exportSnapshotPin.current = null;
+        throw new Error("Export snapshot verification is unavailable or has changed. Download all report files again.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
       const fallback = kind === "trusted" ? `samewise-${run.runId}-trusted-merged.csv` : kind === "manifest" ? `samewise-${run.runId}-manifest.json` : `samewise-${run.runId}-reconciliation.csv`;
       const headerFilename = /filename="([A-Za-z0-9._-]+)"/.exec(response.headers.get("Content-Disposition") ?? "")?.[1];
-      link.href = url; link.download = headerFilename ?? fallback; link.click(); URL.revokeObjectURL(url);
+      try {
+        link.href = url;
+        link.download = headerFilename ?? fallback;
+        link.click();
+        if (responsePin) exportSnapshotPin.current = { runId: run.runId, sha256: responsePin };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Export could not be created."); }
-    finally { setBusy(false); }
+    finally { downloadInFlight.current = false; setBusy(false); }
   }
 
   const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.screens.includes(screen)));

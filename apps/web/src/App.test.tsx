@@ -56,9 +56,60 @@ function suggestionResponse(value = proposal(), confirmedMappings: MappingSugges
   return { contractVersion: "3.0.0", proposal: value, confirmedMappings };
 }
 
-afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
+
+function stubBrowserDownloads() {
+  class DownloadURL extends URL {
+    static createObjectURL = vi.fn(() => "blob:samewise-test");
+    static revokeObjectURL = vi.fn();
+  }
+  vi.stubGlobal("URL", DownloadURL);
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  return { createObjectURL: DownloadURL.createObjectURL, revokeObjectURL: DownloadURL.revokeObjectURL, click };
+}
+
+function readyExportRun(): RunSummary {
+  return runView({
+    trustedExportReadiness: { ready: true, unresolvedIdentityCount: 0, unresolvedConflictCount: 0, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: [] },
+    reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 },
+    conflictSummary: { total: 1, resolved: 1, unresolved: 0 },
+  });
+}
+
+
 
 describe("Samewise vertical slice", () => {
+  it("SW-028 refreshes authoritative run after a stale review 409 without retrying the identity decision", async () => {
+    const current = runView({stage:"review"});
+    const refreshed = runView({
+      stage:"review",
+      reviewProgress:{total:1,reviewed:1,remaining:0,deferred:0},
+      summary:{matched:0,needsReview:0,onlyA:3,onlyB:4},
+    });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch",vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url=String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/review?")) return new Response(JSON.stringify(reviewPage()),{status:200});
+      if (url.endsWith("/candidates/candidate-1-1") && !init?.method) {
+        return new Response(JSON.stringify(candidateDetail()),{status:200});
+      }
+      if (url.endsWith("/candidates/candidate-1-1/decisions")) {
+        return new Response(JSON.stringify({error:{code:"decision_exists",message:"This candidate already has a recorded decision."}}),{status:409});
+      }
+      if (url==="/api/runs/run-1" && !init?.method) {
+        return new Response(JSON.stringify(refreshed),{status:200});
+      }
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={current} initialScreen="review"/>);
+    fireEvent.click(await screen.findByRole("button",{name:"Different entities"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("already has a recorded decision");
+    expect(await screen.findByRole("heading",{name:"Identity review complete"})).toBeInTheDocument();
+    expect(requests.filter(request=>request.endsWith("/candidates/candidate-1-1/decisions"))).toHaveLength(1);
+    expect(requests).toContain("GET /api/runs/run-1");
+  });
+
   it("opens an accessible mobile menu, exposes workflow state, and closes after navigation", async () => {
     render(<App initialRun={runView()} initialScreen="results" />);
     const menuButton = screen.getByRole("button", { name: "Menu" });
@@ -414,6 +465,115 @@ describe("Samewise vertical slice", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1");
     expect(window.location.search).toContain("run=run-1");
     expect(window.location.search).toContain("screen=review");
+  });
+
+  it("SW-032 pins later browser downloads to the first exact-state export response", async () => {
+    const downloads = stubBrowserDownloads();
+    const pin = "a".repeat(64);
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      return new Response("export bytes", { status: 200, headers: {
+        "X-Samewise-Export-Snapshot": pin,
+        "Content-Disposition": 'attachment; filename="samewise-run-1-report.csv"',
+      } });
+    }));
+    render(<App initialRun={readyExportRun()} initialScreen="export" />);
+    fireEvent.click(screen.getByText("Audit & technical files"));
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciled data" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(3));
+    expect(requests).toEqual([
+      "/api/runs/run-1/manifest",
+      `/api/runs/run-1/export?expectedSnapshot=${pin}`,
+      `/api/runs/run-1/trusted-export?expectedSnapshot=${pin}`,
+    ]);
+    expect(downloads.createObjectURL).toHaveBeenCalledTimes(3);
+    expect(downloads.revokeObjectURL).toHaveBeenCalledTimes(3);
+  });
+
+  it("SW-032 stops stale downloads on 409 and requires a fresh user action to restart", async () => {
+    const downloads = stubBrowserDownloads();
+    const firstPin = "b".repeat(64);
+    const newPin = "c".repeat(64);
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      if (requests.length === 2) {
+        return new Response(JSON.stringify({ error: { code: "stale_export_snapshot", message: "stale" } }), {
+          status: 409, headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("export bytes", { status: 200, headers: {
+        "X-Samewise-Export-Snapshot": requests.length === 1 ? firstPin : newPin,
+      } });
+    }));
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByText("Audit & technical files"));
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Download all report files again");
+    expect(downloads.click).toHaveBeenCalledTimes(1);
+    expect(requests).toHaveLength(2);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download provenance manifest" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(2));
+    expect(requests).toEqual([
+      "/api/runs/run-1/export",
+      `/api/runs/run-1/manifest?expectedSnapshot=${firstPin}`,
+      "/api/runs/run-1/manifest",
+    ]);
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("SW-032 rejects missing snapshot headers after pinning and supports legacy first downloads", async () => {
+    const downloads = stubBrowserDownloads();
+    const pin = "d".repeat(64);
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      if (requests.length === 2) return new Response("legacy bytes", { status: 200 });
+      return new Response("export bytes", { status: 200, headers: requests.length === 1 ? { "X-Samewise-Export-Snapshot": pin } : {} });
+    }));
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByText("Audit & technical files"));
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Export snapshot verification is unavailable");
+    expect(downloads.click).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(2));
+    expect(requests).toEqual([
+      "/api/runs/run-1/export",
+      `/api/runs/run-1/manifest?expectedSnapshot=${pin}`,
+      "/api/runs/run-1/manifest",
+    ]);
+  });
+
+  it("SW-032 rejects a different 200-response snapshot SHA without downloading mixed bytes", async () => {
+    const downloads = stubBrowserDownloads();
+    const first = "e".repeat(64);
+    const second = "f".repeat(64);
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      return new Response("export bytes", { status: 200, headers: {
+        "X-Samewise-Export-Snapshot": requests.length === 1 ? first : second,
+      } });
+    }));
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByText("Audit & technical files"));
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Export snapshot verification is unavailable or has changed");
+    expect(downloads.click).toHaveBeenCalledTimes(1);
+    expect(requests).toEqual(["/api/runs/run-1/export", `/api/runs/run-1/manifest?expectedSnapshot=${first}`]);
   });
 
   it("keeps the reconciliation report available while trusted merged output is blocked", () => {

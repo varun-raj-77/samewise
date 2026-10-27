@@ -51,6 +51,29 @@ Results and conflict lists use stable ordering. Review applies filter, sort, and
 
 The trusted endpoint returns a readiness error while identity or required field conflicts remain unresolved. Saving a policy and previewing it are non-mutating; application is separate. For field semantics and provenance, see [SW-008](sw-008-survivorship.md) and [SW-010](sw-010-export-provenance.md).
 
+### Optional SW-031 exact-state export pinning
+
+Each successful export, trusted-export, and manifest response includes
+`X-Samewise-Export-Snapshot: <64-character lowercase SHA-256>` and
+`Cache-Control: no-store`. The token is the manifest's
+`run.snapshot.authoritativeStateSha256`, computed from the same view as the
+returned CSV or manifest. No new artifact format is introduced.
+
+An API client assembling one portable set should first request `/manifest`,
+then request `/export?expectedSnapshot=<token>` and, if the manifest is
+`trusted_ready`, `/trusted-export?expectedSnapshot=<token>`.
+A matching token yields the existing exact artifact bytes. A changed run yields
+HTTP 409 `stale_export_snapshot` with no artifact; clients must start over and
+download **every file** for the new state. Malformed or repeated tokens yield
+HTTP 400 `invalid_export_snapshot`. Omitting the optional parameter preserves
+the existing individual-download behavior.
+
+This is a fail-closed **read consistency guard**, not persistent historical
+snapshot storage, a multi-file transaction or an authenticity signature.
+The current web UI still downloads individual files without this optional pin;
+consumer/UI integration can follow once the concurrent web changes in PR #18
+are resolved. See [SW-031](sw-031-pinned-export-snapshot.md).
+
 ## Evaluation
 
 `GET /api/evaluations` lists checked-in snapshots; `GET /api/evaluations/:evaluationId`, `GET /api/evaluations/:evaluationId/comparison/:otherId`, and `GET /api/evaluations/:evaluationId/errors` inspect them. `GET /api/runs/:runId/evaluation-evidence` exposes human review evidence separately. Evaluation truth never enters ordinary run matching.
