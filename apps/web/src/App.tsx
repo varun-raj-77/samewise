@@ -25,6 +25,7 @@ const SAMPLE_B_URL = "/samples/samewise_sample_vendors_b.csv";
 const SAMPLE_A_FILENAME = "samewise_sample_vendors_a.csv";
 const SAMPLE_B_FILENAME = "samewise_sample_vendors_b.csv";
 const SAMPLE_LOAD_ERROR = "Sample data couldn't be loaded. You can try again, download the sample files, or choose your own CSVs.";
+const MAX_CSV_UPLOAD_BYTES = 2 * 1024 * 1024; // Mirrors the API's per-file 2 MiB limit.
 const STEPS: { id: Screen; label: string; screens: Screen[] }[] = [
   { id: "upload", label: "Upload", screens: ["upload", "profile"] },
   { id: "mapping", label: "Match setup", screens: ["mapping"] },
@@ -152,6 +153,12 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     if (!run || uploadInFlight.current) return;
     if (run.datasets.A || run.datasets.B) { setError("Source files are already saved for this run. Start a new reconciliation to use different files."); return; }
     if (![aFile, bFile].every((file) => file.name.toLowerCase().endsWith(".csv"))) { setError("Both source files must be CSV files."); return; }
+    // Validate the entire pair before accepting A; source files become immutable after upload.
+    const files = [{ side: "A", file: aFile }, { side: "B", file: bFile }] as const;
+    const empty = files.find(({ file }) => file.size === 0);
+    if (empty) { setError(`Dataset ${empty.side} is empty. Choose a non-empty CSV.`); return; }
+    const oversized = files.find(({ file }) => file.size > MAX_CSV_UPLOAD_BYTES);
+    if (oversized) { setError(`Dataset ${oversized.side} exceeds the 2 MiB file limit. Choose a smaller CSV.`); return; }
     uploadInFlight.current = true;
     setBusy(true); setError(null);
     let latestAuthoritativeRun = run;

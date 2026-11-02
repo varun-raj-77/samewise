@@ -230,6 +230,44 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByText("samewise_sample_vendors_b.csv")).toBeInTheDocument();
   });
 
+  it.each([
+    { scenario: "empty A", side: "A", bytes: 0, expected: "Dataset A is empty" },
+    { scenario: "empty B", side: "B", bytes: 0, expected: "Dataset B is empty" },
+    { scenario: "oversized A", side: "A", bytes: 2 * 1024 * 1024 + 1, expected: "Dataset A exceeds the 2 MiB file limit" },
+    { scenario: "oversized B", side: "B", bytes: 2 * 1024 * 1024 + 1, expected: "Dataset B exceeds the 2 MiB file limit" },
+  ])("SW-039 rejects $scenario before sending either immutable source", ({ side, bytes, expected }) => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    const valid = new File(["id\n1"], "valid.csv", { type: "text/csv" });
+    const invalid = new File([new Uint8Array(bytes)], "invalid.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [side === "A" ? invalid : valid] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [side === "B" ? invalid : valid] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(expected);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Source files are locked for this run" })).not.toBeInTheDocument();
+  });
+
+  it("SW-039 allows a CSV exactly at the 2 MiB boundary", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const afterA = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const complete = runView({ stage: "profile", datasets: { A: afterA.datasets.A, B: profile("B") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/datasets/A") ? afterA : complete), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File([new Uint8Array(2 * 1024 * 1024)], "at-limit.csv", { type: "text/csv" })] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "small.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/runs/run-1/datasets/A", "/api/runs/run-1/datasets/B",
+    ]);
+  });
+
   it("keeps normal upload recovery truthful when the API is unavailable", async () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "The API is unavailable." } }), { status: 503, headers: { "Content-Type": "application/json" } })));
