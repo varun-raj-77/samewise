@@ -74,6 +74,10 @@ h2 { color: var(--text-primary); font-size: 20px; letter-spacing: -.02em; }
 .page-heading { margin-bottom: 22px; }
 .page-heading h1 { font-size: clamp(30px, 3vw, 34px); }
 .page-heading p { max-width: 640px; margin: 9px 0 0; color: var(--text-secondary); font-size: 15px; line-height: 1.55; }
+.upload-privacy-notice { display: flex; align-items: flex-start; gap: 11px; margin: -5px 0 16px; padding: 12px 14px; border: 1px solid rgba(245, 158, 11, .25); border-left: 3px solid var(--semantic-warning); border-radius: 9px; background: rgba(245, 158, 11, .06); }
+.upload-privacy-notice > span { display: grid; flex: 0 0 22px; width: 22px; height: 22px; place-items: center; border-radius: 6px; background: rgba(245, 158, 11, .16); color: var(--semantic-warning); font-size: 13px; font-weight: 800; }
+.upload-privacy-notice p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.upload-privacy-notice strong { color: var(--text-primary); }
 .source-pair-panel { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 13px; background: var(--surface-1); }
 .source-pair-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 70px; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
 .source-pair-panel h2 { margin: 3px 0 0; font-size: 17px; }
