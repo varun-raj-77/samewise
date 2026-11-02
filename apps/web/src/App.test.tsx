@@ -752,6 +752,65 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByLabelText("Dataset B column")).toHaveValue("status");
   });
 
+  it("SW-044 preserves unsaved manual edits made while AI recommendations load", async () => {
+    let resolveSuggestions!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveSuggestions = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "My unsaved manual field" } });
+    resolveSuggestions(new Response(JSON.stringify(suggestionResponse(proposal(), [mapping])), { status: 201 }));
+    expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.getByLabelText("Mapping label")).toHaveValue("My unsaved manual field");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("SW-044 keeps manual mapping precedence over a conflicting accepted recommendation", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    let resolveAccept!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201 }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveAccept = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "Preserve my edit" } });
+    resolveAccept(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [acceptedMapping])), { status: 200 }));
+    expect(await screen.findByRole("status")).toHaveTextContent("manual mappings were preserved");
+    expect(screen.getAllByLabelText("Mapping label")).toHaveLength(1);
+    expect(screen.getByLabelText("Mapping label")).toHaveValue("Preserve my edit");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("SW-044 appends AI mappings for unused columns without deleting manual mappings", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse()), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [acceptedMapping])), { status: 200 })));
+    render(<App initialRun={runView({ mappings: [comparison] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("manual mappings were preserved");
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.getAllByLabelText("Mapping label")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Mapping label").map((input) => (input as HTMLInputElement).value)).toEqual(["Status", "name"]);
+  });
+
+  it("SW-044 does not resurrect a manually removed mapping on recommendation refresh", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(suggestionResponse(proposal(), [mapping])), { status: 201 })));
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Organization name" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.queryByLabelText("Mapping label")).not.toBeInTheDocument();
+  });
+
   it("keeps manual mapping available when AI is unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "ai_missing_key", message: "AI suggestions unavailable. You can continue mapping columns manually." } }), { status: 503, headers: { "Content-Type": "application/json" } })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);

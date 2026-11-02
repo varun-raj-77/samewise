@@ -313,7 +313,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     try {
       const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions`, { method: "POST" }));
       setMappingProposal(response.proposal);
-      setDraftMappings(response.confirmedMappings);
+      // Recommendations are advisory; an AI refresh must never overwrite unsaved manual edits.
     } catch (caught) {
       setSuggestionNotice(caught instanceof Error ? caught.message : "AI suggestions unavailable. You can continue mapping columns manually.");
     } finally { setSuggestionsLoading(false); }
@@ -329,9 +329,13 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "accept" }),
         }));
         setMappingProposal(latest.proposal);
-        setDraftMappings(latest.confirmedMappings);
+        const accepted = latest.proposal.suggestions.find((item) => item.suggestionId === suggestion.suggestionId);
+        const recommendedMapping = accepted?.status === "accepted" ? accepted.finalMapping : null;
+        if (recommendedMapping) {
+          setDraftMappings((current) => appendNonConflictingRecommendation(current, recommendedMapping));
+        }
       }
-      setSuggestionNotice("Recommended setup added. Inspect or adjust it before running matching.");
+      setSuggestionNotice("Recommended setup added where fields are unused. Your manual mappings were preserved; inspect or adjust before matching.");
     } catch (caught) {
       setSuggestionNotice(caught instanceof Error ? caught.message : "The recommended setup could not be applied. Manual setup remains available.");
     } finally { setSuggestionsLoading(false); }
@@ -558,6 +562,14 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
     {!run.trustedExportReadiness.ready && <div className="warning" role="status"><strong>Trusted export blocked.</strong><ul>{run.trustedExportReadiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div>}
     <div className="actions">{unresolvedIdentity > 0 ? <button className="secondary" onClick={onReview}>Review identity</button> : run.trustedExportReadiness.unresolvedConflictCount > 0 ? <button className="secondary" onClick={onResolution}>Review unresolved conflicts</button> : <button className="secondary" onClick={onResults}>Back to results</button>}</div>
   </section>;
+}
+
+// Keep the user's local mapping choices authoritative. Accepted AI suggestions can
+// fill unused source columns, but must not duplicate a field or replace a local edit.
+function appendNonConflictingRecommendation(current: ManualMapping[], recommended: ManualMapping): ManualMapping[] {
+  if (current.some((mapping) => mapping.mappingId === recommended.mappingId
+    || mapping.aColumn === recommended.aColumn || mapping.bColumn === recommended.bColumn)) return current;
+  return [...current, recommended];
 }
 
 function hasMeaningfulWork(run: RunSummary): boolean {
