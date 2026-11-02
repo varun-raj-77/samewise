@@ -1,6 +1,5 @@
 import {
   RECONCILIATION_EXPORT_VERSION,
-  RUN_MANIFEST_VERSION,
   RunManifestSchema,
   TRUSTED_EXPORT_VERSION,
 } from "@samewise/contracts";
