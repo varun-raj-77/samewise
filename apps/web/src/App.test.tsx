@@ -432,6 +432,70 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Choose one CSV file for Dataset A and one for Dataset B");
   });
 
+  it("SW-042 creates only one fresh run while the first request is pending", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fresh = { ...empty, runId: "run-2" };
+    let completeCreate!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { completeCreate = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    const newRun = screen.getByRole("button", { name: "New reconciliation" });
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id"], "before.csv")] } });
+    expect(screen.getByText("before.csv")).toBeInTheDocument();
+    fireEvent.click(newRun);
+    expect(newRun).toBeDisabled();
+    fireEvent.click(newRun);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/runs", { method: "POST" });
+    completeCreate(new Response(JSON.stringify(fresh), { status: 201 }));
+    await waitFor(() => expect(screen.queryByText("before.csv")).not.toBeInTheDocument());
+    expect(newRun).toBeEnabled();
+  });
+
+  it("SW-042 blocks the recovery escape during an in-flight missing-source upload", async () => {
+    const partial = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const completed = runView({ ...partial, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+    let completeUpload!: (response: Response) => void;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith("/datasets/B")) {
+        return new Promise<Response>((resolve) => { completeUpload = resolve; });
+      }
+      throw new Error(`Unexpected request ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={partial} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "b.csv")] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    const newRunButtons = screen.getAllByRole("button", { name: "New reconciliation" });
+    expect(newRunButtons.length).toBeGreaterThan(1);
+    for (const button of newRunButtons) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    completeUpload(new Response(JSON.stringify(completed), { status: 201 }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("SW-042 preserves the current run after new-run creation fails and permits a retry", async () => {
+    const fresh = runView({ runId: "run-2", stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Could not create run" } }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fresh), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView()} initialScreen="export" />);
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not create run");
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+    expect(await screen.findByRole("heading", { name: "Upload datasets" })).toBeInTheDocument();
+    expect(screen.queryByText("run-1")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("offers New reconciliation from an active run without changing the current run", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
     fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
