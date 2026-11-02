@@ -85,6 +85,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const cancelSampleButton = useRef<HTMLButtonElement>(null);
   const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const mobileMenuDialog = useRef<HTMLDialogElement>(null);
+  const hasUnuploadedSelections = Boolean((fileA && !run?.datasets.A) || (fileB && !run?.datasets.B));
 
   useEffect(() => {
     if (initialRun) return;
@@ -271,7 +272,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
 
   function requestNewReconciliation() {
     if (busy || uploadInFlight.current || sampleInFlight.current || newRunInFlight.current) return;
-    if (run && hasMeaningfulWork(run)) setConfirmNewRun(true);
+    if ((run && hasMeaningfulWork(run)) || hasUnuploadedSelections) setConfirmNewRun(true);
     else void startNewReconciliation();
   }
 
@@ -490,7 +491,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     </main>
     {confirmNewRun && <dialog ref={newRunDialog} className="new-run-dialog" aria-modal="true" aria-labelledby="new-run-title" aria-describedby="new-run-description" onCancel={(event) => { event.preventDefault(); cancelNewReconciliation(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelNewReconciliation(); } }}>
       <h2 id="new-run-title">Start a new reconciliation?</h2>
-      <p id="new-run-description">Your current run will remain unchanged.</p>
+      <p id="new-run-description">Your current run will remain unchanged.{hasUnuploadedSelections && " Selected CSV files that have not been uploaded will be cleared from this page."}</p>
       <div className="dialog-actions"><button ref={cancelNewRunButton} className="secondary" onClick={cancelNewReconciliation}>Cancel</button><button className="primary" onClick={() => void startNewReconciliation()} disabled={busy}>Start new reconciliation</button></div>
     </dialog>}
     {confirmSampleReplacement && <dialog ref={sampleDialog} className="new-run-dialog" aria-modal="true" aria-labelledby="sample-replacement-title" aria-describedby="sample-replacement-description" onCancel={(event) => { event.preventDefault(); cancelSampleReplacement(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelSampleReplacement(); } }}>
