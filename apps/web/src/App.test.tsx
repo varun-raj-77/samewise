@@ -443,6 +443,8 @@ describe("Samewise vertical slice", () => {
     fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id"], "before.csv")] } });
     expect(screen.getByText("before.csv")).toBeInTheDocument();
     fireEvent.click(newRun);
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toHaveTextContent("Selected CSV files that have not been uploaded");
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
     expect(newRun).toBeDisabled();
     fireEvent.click(newRun);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -496,6 +498,66 @@ describe("Samewise vertical slice", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each(["A", "B"] as const)("SW-043 confirms before discarding an unuploaded Dataset %s selection", (side) => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    const filename = `pending-${side.toLowerCase()}.csv`;
+    fireEvent.change(screen.getByLabelText(`Dataset ${side} CSV`), { target: { files: [new File(["id"], filename)] } });
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toHaveTextContent("Selected CSV files that have not been uploaded will be cleared");
+    expect(screen.getByText(filename)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText(filename)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("SW-043 clears both selected local files only after explicit confirmation", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fresh = { ...empty, runId: "run-2" };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(fresh), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["a"], "local-a.csv")] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["b"], "local-b.csv")] } });
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByText("local-a.csv")).toBeInTheDocument();
+    expect(screen.getByText("local-b.csv")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+    await waitFor(() => expect(screen.queryByText("local-a.csv")).not.toBeInTheDocument());
+    expect(screen.queryByText("local-b.csv")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/runs", { method: "POST" });
+  });
+
+  it("SW-043 skips confirmation after the last unuploaded CSV is removed", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fresh = { ...empty, runId: "run-2" };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(fresh), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["a"], "local-a.csv")] } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Dataset A CSV" }));
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.queryByRole("dialog", { name: "Start a new reconciliation?" })).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("SW-043 identifies only unuploaded files in the confirmation warning", () => {
+    const partial = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    render(<App initialRun={partial} initialScreen="upload" />);
+    fireEvent.click(screen.getAllByRole("button", { name: "New reconciliation" })[0]!);
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).not.toHaveTextContent("Selected CSV files that have not been uploaded");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["b"], "pending-b.csv")] } });
+    fireEvent.click(screen.getAllByRole("button", { name: "New reconciliation" })[0]!);
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toHaveTextContent("Selected CSV files that have not been uploaded");
+  });
+
   it("offers New reconciliation from an active run without changing the current run", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
     fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
@@ -534,6 +596,8 @@ describe("Samewise vertical slice", () => {
     const originalInput = screen.getByLabelText("Dataset A CSV");
     fireEvent.change(originalInput, { target: { files: [new File(["id\n1"], "same-a.csv", { type: "text/csv" })] } });
     fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
     await waitFor(() => expect(screen.getByLabelText("Dataset A CSV")).not.toBe(originalInput));
     expect(screen.queryByText("same-a.csv")).not.toBeInTheDocument();
   });
