@@ -33,6 +33,7 @@ const aBytes = Buffer.from("id,name,status\nA1,Acme Corp,=SUM(1,2)\n");
 const bBytes = Buffer.from("id,organization,status\nB1,Acme Corporation,inactive\nB2,Other,active\n");
 
 let matcherResultOverride: MatcherResult | undefined;
+let profileFailureOverride: Error | undefined;
 
 function baseMatcherResult(): MatcherResult {
   return {
@@ -61,6 +62,7 @@ function baseMatcherResult(): MatcherResult {
 
 const matcher: MatcherRunner = {
   async profile(input) {
+    if (profileFailureOverride) throw profileFailureOverride;
     const names = input.side === "A" ? ["id", "name", "status"] : ["id", "organization", "status"];
     return {
       contractVersion: "1.0.0", datasetId: input.datasetId, side: input.side,
@@ -77,7 +79,7 @@ describe("SW-003 API workflow", () => {
   let dataRoot: string;
   let app: ReturnType<typeof buildApp>;
 
-  beforeEach(async () => { matcherResultOverride = undefined; dataRoot = await mkdtemp(join(tmpdir(), "samewise-api-")); app = buildApp({ dataRoot, matcher }); });
+  beforeEach(async () => { matcherResultOverride = undefined; profileFailureOverride = undefined; dataRoot = await mkdtemp(join(tmpdir(), "samewise-api-")); app = buildApp({ dataRoot, matcher }); });
   afterEach(async () => { await app.close(); });
 
   async function setup() {
@@ -107,6 +109,40 @@ describe("SW-003 API workflow", () => {
   async function conflictPage(runId: string) {
     return ConflictPageSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/conflicts?limit=100` })).json());
   }
+
+  it("SW-038 removes a rejected upload without changing an accepted source, and permits retry", async () => {
+    const created = RunSummarySchema.parse((await app.inject({ method: "POST", url: "/api/runs" })).json());
+    const base = `/api/runs/${created.runId}/datasets`;
+    const uploadA = await app.inject({
+      method: "POST", url: `${base}/A`,
+      headers: { "content-type": "text/csv", "x-file-name": "a.csv" }, payload: aBytes,
+    });
+    expect(uploadA.statusCode).toBe(201);
+    const runDirectory = join(dataRoot, created.runId);
+    const accepted = (await readdir(runDirectory)).filter((name) => name.endsWith(".csv"));
+    expect(accepted).toHaveLength(1);
+    const acceptedBytes = await readFile(join(runDirectory, accepted[0]!));
+
+    profileFailureOverride = new Error("CSV profile could not be parsed.");
+    const rejectedB = await app.inject({
+      method: "POST", url: `${base}/B`,
+      headers: { "content-type": "text/csv", "x-file-name": "b.csv" }, payload: bBytes,
+    });
+    expect(rejectedB.statusCode).toBe(400);
+    expect(rejectedB.json().error.code).toBe("csv_parse_failed");
+    expect((await readdir(runDirectory)).filter((name) => name.endsWith(".csv"))).toEqual(accepted);
+    expect(await readFile(join(runDirectory, accepted[0]!))).toEqual(acceptedBytes);
+    expect(RunSummarySchema.parse((await app.inject({ method: "GET", url: `/api/runs/${created.runId}` })).json()).datasets.B).toBeUndefined();
+
+    profileFailureOverride = undefined;
+    const retryB = await app.inject({
+      method: "POST", url: `${base}/B`,
+      headers: { "content-type": "text/csv", "x-file-name": "b.csv" }, payload: bBytes,
+    });
+    expect(retryB.statusCode).toBe(201);
+    expect((await readdir(runDirectory)).filter((name) => name.endsWith(".csv"))).toHaveLength(2);
+    expect(await readFile(join(runDirectory, accepted[0]!))).toEqual(acceptedBytes);
+  });
 
   it("SW-037 prevents caching of run-scoped success and error responses", async () => {
     const created = await app.inject({ method: "POST", url: "/api/runs" });

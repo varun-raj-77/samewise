@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 
 import {
@@ -564,6 +564,13 @@ export class WorkflowStore {
     try {
       profile = await this.matcher.profile({ datasetId, side, originalFilename, sha256, path });
     } catch (error) {
+      // The source was never accepted. Do not retain raw bytes from a rejected upload.
+      // Never touch previously accepted sources for the other dataset side.
+      try {
+        await rm(path, { force: true });
+      } catch {
+        throw new WorkflowError("upload_cleanup_failed", "CSV profiling failed and the rejected upload could not be removed.", 500);
+      }
       const message = error instanceof Error && !error.message.includes(path)
         ? error.message
         : "CSV could not be profiled safely.";
