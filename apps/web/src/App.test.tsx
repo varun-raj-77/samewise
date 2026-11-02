@@ -494,6 +494,64 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByText("new-b.csv")).toBeInTheDocument();
   });
 
+  it.each(["A", "B"] as const)("SW-041 clears native Dataset %s input to permit reselecting the same path", (side) => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    render(<App initialRun={empty} initialScreen="upload" />);
+    const input = screen.getByLabelText(`Dataset ${side} CSV`) as HTMLInputElement;
+    const assignments: string[] = [];
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      get: () => "",
+      set: (value: string) => { assignments.push(value); },
+    });
+    fireEvent.change(input, { target: { files: [new File(["before"], "same.csv")] } });
+    expect(screen.getByText("same.csv")).toBeInTheDocument();
+    expect(assignments).toEqual([""]);
+    fireEvent.click(screen.getByRole("button", { name: `Replace Dataset ${side} CSV` }));
+    fireEvent.change(input, { target: { files: [new File(["after"], "same.csv")] } });
+    expect(assignments).toEqual(["", ""]);
+    expect(screen.getByText("same.csv")).toBeInTheDocument();
+  });
+
+  it("SW-041 clears stale preflight guidance after a new source selection", () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose one CSV file");
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "a.csv")] } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("SW-041 retries a corrected Dataset B with the same filename and keeps saved A immutable", async () => {
+    const partial = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const completed = runView({ ...partial, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+    const requests: string[] = [];
+    const corrected = new File(["id\nB-IV-301"], "corrected.csv", { type: "text/csv" });
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(`${init?.method ?? "GET"} ${String(url)}`);
+      if (String(url).endsWith("/datasets/B")) {
+        expect(init?.body).toBe(corrected);
+        return new Response(JSON.stringify(completed), { status: 201 });
+      }
+      throw new Error(`Unexpected request ${String(url)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={partial} initialScreen="upload" />);
+    const input = screen.getByLabelText("Dataset B CSV");
+    fireEvent.change(input, { target: { files: [new File([], "corrected.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Dataset B is empty");
+    fireEvent.click(screen.getByRole("button", { name: "Replace Dataset B CSV" }));
+    fireEvent.change(input, { target: { files: [corrected] } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(requests).toEqual(["POST /api/runs/run-1/datasets/B"]);
+  });
+
   it("renders Python-shaped dataset profiles and limited samples", () => {
     render(<App initialRun={runView()} initialScreen="profile" />);
     expect(screen.getByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
