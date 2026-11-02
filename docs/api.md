@@ -51,6 +51,8 @@ Results and conflict lists use stable ordering. Review applies filter, sort, and
 
 The trusted endpoint returns a readiness error while identity or required field conflicts remain unresolved. Saving a policy and previewing it are non-mutating; application is separate. For field semantics and provenance, see [SW-008](sw-008-survivorship.md) and [SW-010](sw-010-export-provenance.md).
 
+CSV exports apply a **best-effort spreadsheet formula-injection defense** to cell values and headers. Text beginning with `=`, `+`, `-`, `@`, their full-width variants, certain invisible leading characters followed by these operators, or a leading tab/newline is prefixed with an apostrophe; ordinary signed numeric strings remain unchanged. This alters the exported cell text intentionally, while immutable uploaded source bytes are untouched. It is not a guarantee across all spreadsheet programs or after spreadsheet save/reopen cycles. Treat CSVs from untrusted data as untrusted files and use a non-evaluating CSV parser for machine ingestion. Export manifest hashes cover the exact escaped artifact bytes.
+
 ### Optional SW-031 exact-state export pinning
 
 Each successful export, trusted-export, and manifest response includes

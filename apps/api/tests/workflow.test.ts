@@ -693,6 +693,33 @@ describe("SW-003 API workflow", () => {
     expect(report).not.toContain("'-42.5");
   });
 
+  it("SW-035 escapes hidden and full-width formula prefixes in both CSV artifacts", async () => {
+    for (const dangerous of [
+      "\t=1+1", "\r=1+1", "\n=1+1", " \t=1+1",
+      "\uFEFF=1+1", "\u200B=1+1", "\u0000=1+1",
+      "＝1+1", "＋1+1", "－1+1", "＠SUM(1)",
+    ]) {
+      const base = baseMatcherResult();
+      matcherResultOverride = {
+        ...base,
+        candidates: [{ ...base.candidates[0]!, aRecord: { ...base.candidates[0]!.aRecord, status: dangerous } }],
+      };
+      const { runId } = await setup();
+      const decision = await app.inject({ method: "POST", url: `/api/runs/${runId}/candidates/candidate-1-1/decisions`, payload: { decision: "same_entity" } });
+      expect(decision.statusCode).toBe(200);
+      const conflict = (await conflictPage(runId)).items[0]!;
+      const resolution = await app.inject({ method: "POST", url: `/api/runs/${runId}/conflicts/${conflict.conflictId}/resolutions`, payload: { action: "use_a" } });
+      expect(resolution.statusCode).toBe(200);
+      const report = await app.inject({ method: "GET", url: `/api/runs/${runId}/export` });
+      const trusted = await app.inject({ method: "GET", url: `/api/runs/${runId}/trusted-export` });
+      expect(report.statusCode).toBe(200);
+      expect(trusted.statusCode).toBe(200);
+      // The escape must precede the entire payload, including its invisible first character.
+      expect(report.body).toContain(`'${dangerous}`);
+      expect(trusted.body).toContain(`'${dangerous}`);
+    }
+  });
+
   it("generates a deterministic 10,000-row reconciliation artifact without an export-only scaling abstraction", async () => {
     const { result } = await setup();
     const { projectionVersion: _projectionVersion, conflictSummary: _conflictSummary, ...fullBase } = result;

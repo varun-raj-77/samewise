@@ -1943,8 +1943,13 @@ export class WorkflowStore {
 }
 
 function defendFormula(value: string): string {
+  // Preserve ordinary signed numbers without allowing formula operators in text cells.
   if (/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(value)) return value;
-  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+  // A spreadsheet may interpret an operator after invisible leading characters as a formula.
+  // Control prefixes and full-width operators also need an explicit text escape.
+  const startsWithControl = value.startsWith("\t") || value.startsWith("\r") || value.startsWith("\n");
+  const looksLikeFormula = /^[\s\u200B\u2060\p{Cc}]*[=+\-@＝＋－＠]/u.test(value);
+  return startsWithControl || looksLikeFormula ? `'${value}` : value;
 }
 
 function csvCell(value: string): string {
