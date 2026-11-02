@@ -76,6 +76,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const sampleInFlight = useRef(false);
   const newRunInFlight = useRef(false);
   const downloadInFlight = useRef(false);
+  // Track deliberate draft removals separately from server-accepted suggestions.
+  const removedMappingIds = useRef(new Set<string>());
+  const serverConfirmedMappings = useRef<ManualMapping[]>(initialRun?.mappings ?? []);
   const exportSnapshotPin = useRef<{ runId: string; sha256: string } | null>(null);
   const newRunButton = useRef<HTMLButtonElement>(null);
   const newRunDialog = useRef<HTMLDialogElement>(null);
@@ -288,6 +291,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     try {
       const freshRun = await parseRun(await fetch("/api/runs", { method: "POST" }));
       setRun(freshRun); setFileA(null); setFileB(null); setDraftMappings([]);
+      removedMappingIds.current.clear(); serverConfirmedMappings.current = [];
       setMappingProposal(null); setSuggestionNotice(null); setSelectedCandidateId(null);
       setUsingSampleData(false); setConfirmSampleReplacement(false);
       setScreen("upload");
@@ -313,7 +317,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     try {
       const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions`, { method: "POST" }));
       setMappingProposal(response.proposal);
-      // Recommendations are advisory; an AI refresh must never overwrite unsaved manual edits.
+      serverConfirmedMappings.current = response.confirmedMappings;
+      setDraftMappings((current) => mergeConfirmedMappings(current, response.confirmedMappings, removedMappingIds.current));
     } catch (caught) {
       setSuggestionNotice(caught instanceof Error ? caught.message : "AI suggestions unavailable. You can continue mapping columns manually.");
     } finally { setSuggestionsLoading(false); }
@@ -323,19 +328,22 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     if (!run || !mappingProposal) return;
     setSuggestionsLoading(true); setSuggestionNotice(null);
     try {
-      let latest: MappingSuggestionResponse | null = null;
+      let applied = 0;
       for (const suggestion of mappingProposal.suggestions.filter((item) => item.status === "pending")) {
-        latest = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestion.suggestionId}`, {
+        // A prior PATCH may have committed even if its response was lost.
+        if (serverConfirmedMappings.current.some((mapping) =>
+          mapping.aColumn === suggestion.leftColumn && mapping.bColumn === suggestion.rightColumn)) continue;
+        const latest = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestion.suggestionId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "accept" }),
         }));
+        serverConfirmedMappings.current = latest.confirmedMappings;
         setMappingProposal(latest.proposal);
-        const accepted = latest.proposal.suggestions.find((item) => item.suggestionId === suggestion.suggestionId);
-        const recommendedMapping = accepted?.status === "accepted" ? accepted.finalMapping : null;
-        if (recommendedMapping) {
-          setDraftMappings((current) => appendNonConflictingRecommendation(current, recommendedMapping));
-        }
+        setDraftMappings((current) => mergeConfirmedMappings(current, latest.confirmedMappings, removedMappingIds.current));
+        applied += 1;
       }
-      setSuggestionNotice("Recommended setup added where fields are unused. Your manual mappings were preserved; inspect or adjust before matching.");
+      setSuggestionNotice(applied
+        ? "Recommended setup added without replacing manual mappings. Inspect or adjust before matching."
+        : "Existing confirmed mappings are already available. Your manual mappings were preserved.");
     } catch (caught) {
       setSuggestionNotice(caught instanceof Error ? caught.message : "The recommended setup could not be applied. Manual setup remains available.");
     } finally { setSuggestionsLoading(false); }
@@ -480,7 +488,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           <details className="advanced-setup" open={!mappingProposal}>
             <summary>Advanced setup</summary>
             <p>Pair columns manually, override recommendations, or continue here when AI is unavailable.</p>
-            <div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index))} />)}</div>
+            <div className="mapping-list">{draftMappings.map((mapping, index) => <MappingRow key={mapping.mappingId} mapping={mapping} aColumns={run.datasets.A!.columns.map((column) => column.name)} bColumns={run.datasets.B!.columns.map((column) => column.name)} onChange={(next) => setDraftMappings(draftMappings.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => { removedMappingIds.current.add(mapping.mappingId); setDraftMappings(draftMappings.filter((_, itemIndex) => itemIndex !== index)); }} />)}</div>
             <button className="secondary" onClick={addMapping}>+ Add manual mapping</button>
           </details>
           <MatchingSafetyGuidance mappings={draftMappings} run={run} />
@@ -564,12 +572,19 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
   </section>;
 }
 
-// Keep the user's local mapping choices authoritative. Accepted AI suggestions can
-// fill unused source columns, but must not duplicate a field or replace a local edit.
+// The API allows a column in multiple correspondences. Only an identical ID or
+// exact A/B pair conflicts; preserve the local version when either exists.
 function appendNonConflictingRecommendation(current: ManualMapping[], recommended: ManualMapping): ManualMapping[] {
   if (current.some((mapping) => mapping.mappingId === recommended.mappingId
-    || mapping.aColumn === recommended.aColumn || mapping.bColumn === recommended.bColumn)) return current;
+    || (mapping.aColumn === recommended.aColumn && mapping.bColumn === recommended.bColumn))) return current;
   return [...current, recommended];
+}
+
+// Recover accepted server mappings after a lost PATCH response without
+// resurrecting fields the user explicitly removed from the current draft.
+function mergeConfirmedMappings(current: ManualMapping[], confirmed: ManualMapping[], removedIds: ReadonlySet<string>): ManualMapping[] {
+  return confirmed.reduce((merged, mapping) => removedIds.has(mapping.mappingId)
+    ? merged : appendNonConflictingRecommendation(merged, mapping), current);
 }
 
 function hasMeaningfulWork(run: RunSummary): boolean {
