@@ -752,6 +752,132 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByLabelText("Dataset B column")).toHaveValue("status");
   });
 
+  it("SW-044 preserves unsaved manual edits made while AI recommendations load", async () => {
+    let resolveSuggestions!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveSuggestions = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "My unsaved manual field" } });
+    resolveSuggestions(new Response(JSON.stringify(suggestionResponse(proposal(), [mapping])), { status: 201 }));
+    expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.getByLabelText("Mapping label")).toHaveValue("My unsaved manual field");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("SW-044 keeps an edited manual mapping when a recommendation has the same pair", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(suggestionResponse(proposal(), [mapping])), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "Preserve my edit" } });
+    expect(await screen.findByRole("status")).toHaveTextContent("manual mappings were preserved");
+    expect(screen.getAllByLabelText("Mapping label")).toHaveLength(1);
+    expect(screen.getByLabelText("Mapping label")).toHaveValue("Preserve my edit");
+    // The accepted server pair already exists; accepting it again would fail duplicate_mapping.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("SW-044 appends AI mappings for distinct pairs without deleting manual mappings", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(proposal(), [comparison])), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [comparison, acceptedMapping])), { status: 200 })));
+    render(<App initialRun={runView({ mappings: [comparison] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("without replacing manual mappings");
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.getAllByLabelText("Mapping label")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Mapping label").map((input) => (input as HTMLInputElement).value)).toEqual(["Status", "name"]);
+  });
+
+  it("SW-044 permits two AI correspondences sharing the same source column", async () => {
+    const firstProposal = proposal();
+    const first = firstProposal.suggestions[0]!;
+    const second = { ...first, suggestionId: "suggestion-2", rightColumn: "status", reason: "A second valid correspondence." };
+    const pending: SemanticMappingProposal = { ...firstProposal, suggestions: [first, second] };
+    const firstMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const secondMapping = { ...firstMapping, mappingId: "mapping-suggestion-2", bColumn: "status" };
+    const afterFirst: SemanticMappingProposal = {
+      ...pending, suggestions: [{ ...first, status: "accepted", finalMapping: firstMapping }, second],
+    };
+    const afterSecond: SemanticMappingProposal = {
+      ...pending, suggestions: [
+        { ...first, status: "accepted", finalMapping: firstMapping },
+        { ...second, status: "accepted", finalMapping: secondMapping },
+      ],
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(pending)), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(afterFirst, [firstMapping])), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(afterSecond, [firstMapping, secondMapping])), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("without replacing manual mappings");
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.getAllByLabelText("Mapping label")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Dataset B column").map((select) => (select as HTMLSelectElement).value)).toEqual(["organization", "status"]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("SW-044 restores server-confirmed acceptance after its PATCH response is lost", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(proposal(), [comparison])), { status: 201 }))
+      .mockRejectedValueOnce(new Error("Response lost after server commit"))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [comparison, acceptedMapping])), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [comparison] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Response lost after server commit");
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "My edited status field" } });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh recommendations" }));
+    expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByLabelText("Mapping label")).toHaveLength(2));
+    expect(screen.getAllByLabelText("Mapping label").map((input) => (input as HTMLInputElement).value)).toEqual(["My edited status field", "name"]);
+    expect(screen.queryByRole("button", { name: "Use recommended setup" })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("SW-044 preserves unsaved manual edits while a distinct AI acceptance is pending", async () => {
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
+    const acceptedProposal = proposal({ status: "accepted", finalMapping: acceptedMapping });
+    let resolveAccept!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggestionResponse(proposal(), [comparison])), { status: 201 }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveAccept = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ mappings: [comparison] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    fireEvent.change(screen.getByLabelText("Mapping label"), { target: { value: "Preserve my status edit" } });
+    resolveAccept(new Response(JSON.stringify(suggestionResponse(acceptedProposal, [comparison, acceptedMapping])), { status: 200 }));
+    expect(await screen.findByRole("status")).toHaveTextContent("without replacing manual mappings");
+    expect(screen.getAllByLabelText("Mapping label").map((input) => (input as HTMLInputElement).value)).toEqual(["Preserve my status edit", "name"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("SW-044 does not resurrect a manually removed mapping on recommendation refresh", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(suggestionResponse(proposal(), [mapping])), { status: 201 })));
+    render(<App initialRun={runView({ mappings: [mapping] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Organization name" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
+    if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
+    expect(screen.queryByLabelText("Mapping label")).not.toBeInTheDocument();
+  });
+
   it("keeps manual mapping available when AI is unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "ai_missing_key", message: "AI suggestions unavailable. You can continue mapping columns manually." } }), { status: 503, headers: { "Content-Type": "application/json" } })));
     render(<App initialRun={runView({ mappings: [] })} initialScreen="mapping" />);
