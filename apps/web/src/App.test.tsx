@@ -291,7 +291,7 @@ describe("Samewise vertical slice", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("synchronizes an authoritative Dataset A upload when Dataset B fails", async () => {
+  it("SW-040 preserves Dataset A and offers missing-side recovery when B fails", async () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     const afterA = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -307,10 +307,102 @@ describe("Samewise vertical slice", () => {
     fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "b.csv", { type: "text/csv" })] } });
     fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
     expect(await screen.findByRole("heading", { name: "Source files are locked for this run" })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Start a new reconciliation and retry");
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose a corrected CSV for the missing dataset");
+    expect(screen.getByRole("status")).toHaveTextContent("Dataset A is saved as a.csv");
+    expect(screen.getByRole("button", { name: "Upload remaining Dataset B" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload remaining Dataset A" })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       "/api/runs/run-1/datasets/A", "/api/runs/run-1/datasets/B", "/api/runs/run-1",
     ]);
+  });
+
+  it("SW-040 retries only Dataset B after its first profiling failure", async () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const afterA = runView({ ...empty, datasets: { A: profile("A") } });
+    const completed = runView({ ...empty, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+    let bAttempts = 0;
+    const requests: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/datasets/A")) return new Response(JSON.stringify(afterA), { status: 201 });
+      if (url.endsWith("/datasets/B")) {
+        bAttempts++;
+        if (bAttempts === 1) return new Response(JSON.stringify({ error: { message: "Invalid CSV header." } }), { status: 400 });
+        expect((init?.body as File).name).toBe("corrected-b.csv");
+        return new Response(JSON.stringify(completed), { status: 201 });
+      }
+      if (url.endsWith("/api/runs/run-1")) return new Response(JSON.stringify(afterA), { status: 200 });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={empty} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "a.csv", { type: "text/csv" })] } });
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["bad"], "bad-b.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+    expect(await screen.findByRole("button", { name: "Upload remaining Dataset B" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "corrected-b.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(requests).toEqual([
+      "POST /api/runs/run-1/datasets/A", "POST /api/runs/run-1/datasets/B", "GET /api/runs/run-1",
+      "POST /api/runs/run-1/datasets/B",
+    ]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("SW-040 accepts an A-only recovery when Dataset B is already saved", async () => {
+    const partial = runView({ stage: "upload", datasets: { B: profile("B") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const complete = runView({ ...partial, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/datasets/A")) return new Response(JSON.stringify(complete), { status: 201 });
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={partial} initialScreen="upload" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Dataset B is saved as b.csv");
+    fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "a.csv", { type: "text/csv" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset A" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(requests).toEqual(["POST /api/runs/run-1/datasets/A"]);
+  });
+
+  it.each([
+    { name: "missing", file: null, expected: "Choose a CSV file for Dataset B" },
+    { name: "wrong extension", file: new File(["id\n1"], "bad.txt"), expected: "Dataset B must be a CSV file" },
+    { name: "empty", file: new File([], "empty.csv"), expected: "Dataset B is empty" },
+    { name: "oversized", file: new File([new Uint8Array(2 * 1024 * 1024 + 1)], "big.csv"), expected: "Dataset B exceeds the 2 MiB file limit" },
+  ])("SW-040 rejects $name recovery before sending a network request", ({ file, expected }) => {
+    const partial = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={partial} initialScreen="upload" />);
+    if (file) fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(expected);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("a.csv")).toBeInTheDocument();
+  });
+
+  it("SW-040 reconciles a lost success response before offering another upload", async () => {
+    const partial = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const completed = runView({ ...partial, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/datasets/B")) throw new Error("Connection lost after upload");
+      if (url.endsWith("/api/runs/run-1")) return new Response(JSON.stringify(completed), { status: 200 });
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={partial} initialScreen="upload" />);
+    fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "b.csv") ] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload remaining Dataset B" }));
+    expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(requests).toEqual(["POST /api/runs/run-1/datasets/B", "GET /api/runs/run-1"]);
   });
 
   it("opens Merge values from a completed zero-case review without creating another run", async () => {
