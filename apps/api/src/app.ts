@@ -90,6 +90,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   let closing = false;
 
+  // Run-scoped responses may contain uploaded records, mapping decisions, or review evidence.
+  // Prevent storage by browser and shared caches for both successful and error responses.
+  app.addHook("onSend", async (request, reply, payload) => {
+    if (/^\/api\/runs(?:\/|\?|$)/.test(request.url)) {
+      reply.header("Cache-Control", "no-store");
+    }
+    return payload;
+  });
+
   app.addHook("onReady", async () => {
     await store.initialize();
     for (const job of await store.recoverMatchJobs()) scheduleMatchJob(job.runId);

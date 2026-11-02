@@ -108,6 +108,36 @@ describe("SW-003 API workflow", () => {
     return ConflictPageSchema.parse((await app.inject({ method: "GET", url: `/api/runs/${runId}/conflicts?limit=100` })).json());
   }
 
+  it("SW-037 prevents caching of run-scoped success and error responses", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/runs" });
+    expect(created.statusCode).toBe(201);
+    expect(created.headers["cache-control"]).toBe("no-store");
+    const { runId } = RunSummarySchema.parse(created.json());
+
+    const read = await app.inject({ method: "GET", url: `/api/runs/${runId}?view=summary` });
+    expect(read.statusCode).toBe(200);
+    expect(read.headers["cache-control"]).toBe("no-store");
+
+    const upload = await app.inject({
+      method: "POST", url: `/api/runs/${runId}/datasets/A`,
+      headers: { "content-type": "text/csv", "x-file-name": "a.csv" }, payload: aBytes,
+    });
+    expect(upload.statusCode).toBe(201);
+    expect(upload.headers["cache-control"]).toBe("no-store");
+
+    const missingRun = await app.inject({ method: "GET", url: "/api/runs/not-created" });
+    expect(missingRun.statusCode).toBe(404);
+    expect(missingRun.headers["cache-control"]).toBe("no-store");
+
+    const health = await app.inject({ method: "GET", url: "/api/health" });
+    expect(health.statusCode).toBe(200);
+    expect(health.headers["cache-control"]).toBeUndefined();
+
+    const unrelatedPath = await app.inject({ method: "GET", url: "/api/runs-public" });
+    expect(unrelatedPath.statusCode).toBe(404);
+    expect(unrelatedPath.headers["cache-control"]).toBeUndefined();
+  });
+
   it("SW-027 shows complete B-side contender context across pages and updates human claim provenance without deciding automatically", async () => {
     const original = baseMatcherResult();
     const competing = {
