@@ -19,7 +19,7 @@ concurrency:
 jobs:
   verify:
     name: Verify repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
@@ -85,3 +85,33 @@ jobs:
 
       - name: Build production web app
         run: pnpm --filter @samewise/web build
+
+      - name: Install isolated Playwright browser for public sample
+        if: github.event_name == 'pull_request'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/samewise-playwright" --no-save playwright@1.56.1
+          "$RUNNER_TEMP/samewise-playwright/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Verify synthetic public sample in browser
+        if: github.event_name == 'pull_request'
+        env:
+          SAMEWISE_PYTHON: ${{ github.workspace }}/services/matcher/.venv/bin/python
+          SAMEWISE_RUNTIME_NODE_MODULES: ${{ runner.temp }}/samewise-playwright/node_modules
+          NODE_OPTIONS: --dns-result-order=ipv4first
+        run: |
+          pnpm --filter @samewise/api start > "$RUNNER_TEMP/samewise-api.log" 2>&1 &
+          api_pid=$!
+          pnpm --filter @samewise/web dev --host 127.0.0.1 > "$RUNNER_TEMP/samewise-web.log" 2>&1 &
+          web_pid=$!
+          trap 'result=$?; if [ "$result" -ne 0 ]; then tail -100 "$RUNNER_TEMP/samewise-api.log"; tail -100 "$RUNNER_TEMP/samewise-web.log"; fi; kill "$api_pid" "$web_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null &&
+               curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null
+          curl --fail --silent http://127.0.0.1:5173/ > /dev/null
+          pnpm acceptance:public-demo
+          node apps/web/e2e/export-verifier-smoke.mjs
