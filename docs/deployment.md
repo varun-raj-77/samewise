@@ -10,6 +10,8 @@ Canonical UI: https://trysamewise.vercel.app. The frontend's relative `/api` req
 
 This is a constrained portfolio demo, not a multi-user production SaaS.
 
+The Upload screen warns users to choose synthetic or de-identified data. Uploaded CSV contents go to the API server for profiling and matching; the demo has no authenticated run ownership, defined retention/deletion controls, or guarantee of access isolation. Do not upload confidential, personal, or regulated records. The built-in vendor example is synthetic.
+
 ## Run storage and rollout
 
 Without `DATABASE_URL`, the API uses a local `FileRunRepository` below `.samewise-data/_run-store`. This survives only when that directory survives; Railway's current ephemeral filesystem is **not deployment-durable**. No persistent Railway volume is used.

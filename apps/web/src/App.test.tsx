@@ -131,6 +131,22 @@ describe("Samewise vertical slice", () => {
     await waitFor(() => expect(menuButton).toHaveFocus());
   });
 
+  it("SW-036 makes the public-demo upload boundary visible before and after source locking", () => {
+    const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    const { unmount } = render(<App initialRun={empty} initialScreen="upload" />);
+    const notice = screen.getByRole("note", { name: "Public demo data notice" });
+    expect(notice).toHaveTextContent("Public demo — use non-sensitive CSVs.");
+    expect(notice).toHaveTextContent("Uploaded records are processed on Samewise's server.");
+    expect(notice).toHaveTextContent("no sign-in or guaranteed deletion schedule");
+    expect(screen.getByRole("button", { name: "Upload & profile" })).toBeInTheDocument();
+    unmount();
+
+    const locked = runView({ stage: "upload", datasets: { A: profile("A") }, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    render(<App initialRun={locked} initialScreen="upload" />);
+    expect(screen.getByRole("note", { name: "Public demo data notice" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Source files are locked for this run" })).toBeInTheDocument();
+  });
+
   it("offers same-origin sample downloads only for an empty run", () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     const { unmount } = render(<App initialRun={empty} initialScreen="upload" />);
