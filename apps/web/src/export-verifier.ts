@@ -100,7 +100,7 @@ export async function verifyBrowserExport(
   insist(files.length === declared.length, "file_set_mismatch", "Select exactly the CSV files declared in the manifest.");
   const byName = new Map<string, Uint8Array>();
   for (const file of files) {
-    insist(file && typeof file.filename === "string" && file.filename.length > 0 && file.bytes instanceof Uint8Array, "invalid_file_input", "A selected file is invalid.");
+    insist(file && typeof file.filename === "string" && file.filename.length > 0 && ArrayBuffer.isView(file.bytes) && Object.prototype.toString.call(file.bytes) === "[object Uint8Array]", "invalid_file_input", "A selected file is invalid.");
     insist(!byName.has(file.filename), "duplicate_file", "The same filename was supplied more than once.");
     byName.set(file.filename, file.bytes);
   }
