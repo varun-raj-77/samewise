@@ -114,3 +114,4 @@ jobs:
           curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null
           curl --fail --silent http://127.0.0.1:5173/ > /dev/null
           pnpm acceptance:public-demo
+          node apps/web/e2e/export-verifier-smoke.mjs
