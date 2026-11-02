@@ -798,7 +798,7 @@ describe("Samewise vertical slice", () => {
 
   it("SW-044 permits two AI correspondences sharing the same source column", async () => {
     const firstProposal = proposal();
-    const first = firstProposal.suggestions[0];
+    const first = firstProposal.suggestions[0]!;
     const second = { ...first, suggestionId: "suggestion-2", rightColumn: "status", reason: "A second valid correspondence." };
     const pending: SemanticMappingProposal = { ...firstProposal, suggestions: [first, second] };
     const firstMapping = { ...mapping, mappingId: "mapping-suggestion-1", label: "name" };
