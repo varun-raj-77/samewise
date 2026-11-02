@@ -27,7 +27,7 @@ const checks = [];
 const check = (name, condition = true) => { assert(condition, name); checks.push(name); };
 
 try {
-  await page.goto("http://localhost:5173", { waitUntil: "networkidle" });
+  await page.goto("http://127.0.0.1:5173", { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Upload datasets" }).waitFor();
 
   const uploaded = page.waitForResponse((response) => response.request().method() === "POST" && /\/datasets\/B$/.test(response.url()));
