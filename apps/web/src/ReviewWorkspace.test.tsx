@@ -128,6 +128,24 @@ describe("bounded review workspace", () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["filter", { filter: "deferred" }],
+    ["sort order", { sort: "score_desc" }],
+    ["search query", { query: "different organization" }],
+    ["page size", { page: { ...reviewPage().page, limit: 25 } }],
+  ])("SW-050 rejects a review queue with a mismatched %s", async (_label, override) => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ...reviewPage(), ...override }), { status: 200 },
+    )));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review queue response did not match the requested reconciliation, page, or filters.");
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
   it("SW-050 rejects evidence for a different candidate without enabling identity actions", async () => {
     const onDecision = vi.fn(async () => run());
     vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(
