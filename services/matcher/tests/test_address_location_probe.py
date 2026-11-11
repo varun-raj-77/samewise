@@ -33,14 +33,34 @@ def mappings() -> list[ManualMapping]:
 A_HEADERS = ["id", "org", "street", "city"]
 B_HEADERS = ["id", "business", "address", "town"]
 A_ROWS = [
-    {"id": "A1", "org": "Northstar Holdings", "street": "42 High Street", "city": "Boston"},
+    {
+        "id": "A1",
+        "org": "Northstar Holdings",
+        "street": "42 High Street",
+        "city": "Boston",
+    },
     {"id": "A2", "org": "Cedar Freight", "street": "42 High Street", "city": "Boston"},
-    {"id": "A3", "org": "Orion Medical", "street": "700 River Street", "city": "Boston"},
+    {
+        "id": "A3",
+        "org": "Orion Medical",
+        "street": "700 River Street",
+        "city": "Boston",
+    },
 ]
 B_ROWS = [
-    {"id": "B1", "business": "Bluebird Data", "address": "42 High St", "town": "BOSTON"},
+    {
+        "id": "B1",
+        "business": "Bluebird Data",
+        "address": "42 High St",
+        "town": "BOSTON",
+    },
     {"id": "B2", "business": "Maple Clinic", "address": "42 High St", "town": "Boston"},
-    {"id": "B3", "business": "Orion Medical", "address": "700 River St", "town": "Boston"},
+    {
+        "id": "B3",
+        "business": "Orion Medical",
+        "address": "700 River St",
+        "town": "Boston",
+    },
 ]
 TRUTH = {("A1", "B1"), ("A2", "B2"), ("A3", "B3")}
 HARD_NEGATIVES = {("A1", "B2"), ("A2", "B1")}
@@ -63,8 +83,11 @@ def test_name_change_rescue_measures_shared_building_hard_negatives() -> None:
     result = probe()
     assert result.candidate_pairs == frozenset(
         {
-            ("A1", "B1"), ("A1", "B2"), ("A2", "B1"),
-            ("A2", "B2"), ("A3", "B3"),
+            ("A1", "B1"),
+            ("A1", "B2"),
+            ("A2", "B1"),
+            ("A2", "B2"),
+            ("A3", "B3"),
         }
     )
     metrics = evaluate_address_location_probe(baseline, result, TRUTH, HARD_NEGATIVES)
