@@ -6,7 +6,7 @@ The review workspace previously parsed queue, candidate-detail, group-list, and 
 
 ## Implementation
 
-- Reject a review page when its run ID or offset differs from the requested run and page.
+- Reject a review page when its run ID, offset, page limit, filter, sort order, or search query differs from the requested queue.
 - Reject a candidate-detail response unless its run ID and candidate ID match the requested pair.
 - Reject group lists with the wrong run ID and previews with the wrong run ID, group ID, or first-page offset.
 - Bind displayed review rows, candidate details, and group lists to the current authoritative run projection. Hide stale evidence immediately on run changes; asynchronous request cleanup still prevents late responses from updating state.
