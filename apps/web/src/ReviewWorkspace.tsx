@@ -36,30 +36,46 @@ async function loadReviewPage(runId: string, offset: number, filter: ReviewFilte
   if (query) params.set("q", query);
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/review?${params}`);
   if (!response.ok) throw new Error("The review queue could not be loaded.");
-  return ReviewQueuePageSchema.parse(await response.json());
+  const page = ReviewQueuePageSchema.parse(await response.json());
+  if (page.runId !== runId || page.page.offset !== offset || page.page.limit !== 50
+    || page.filter !== filter || page.sort !== sort || page.query !== query) {
+    throw new Error("Review queue response did not match the requested reconciliation, page, or filters.");
+  }
+  return page;
 }
 
 async function loadDetail(runId: string, candidateId: string): Promise<CandidateEvidenceDetail> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/candidates/${encodeURIComponent(candidateId)}`);
   if (!response.ok) throw new Error("Candidate evidence could not be loaded.");
-  return CandidateEvidenceDetailSchema.parse(await response.json());
+  const detail = CandidateEvidenceDetailSchema.parse(await response.json());
+  if (detail.runId !== runId || detail.candidate.candidateId !== candidateId) {
+    throw new Error("Candidate evidence did not match the requested reconciliation or candidate.");
+  }
+  return detail;
 }
 
 async function loadReviewGroups(runId: string): Promise<ReviewGroupList> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/review-groups`);
   if (!response.ok) throw new Error("Review groups could not be loaded.");
-  return ReviewGroupListSchema.parse(await response.json());
+  const groups = ReviewGroupListSchema.parse(await response.json());
+  if (groups.runId !== runId) throw new Error("Review groups did not match the requested reconciliation.");
+  return groups;
 }
 
 async function loadGroupPreview(runId: string, groupId: string): Promise<ReviewGroupPreview> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/review-groups/${encodeURIComponent(groupId)}?offset=0&limit=20`);
   if (!response.ok) throw new Error("The bounded group preview could not be loaded.");
-  return ReviewGroupPreviewSchema.parse(await response.json());
+  const preview = ReviewGroupPreviewSchema.parse(await response.json());
+  if (preview.runId !== runId || preview.group.groupId !== groupId || preview.page.offset !== 0) {
+    throw new Error("Group preview did not match the requested reconciliation or group.");
+  }
+  return preview;
 }
 
 export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onBatchDecision, onDefer, onUndo, onGoResolution }: ReviewWorkspaceProps) {
   const [viewMode, setViewMode] = useState<"groups" | "individual">(run.reviewProgress.remaining >= 20 ? "groups" : "individual");
-  const [groupList, setGroupList] = useState<ReviewGroupList | null>(null);
+  const [groupListState, setGroupListState] = useState<{ run: RunSummary; list: ReviewGroupList } | null>(null);
+  const groupList = groupListState?.run === run ? groupListState.list : null;
   const [groupError, setGroupError] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   // A preview is actionable only for the precise run projection and group it
@@ -71,11 +87,18 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState<ReviewQueuePage | null>(null);
-  const [queueError, setQueueError] = useState<string | null>(null);
   const [queueRequestVersion, setQueueRequestVersion] = useState(0);
+  const [pageState, setPageState] = useState<{
+    run: RunSummary; offset: number; filter: ReviewFilter; sort: ReviewSort; query: string;
+    requestVersion: number; page: ReviewQueuePage;
+  } | null>(null);
+  const page = pageState?.run === run && pageState.offset === offset && pageState.filter === filter
+    && pageState.sort === sort && pageState.query === deferredQuery
+    && pageState.requestVersion === queueRequestVersion ? pageState.page : null;
+  const [queueError, setQueueError] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(initialCandidateId ?? null);
-  const [detail, setDetail] = useState<CandidateEvidenceDetail | null>(null);
+  const [detailState, setDetailState] = useState<{ run: RunSummary; candidateId: string; detail: CandidateEvidenceDetail } | null>(null);
+  const detail = detailState?.run === run && detailState.candidateId === selectedCandidateId ? detailState.detail : null;
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailRequestVersion, setDetailRequestVersion] = useState(0);
@@ -101,7 +124,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     if (previousRunProjection.current === run) return;
     previousRunProjection.current = run;
     detailCache.current.clear();
-    setDetail(null);
+    setDetailState(null);
     setDetailRequestVersion((value) => value + 1);
   }, [run]);
 
@@ -110,10 +133,10 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     let active = true;
     setGroupError(null);
     void loadReviewGroups(run.runId)
-      .then((loaded) => { if (active) setGroupList(loaded); })
+      .then((loaded) => { if (active) setGroupListState({ run, list: loaded }); })
       .catch((caught) => { if (active) setGroupError(caught instanceof Error ? caught.message : "Review groups could not be loaded."); });
     return () => { active = false; };
-  }, [run.runId, run.reviewProgress, run.reviewUndo, viewMode]);
+  }, [run, viewMode]);
 
   useEffect(() => {
     if (!selectedGroupId || viewMode !== "groups") { setGroupPreviewRecord(null); return; }
@@ -135,7 +158,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     void loadReviewPage(run.runId, offset, filter, sort, deferredQuery)
       .then((loaded) => {
         if (!active) return;
-        setPage(loaded);
+        setPageState({ run, offset, filter, sort, query: deferredQuery, requestVersion: queueRequestVersion, page: loaded });
         // A contender opened from an exact B collision group need not appear
         // on the current queue page. Preserve it through queue refetch/undo.
         // Functional state avoids races with an in-flight older queue request.
@@ -148,14 +171,14 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
       })
       .catch((caught) => { if (active) setQueueError(caught instanceof Error ? caught.message : "The review queue could not be loaded."); });
     return () => { active = false; };
-  }, [run.runId, run.reviewProgress, run.reviewUndo, offset, filter, sort, deferredQuery, queueRequestVersion]);
+  }, [run, offset, filter, sort, deferredQuery, queueRequestVersion]);
 
   useEffect(() => {
-    if (!selectedCandidateId) { setDetail(null); return; }
+    if (!selectedCandidateId) { setDetailState(null); return; }
     const cached = detailCache.current.get(selectedCandidateId);
-    if (cached) { setDetail(cached); setDetailError(null); return; }
+    if (cached) { setDetailState({ run, candidateId: selectedCandidateId, detail: cached }); setDetailError(null); return; }
     let active = true;
-    setDetail(null);
+    setDetailState(null);
     setDetailLoading(true);
     setDetailError(null);
     void loadDetail(run.runId, selectedCandidateId)
@@ -163,12 +186,12 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
         if (!active) return;
         detailCache.current.set(selectedCandidateId, loaded);
         while (detailCache.current.size > 10) detailCache.current.delete(detailCache.current.keys().next().value!);
-        setDetail(loaded);
+        setDetailState({ run, candidateId: selectedCandidateId, detail: loaded });
       })
       .catch((caught) => { if (active) setDetailError(caught instanceof Error ? caught.message : "Candidate evidence could not be loaded."); })
       .finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
-  }, [run.runId, selectedCandidateId, detailRequestVersion]);
+  }, [run, selectedCandidateId, detailRequestVersion]);
 
   const selectedItem = useMemo(() => page?.items.find((item) => item.candidates.some((candidate) => candidate.candidateId === selectedCandidateId)) ?? null, [page, selectedCandidateId]);
   const alternatives = selectedItem?.candidates ?? detail?.alternatives ?? [];

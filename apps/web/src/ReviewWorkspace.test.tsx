@@ -115,6 +115,86 @@ describe("bounded review workspace", () => {
     expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
   });
 
+
+  it("SW-050 rejects review queues from another reconciliation before exposing decisions", async () => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...reviewPage(), runId: "run-other" }), { status: 200 })));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review queue response did not match the requested reconciliation");
+    expect(screen.queryByRole("heading", { name: "Could A1 and B1 be the same entity?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  const mismatchedQueueCases: Array<[string, Record<string, unknown>]> = [
+    ["filter", { filter: "deferred" }],
+    ["sort order", { sort: "score_desc" }],
+    ["search query", { query: "different organization" }],
+    ["page size", { page: { ...reviewPage().page, limit: 25 } }],
+  ];
+  it.each(mismatchedQueueCases)("SW-050 rejects a review queue with a mismatched %s", async (_label, override) => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ...reviewPage(), ...override }), { status: 200 },
+    )));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review queue response did not match the requested reconciliation, page, or filters.");
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-050 rejects evidence for a different candidate without enabling identity actions", async () => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(
+      new Response(JSON.stringify(String(input).includes("/review?") ? reviewPage() : detail("c12")), { status: 200 }),
+    )));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Candidate evidence did not match the requested reconciliation or candidate.");
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
+
+  it("SW-050 rejects a group preview for another group before batch consent is offered", async () => {
+    const expected = quickReviewGroup("review-group-0123456789abcdef0123", 30);
+    const foreign = quickReviewGroup("review-group-0123456789abcdef0124", 30);
+    const onBatchDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.endsWith("/review-groups") ? reviewGroupsFixture([expected])
+        : url.includes("/review-groups/") ? reviewGroupPreviewFixture(foreign)
+        : url.includes("/review?") ? reviewPage() : detail();
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    }));
+    render(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } })}
+      busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop}
+      onGoResolution={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Preview cases" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Group preview did not match the requested reconciliation or group.");
+    expect(screen.queryByRole("button", { name: "Apply to eligible cases" })).not.toBeInTheDocument();
+    expect(onBatchDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-050 hides old queue and candidate evidence synchronously on a run switch", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => String(input).includes("run-2")
+      ? new Promise<Response>(() => undefined)
+      : Promise.resolve(new Response(JSON.stringify(String(input).includes("/review?") ? reviewPage() : detail()), { status: 200 }))));
+    const props = { busy: false, onDecision: noop, onBatchDecision: noopBatch, onDefer: noop, onUndo: noop, onGoResolution: vi.fn() };
+    const { rerender } = render(<ReviewWorkspace run={run()} {...props} />);
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+
+    rerender(<ReviewWorkspace run={run({ runId: "run-2" })} {...props} />);
+    expect(screen.queryByRole("heading", { name: "Could A1 and B1 be the same entity?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+  });
+
   it("loads a bounded queue and full evidence separately", async () => {
     const fetchMock = fetchSuccess();
     vi.stubGlobal("fetch", fetchMock);
