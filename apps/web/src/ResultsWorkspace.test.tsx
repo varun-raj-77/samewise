@@ -14,9 +14,9 @@ const run: RunSummary = {
   conflictSummary: { total: 0, resolved: 0, unresolved: 0 },
 };
 
-function page(offset: number, aRowId: string): ResultsPage {
+function page(offset: number, aRowId: string, runId = "run-1"): ResultsPage {
   return {
-    contractVersion: "1.0.0", runId: "run-1", ordering: "a_row_id_ascending",
+    contractVersion: "1.0.0", runId, ordering: "a_row_id_ascending",
     items: [{ aRowId, aIdentity: { name: `Entity ${aRowId}` }, status: "needs_review", topCandidate: { candidateId: `candidate-${aRowId}`, bRowId: `B${aRowId.slice(1)}`, rank: 1, matchScore: 0.6, band: "needs_review", collision: false, strongContradiction: false, strongestPositive: null, strongestContradiction: null, humanDecision: null }, topBIdentity: { organization: `Candidate ${aRowId}` }, alternativeCount: 0, collision: false, sourceOrder: offset }],
     page: { offset, limit: 50, total: 51, returned: 1, nextOffset: offset === 0 ? 50 : null, previousOffset: offset === 0 ? null : 0 },
   };
@@ -79,5 +79,94 @@ describe("bounded results workspace", () => {
     expect(screen.getByText("Matched automatically / confirmed").parentElement).toHaveTextContent("1");
     fireEvent.click(screen.getByRole("button", { name: "Review 2 uncertain matches" }));
     expect(onOpenReview).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a valid-looking results page from a different run", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(page(0, "A-other", "run-other")), { status: 200 })));
+    const onReview = vi.fn();
+    render(<ResultsWorkspace run={run} onReview={onReview} onResolution={vi.fn()} onOpenReview={vi.fn()} onExport={vi.fn()} />);
+
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("Results response did not match the requested run or page.");
+    expect(error.closest("details")).toBeNull(); // Visible even before the collapsed result list is opened.
+    expect(screen.queryByRole("button", { name: /A-other/ })).not.toBeInTheDocument();
+    expect(onReview).not.toHaveBeenCalled();
+  });
+
+  it("rejects a results page for the wrong offset rather than rendering it under current pagination", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(page(50, "A51")), { status: 200 })));
+    render(<ResultsWorkspace run={run} onReview={vi.fn()} onResolution={vi.fn()} onOpenReview={vi.fn()} onExport={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Results response did not match the requested run or page.");
+    expect(screen.queryByRole("button", { name: /A51.*B51/ })).not.toBeInTheDocument();
+  });
+
+  it("does not present another row's recorded explanation as evidence for the selected row", async () => {
+    const foreignExplanation = {
+      explanationVersion: "identity-explanation-v1", runId: "run-1", aRowId: "A-other", bRowId: null,
+      reasonCode: "no_candidate_retained", evidenceScope: "none_retained", linkedBRowId: null,
+      humanDecision: null, candidateId: null, candidateRank: null, candidateCount: 0,
+      matchScore: null, matchBand: null, hasCollision: false, strongContradiction: false,
+      matcherVersion: "explainable-matcher-v0.3.0", candidateEngineVersion: "candidate-engine-v0.4.0",
+      retainedEvidenceCount: 0, fieldEvidence: [], blockingRuleIds: [],
+    };
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(new Response(
+      JSON.stringify(String(input).includes("identity-explanations") ? foreignExplanation : page(0, "A1")), { status: 200 },
+    ))));
+    render(<ResultsWorkspace run={run} onReview={vi.fn()} onResolution={vi.fn()} onOpenReview={vi.fn()} onExport={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Why this result?" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The recorded explanation could not be loaded.");
+    expect(screen.queryByText(/It might have been blocked, pruned, or never scored/)).not.toBeInTheDocument();
+  });
+
+  it("does not carry an expanded explanation into a different run with the same row ID", async () => {
+    const explanation = {
+      explanationVersion: "identity-explanation-v1", runId: "run-1", aRowId: "A1", bRowId: null,
+      reasonCode: "no_candidate_retained", evidenceScope: "none_retained", linkedBRowId: null,
+      humanDecision: null, candidateId: null, candidateRank: null, candidateCount: 0,
+      matchScore: null, matchBand: null, hasCollision: false, strongContradiction: false,
+      matcherVersion: "explainable-matcher-v0.3.0", candidateEngineVersion: "candidate-engine-v0.4.0",
+      retainedEvidenceCount: 0, fieldEvidence: [], blockingRuleIds: [],
+    };
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const runId = url.includes("run-2") ? "run-2" : "run-1";
+      const data = url.includes("identity-explanations") ? { ...explanation, runId } : page(0, "A1", runId);
+      return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const props = { onReview: vi.fn(), onResolution: vi.fn(), onOpenReview: vi.fn(), onExport: vi.fn() };
+    const { rerender } = render(<ResultsWorkspace run={run} {...props} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Why this result?" }));
+    expect(await screen.findByText(/It might have been blocked, pruned, or never scored/)).toBeInTheDocument();
+
+    rerender(<ResultsWorkspace run={{ ...run, runId: "run-2" }} {...props} />);
+    const toggle = await screen.findByRole("button", { name: "Why this result?" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region", { name: "Why A1 received this outcome" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("run-2/identity-explanations"))).toBe(false);
+  });
+
+  it("restarts pagination at zero when a different reconciliation becomes active", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const result = url.includes("run-2") ? page(0, "A2", "run-2")
+        : url.includes("offset=50") ? page(50, "A51") : page(0, "A1");
+      return Promise.resolve(new Response(JSON.stringify(result), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const props = { onReview: vi.fn(), onResolution: vi.fn(), onOpenReview: vi.fn(), onExport: vi.fn() };
+    const { rerender } = render(<ResultsWorkspace run={run} {...props} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    expect(await screen.findByRole("button", { name: /A51.*B51/ })).toBeInTheDocument();
+
+    rerender(<ResultsWorkspace run={{ ...run, runId: "run-2" }} {...props} />);
+    expect(await screen.findByRole("button", { name: /A2.*B2/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /A51.*B51/ })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/run-2/results?offset=0&limit=50"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/run-2/results?offset=50"))).toBe(false);
   });
 });
