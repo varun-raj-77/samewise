@@ -39,6 +39,10 @@ def _row_ids(
     return ids
 
 
+def _value(row: dict[str, str], mapping: ManualMapping, side: str) -> str:
+    return row.get(mapping.aColumn if side == "A" else mapping.bColumn, "")
+
+
 def _index(
     headers: list[str],
     rows: list[dict[str, str]],
@@ -50,15 +54,11 @@ def _index(
     index: dict[tuple[str, str, str, str], list[str]] = defaultdict(list)
     for row_id, row in zip(ids, rows, strict=True):
         address_values = {
-            (mapping.mappingId, normalize_address(row.get(
-                mapping.aColumn if side == "A" else mapping.bColumn, ""
-            )))
+            (mapping.mappingId, normalize_address(_value(row, mapping, side)))
             for mapping in addresses
         }
         geography_values = {
-            (mapping.mappingId, normalize_text(row.get(
-                mapping.aColumn if side == "A" else mapping.bColumn, ""
-            )))
+            (mapping.mappingId, normalize_text(_value(row, mapping, side)))
             for mapping in geographies
         }
         keys = {
@@ -99,7 +99,9 @@ def generate_address_location_candidates(
         if mapping.role == "identity" and mapping.semanticFamily == "geography"
     ]
     if not addresses or not geographies:
-        raise ValueError("Probe requires confirmed identity address and geography mappings")
+        raise ValueError(
+            "Probe requires confirmed identity address and geography mappings"
+        )
     for mapping in addresses + geographies:
         if mapping.aColumn not in a_headers or mapping.bColumn not in b_headers:
             raise ValueError("Probe mapping references an absent source column")
@@ -112,9 +114,11 @@ def generate_address_location_candidates(
     for key in common:
         left, right = a_index[key], b_index[key]
         relationships = len(left) * len(right)
-        if (len(left) > max_bucket_size_per_side
+        if (
+            len(left) > max_bucket_size_per_side
             or len(right) > max_bucket_size_per_side
-            or relationships > max_bucket_pair_count):
+            or relationships > max_bucket_pair_count
+        ):
             suppressed += 1
             suppressed_relationships += relationships
             continue
@@ -145,8 +149,12 @@ def evaluate_address_location_probe(
     combined = baseline_pairs | probe.candidate_pairs
     added = probe.candidate_pairs - baseline_pairs
 
-    def recall(pairs: set[tuple[str, str]] | frozenset[tuple[str, str]]) -> float | None:
-        return round(len(truth_pairs & pairs) / len(truth_pairs), 9) if truth_pairs else None
+    def recall(
+        pairs: set[tuple[str, str]] | frozenset[tuple[str, str]],
+    ) -> float | None:
+        if not truth_pairs:
+            return None
+        return round(len(truth_pairs & pairs) / len(truth_pairs), 9)
 
     return {
         "probeVersion": PROBE_VERSION,
