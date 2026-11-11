@@ -283,6 +283,99 @@ describe("bounded review workspace", () => {
     await waitFor(() => expect(onDecision).toHaveBeenCalledExactlyOnceWith("c11", "different_entity"));
   });
 
+  it("SW-046 never makes an identity decision from focused buttons or other controls", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    const onDecision = vi.fn(async () => run());
+    const onDefer = vi.fn(async () => run());
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={onDefer} onUndo={noop} onGoResolution={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Back to grouped review" }), { key: "s" });
+    fireEvent.keyDown(screen.getByRole("button", { name: /Keyboard shortcuts:/ }), { key: "d" });
+    fireEvent.keyDown(screen.getByRole("button", { name: /Defer \/ skip/ }), { key: "e" });
+    fireEvent.keyDown(screen.getByRole("button", { name: /Select candidate rank 2/ }), { key: "s" });
+    screen.getByRole("button", { name: "Back to grouped review" }).focus();
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(onDefer).not.toHaveBeenCalled();
+  });
+
+  it("SW-046 suspends review shortcuts while a native confirmation dialog is open", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    const onDecision = vi.fn(async () => run());
+    const onDefer = vi.fn(async () => run());
+    const props = { run: run(), busy: false, onDecision, onBatchDecision: noopBatch,
+      onDefer, onUndo: noop, onGoResolution: vi.fn() };
+    const rendered = render(<><ReviewWorkspace {...props} /><dialog open aria-label="New reconciliation confirmation"><button>Cancel</button></dialog></>);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+
+    // The event might target the modal's button or the window itself.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "s" });
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => { await Promise.resolve(); });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(onDefer).not.toHaveBeenCalled();
+
+    rendered.rerender(<ReviewWorkspace {...props} />);
+    fireEvent.keyDown(window, { key: "d" });
+    await waitFor(() => expect(onDecision).toHaveBeenCalledExactlyOnceWith("c11", "different_entity"));
+  });
+
+  it("SW-046 freezes candidate selection and queue navigation while a decision awaits confirmation", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    let finish!: (updated: RunSummary) => void;
+    const onDecision = vi.fn(() => new Promise<RunSummary>((resolve) => { finish = resolve; }));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch}
+      onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Different entities" }));
+    expect(onDecision).toHaveBeenCalledExactlyOnceWith("c11", "different_entity");
+    expect(screen.getByRole("button", { name: /Select candidate rank 2/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Back to grouped review" })).toBeDisabled();
+    expect(screen.getByLabelText("Filter review queue")).toBeDisabled();
+    expect(screen.getByLabelText("Sort review queue")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Search row ID or name")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Select candidate rank 2/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to grouped review" }));
+    expect(screen.getByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+    await act(async () => { finish(run()); });
+    expect(screen.getByRole("button", { name: "Back to grouped review" })).toBeEnabled();
+  });
+
+  it("SW-046 keeps grouped review navigation and consent locked during a pending batch", async () => {
+    const group = quickReviewGroup("review-group-0123456789abcdef0123", 30);
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.includes(`/review-groups/${group.groupId}`) ? reviewGroupPreviewFixture(group)
+        : url.endsWith("/review-groups") ? reviewGroupsFixture([group]) : url.includes("/review?") ? reviewPage() : detail();
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    }));
+    let finish!: (updated: RunSummary) => void;
+    const onBatchDecision = vi.fn(() => new Promise<RunSummary>((resolve) => { finish = resolve; }));
+    render(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } })}
+      busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Preview cases" }));
+    expect(await screen.findByRole("heading", { name: "30 cases share this evidence pattern" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply to eligible cases" }));
+    expect(onBatchDecision).toHaveBeenCalledExactlyOnceWith(group.groupId, "same_entity");
+
+    expect(screen.getByRole("button", { name: "Preview cases" })).toBeDisabled();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Inspect full evidence" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open individual review and specialist filters" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Open individual review and specialist filters" }));
+    expect(screen.getByRole("heading", { name: "Matching review" })).toBeInTheDocument();
+
+    await act(async () => { finish(run()); });
+    expect(screen.getByRole("button", { name: "Open individual review and specialist filters" })).toBeEnabled();
+  });
+
   it("SW-045 hides old preview and requires fresh consent when switching groups", async () => {
     const first = quickReviewGroup("review-group-0123456789abcdef0123", 30);
     const second = quickReviewGroup("review-group-0123456789abcdef0124", 12);
