@@ -70,15 +70,29 @@ def _normalization_snapshot(
     row: dict[str, str], side: str, mappings: list[ManualMapping]
 ) -> dict[str, dict[str, str]]:
     output: dict[str, dict[str, str]] = {}
+    # Product blocking is semantic-family aware. Miss diagnostics must handle
+    # every confirmed family too, or the cases most worth investigating crash.
+    # These are blocking-normalization snapshots, not feature-score semantics.
     normalizers = {
-        "phone": normalize_phone,
+        "persistent_identifier": normalize_text,
+        "source_local_identifier": normalize_text,
+        "name_or_title": normalize_name,
+        "contact_person": normalize_name,
         "email": normalize_email,
+        "phone": normalize_phone,
         "domain": normalize_domain,
+        "address": normalize_address,
+        "geography": normalize_text,
+        "categorical": normalize_text,
+        "numeric": normalize_text,
+        "date_or_timestamp": normalize_text,
+        "free_text": normalize_text,
+        "unknown": normalize_text,
+        # Older mappings may use the pre-semantic legacy name inference.
         "name": normalize_name,
         "postal": normalize_postal,
         "city": normalize_text,
         "region": normalize_text,
-        "address": normalize_address,
         "other": normalize_text,
     }
     for mapping in mappings:
@@ -170,6 +184,8 @@ def evaluate_candidates(
     known_b = _rows_by_id(b_headers, b_rows, "B")
     if any(a not in known_a or b not in known_b for a, b in candidate_pairs):
         raise ValueError("Candidate result references a nonexistent source row")
+    if any(a not in known_a or b not in known_b for a, b in truth_pairs):
+        raise ValueError("Ground truth references unknown source rows")
     retained = truth_pairs & candidate_pairs
     missed = sorted(truth_pairs - candidate_pairs)
     theoretical = len(a_rows) * len(b_rows)
