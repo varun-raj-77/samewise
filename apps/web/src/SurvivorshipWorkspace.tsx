@@ -14,6 +14,17 @@ async function apiError(response: Response): Promise<Error> {
   return new Error(payload?.error?.message ?? "Samewise could not complete that request.");
 }
 
+async function loadConflictPage(runId: string, offset: number, status: "resolved" | "unresolved"): Promise<ConflictPage> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/conflicts?offset=${offset}&limit=50&status=${status}`);
+  if (!response.ok) throw await apiError(response);
+  const page = ConflictPageSchema.parse(await response.json());
+  if (page.runId !== runId || page.page.offset !== offset
+    || page.items.some((item) => item.runId !== runId || item.status !== status)) {
+    throw new Error("Conflict response did not match the requested reconciliation, status, or page.");
+  }
+  return page;
+}
+
 function ruleLabel(rule: FieldPolicyInput | null): string {
   if (!rule) return "Choose rule";
   if (rule.strategy === "prefer_non_null") return "Use the value that exists";
@@ -41,12 +52,20 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   const preview = previewState?.generation === previewGeneration.current && previewState.data.runId === run.runId
     ? previewState.data : null;
   const [announcement, setAnnouncement] = useState("");
-  const [offset, setOffset] = useState(0);
-  const [conflictPage, setConflictPage] = useState<ConflictPage | null>(null);
-  const [resolvedPage, setResolvedPage] = useState<ConflictPage | null>(null);
-  const [resolvedOffset, setResolvedOffset] = useState(0);
-  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({ runId: run.runId, offset: 0, resolvedOffset: 0 });
+  const offset = pagination.runId === run.runId ? pagination.offset : 0;
+  const resolvedOffset = pagination.runId === run.runId ? pagination.resolvedOffset : 0;
   const [requestVersion, setRequestVersion] = useState(0);
+  const [conflictRecord, setConflictRecord] = useState<{ run: RunSummary; offset: number; requestVersion: number; page: ConflictPage } | null>(null);
+  const [resolvedRecord, setResolvedRecord] = useState<{ run: RunSummary; offset: number; page: ConflictPage } | null>(null);
+  const [conflictErrorRecord, setConflictErrorRecord] = useState<{ run: RunSummary; offset: number; requestVersion: number; message: string } | null>(null);
+  // Scope visible rows and controls to the exact authoritative run projection.
+  // Effects clean up after render, so clearing pages in an effect alone is insufficient.
+  const conflictPage = conflictRecord?.run === run && conflictRecord.offset === offset
+    && conflictRecord.requestVersion === requestVersion ? conflictRecord.page : null;
+  const resolvedPage = resolvedRecord?.run === run && resolvedRecord.offset === resolvedOffset ? resolvedRecord.page : null;
+  const conflictError = conflictErrorRecord?.run === run && conflictErrorRecord.offset === offset
+    && conflictErrorRecord.requestVersion === requestVersion ? conflictErrorRecord.message : null;
   const dateMappings = run.mappings.filter((mapping) => mapping.normalizer === "date");
   const fields = (run.conflictSummary.fields ?? []).filter((field) => field.total > 0);
   const configured = comparisonMappings.flatMap((mapping) => draft[mapping.mappingId] ? [draft[mapping.mappingId]!] : []);
@@ -56,7 +75,10 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   // Never restore a preview that no longer describes the active policy.
   useEffect(() => () => { previewGeneration.current += 1; }, [run.runId]);
   // Discard unsaved rules whenever a reconciliation is left, including on return.
-  useEffect(() => { setDraftState({ runId: run.runId, fields: savedRules(run) }); }, [run.runId]);
+  useEffect(() => {
+    setDraftState({ runId: run.runId, fields: savedRules(run) });
+    setPagination({ runId: run.runId, offset: 0, resolvedOffset: 0 });
+  }, [run.runId]);
 
   function invalidatePreview() {
     previewGeneration.current += 1;
@@ -64,23 +86,28 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   }
 
   useEffect(() => {
-    if (!canReviewExceptions || unresolvedIdentity > 0 || run.conflictSummary.unresolved === 0) { setConflictPage(null); return; }
+    if (!canReviewExceptions || unresolvedIdentity > 0 || run.conflictSummary.unresolved === 0) {
+      setConflictRecord(null);
+      setConflictErrorRecord(null);
+      return;
+    }
     let active = true;
-    setConflictError(null);
-    void fetch(`/api/runs/${encodeURIComponent(run.runId)}/conflicts?offset=${offset}&limit=50&status=unresolved`)
-      .then(async (response) => { if (!response.ok) throw await apiError(response); return ConflictPageSchema.parse(await response.json()); })
-      .then((loaded) => { if (active) setConflictPage(loaded); })
-      .catch((error) => { if (active) setConflictError(error instanceof Error ? error.message : "Exceptions could not be loaded."); });
+    setConflictErrorRecord(null);
+    void loadConflictPage(run.runId, offset, "unresolved")
+      .then((loaded) => { if (active) setConflictRecord({ run, offset, requestVersion, page: loaded }); })
+      .catch((error) => { if (active) {
+        setConflictRecord(null);
+        setConflictErrorRecord({ run, offset, requestVersion, message: error instanceof Error ? error.message : "Exceptions could not be loaded." });
+      } });
     return () => { active = false; };
   }, [run, offset, requestVersion, canReviewExceptions, unresolvedIdentity]);
 
   useEffect(() => {
-    if (run.conflictSummary.resolved === 0) { setResolvedPage(null); return; }
+    if (run.conflictSummary.resolved === 0) { setResolvedRecord(null); return; }
     let active = true;
-    void fetch(`/api/runs/${encodeURIComponent(run.runId)}/conflicts?offset=${resolvedOffset}&limit=50&status=resolved`)
-      .then(async (response) => { if (!response.ok) throw await apiError(response); return ConflictPageSchema.parse(await response.json()); })
-      .then((loaded) => { if (active) setResolvedPage(loaded); })
-      .catch((error) => { if (active) onError(error instanceof Error ? error.message : "Handled decisions could not be loaded."); });
+    void loadConflictPage(run.runId, resolvedOffset, "resolved")
+      .then((loaded) => { if (active) setResolvedRecord({ run, offset: resolvedOffset, page: loaded }); })
+      .catch((error) => { if (active) { setResolvedRecord(null); onError(error instanceof Error ? error.message : "Handled decisions could not be loaded."); } });
     return () => { active = false; };
   }, [run, resolvedOffset, onError]);
 
@@ -196,9 +223,9 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
         {conflictError && <div className="warning" role="alert">{conflictError}<button type="button" onClick={() => setRequestVersion((value) => value + 1)}>Retry</button></div>}
         {!conflictError && !conflictPage && <p role="status">Loading exceptions…</p>}
         {conflictPage?.items.filter((item) => !item.resolution).map((conflict) => <article className="conflict-card is-unresolved" key={conflict.conflictId}><header><div><small>{conflict.aRowId} ↔ {conflict.bRowId}</small><h3>{conflict.label}</h3></div><span className="resolution-badge">Unresolved</span></header><div className="conflict-values"><div><small>Dataset A</small><strong>{conflict.aValue || "Empty"}</strong><button disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_a")}>Use A</button></div><div><small>Dataset B</small><strong>{conflict.bValue || "Empty"}</strong><button disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_b")}>Use B</button></div></div><div className="conflict-footer"><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "keep_both")}>Preserve both</button></div></article>)}
-        {conflictPage && <div className="actions" aria-label="Exception pagination"><button type="button" className="secondary" disabled={conflictPage.page.previousOffset === null} onClick={() => setOffset(conflictPage.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={conflictPage.page.nextOffset === null} onClick={() => setOffset(conflictPage.page.nextOffset ?? offset)}>Next</button></div>}
+        {conflictPage && <div className="actions" aria-label="Exception pagination"><button type="button" className="secondary" disabled={conflictPage.page.previousOffset === null} onClick={() => setPagination({ runId: run.runId, offset: conflictPage.page.previousOffset ?? 0, resolvedOffset })}>Previous</button><button type="button" className="secondary" disabled={conflictPage.page.nextOffset === null} onClick={() => setPagination({ runId: run.runId, offset: conflictPage.page.nextOffset ?? offset, resolvedOffset })}>Next</button></div>}
       </details>}</section>
-    {run.conflictSummary.resolved > 0 && <details className="handled-decisions"><summary>Inspect {run.conflictSummary.resolved} handled decisions</summary>{resolvedPage?.items.map((conflict) => <article className="conflict-card is-resolved" key={conflict.conflictId}><h3>{conflict.label}</h3><p>{conflict.resolution?.reason}</p><small>{conflict.resolution?.strategy === "use_a" ? "Use Dataset A" : conflict.resolution?.strategy === "use_b" ? "Use Dataset B" : conflict.resolution ? ruleLabel({ semanticField: conflict.mappingId, strategy: conflict.resolution.strategy, trustedSource: conflict.resolution.chosenSource ?? undefined }) : ""} · {conflict.resolution?.policyVersion ?? "manual action"} · {conflict.resolution?.ruleId ?? "manual decision"}</small><div className="conflict-footer"><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_a", true)}>Change to Dataset A</button><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_b", true)}>Change to Dataset B</button><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "keep_both", true)}>Change to Preserve both</button><button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button></div></article>)}{resolvedPage && <div className="actions" aria-label="Handled decision pagination"><button type="button" className="secondary" disabled={resolvedPage.page.previousOffset === null} onClick={() => setResolvedOffset(resolvedPage.page.previousOffset ?? 0)}>Previous</button><button type="button" className="secondary" disabled={resolvedPage.page.nextOffset === null} onClick={() => setResolvedOffset(resolvedPage.page.nextOffset ?? resolvedOffset)}>Next</button></div>}</details>}
+    {run.conflictSummary.resolved > 0 && <details className="handled-decisions"><summary>Inspect {run.conflictSummary.resolved} handled decisions</summary>{resolvedPage?.items.map((conflict) => <article className="conflict-card is-resolved" key={conflict.conflictId}><h3>{conflict.label}</h3><p>{conflict.resolution?.reason}</p><small>{conflict.resolution?.strategy === "use_a" ? "Use Dataset A" : conflict.resolution?.strategy === "use_b" ? "Use Dataset B" : conflict.resolution ? ruleLabel({ semanticField: conflict.mappingId, strategy: conflict.resolution.strategy, trustedSource: conflict.resolution.chosenSource ?? undefined }) : ""} · {conflict.resolution?.policyVersion ?? "manual action"} · {conflict.resolution?.ruleId ?? "manual decision"}</small><div className="conflict-footer"><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_a", true)}>Change to Dataset A</button><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "use_b", true)}>Change to Dataset B</button><button className="secondary" disabled={busy} onClick={() => void resolve(conflict.conflictId, "keep_both", true)}>Change to Preserve both</button><button className="secondary" disabled={busy} onClick={() => void clear(conflict.conflictId)}>Clear resolution</button></div></article>)}{resolvedPage && <div className="actions" aria-label="Handled decision pagination"><button type="button" className="secondary" disabled={resolvedPage.page.previousOffset === null} onClick={() => setPagination({ runId: run.runId, offset, resolvedOffset: resolvedPage.page.previousOffset ?? 0 })}>Previous</button><button type="button" className="secondary" disabled={resolvedPage.page.nextOffset === null} onClick={() => setPagination({ runId: run.runId, offset, resolvedOffset: resolvedPage.page.nextOffset ?? resolvedOffset })}>Next</button></div>}</details>}
     <div className="actions"><button className="secondary" onClick={onBack}>Back to results</button>{run.conflictSummary.unresolved === 0 ? <button className="primary" onClick={onContinue}>Continue to Export</button> : <p role="status">Finish merge rules before exporting reconciled data.</p>}</div>
   </section>;
 }
