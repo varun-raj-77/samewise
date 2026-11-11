@@ -14,7 +14,14 @@ export function evidenceStateLabel(candidate: CandidatePair, mappingId: string):
   return "Missing both";
 }
 
-export function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.matches("input, textarea, select, [contenteditable='true']") || !!target.closest("[contenteditable='true']");
+export function isReviewShortcutBlockedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  // Review shortcuts are global while the workspace is mounted. Let focused
+  // controls retain their own keyboard handling, including screen-reader and
+  // disclosure controls which are not text inputs.
+  return Boolean(target.closest(
+    "input, textarea, select, button, a[href], summary, [contenteditable]:not([contenteditable='false']), " +
+    "[role='button'], [role='link'], [role='textbox'], [role='combobox'], [role='menuitem'], " +
+    "[role='option'], [role='tab'], [role='checkbox'], [role='radio'], [role='switch'], [role='slider']",
+  ));
 }

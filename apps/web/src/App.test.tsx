@@ -79,6 +79,32 @@ function readyExportRun(): RunSummary {
 
 
 describe("Samewise vertical slice", () => {
+  it("SW-046 leaves identity unchanged while the real New reconciliation confirmation owns focus", async () => {
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/review?")) return new Response(JSON.stringify(reviewPage()), { status: 200 });
+      if (url.endsWith("/candidates/candidate-1-1") && !init?.method) return new Response(JSON.stringify(candidateDetail()), { status: 200 });
+      if (url.endsWith("/candidates/candidate-1-1/decisions")) return new Response(JSON.stringify(runView({ stage: "review" })), { status: 200 });
+      throw new Error(`Unexpected request ${url}`);
+    }));
+
+    render(<App initialRun={runView({ stage: "review" })} initialScreen="review" />);
+    await screen.findByRole("button", { name: "Same entity" });
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "s" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "d" });
+    expect(requests.some((request) => request.includes("/decisions"))).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Start a new reconciliation?" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "s" });
+    await waitFor(() => expect(requests.filter((request) => request.includes("/decisions"))).toHaveLength(1));
+  });
+
   it("SW-028 refreshes authoritative run after a stale review 409 without retrying the identity decision", async () => {
     const current = runView({stage:"review"});
     const refreshed = runView({
