@@ -2,7 +2,7 @@ import {
   ConflictPageSchema, MergePlanPreviewSchema, RunSummarySchema,
   type ConflictPage, type FieldPolicyInput, type MergePlanPreview, type RuleStrategy, type RunSummary,
 } from "@samewise/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   run: RunSummary; busy: boolean; onRun: (run: RunSummary) => void; onBusy: (busy: boolean) => void;
@@ -22,11 +22,21 @@ function ruleLabel(rule: FieldPolicyInput | null): string {
   return `Prefer Dataset ${rule.trustedSource ?? "A"} when available`;
 }
 
+function savedRules(run: RunSummary): Record<string, FieldPolicyInput> {
+  return Object.fromEntries((run.survivorshipPolicy?.fieldPolicies ?? []).map(({ semanticField, strategy, trustedSource, timestampMappingId }) =>
+    [semanticField, { semanticField, strategy, ...(trustedSource ? { trustedSource } : {}), ...(timestampMappingId ? { timestampMappingId } : {}) }],
+  ));
+}
+
 export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onReview, onBack, onContinue }: Props) {
   const comparisonMappings = run.mappings.filter((mapping) => mapping.includeInMerge);
   const unresolvedIdentity = run.reviewProgress.remaining + run.reviewProgress.deferred;
-  const [draft, setDraft] = useState<Record<string, FieldPolicyInput>>(() => Object.fromEntries((run.survivorshipPolicy?.fieldPolicies ?? []).map(({ semanticField, strategy, trustedSource, timestampMappingId }) => [semanticField, { semanticField, strategy, ...(trustedSource ? { trustedSource } : {}), ...(timestampMappingId ? { timestampMappingId } : {}) }])));
-  const [preview, setPreview] = useState<MergePlanPreview | null>(null);
+  const [draftState, setDraftState] = useState(() => ({ runId: run.runId, fields: savedRules(run) }));
+  const draft = draftState.runId === run.runId ? draftState.fields : savedRules(run);
+  const [previewState, setPreviewState] = useState<{ generation: number; data: MergePlanPreview } | null>(null);
+  const previewGeneration = useRef(0);
+  const preview = previewState?.generation === previewGeneration.current && previewState.data.runId === run.runId
+    ? previewState.data : null;
   const [announcement, setAnnouncement] = useState("");
   const [offset, setOffset] = useState(0);
   const [conflictPage, setConflictPage] = useState<ConflictPage | null>(null);
@@ -38,6 +48,15 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   const fields = (run.conflictSummary.fields ?? []).filter((field) => field.total > 0);
   const configured = comparisonMappings.flatMap((mapping) => draft[mapping.mappingId] ? [draft[mapping.mappingId]!] : []);
   const canReviewExceptions = Boolean(run.conflictSummary.rulesApplied);
+
+  // The request may finish after a rule edit, run switch, or unmount.
+  // Never restore a preview that no longer describes the active policy.
+  useEffect(() => () => { previewGeneration.current += 1; }, [run.runId]);
+
+  function invalidatePreview() {
+    previewGeneration.current += 1;
+    setPreviewState(null);
+  }
 
   useEffect(() => {
     if (!canReviewExceptions || unresolvedIdentity > 0 || run.conflictSummary.unresolved === 0) { setConflictPage(null); return; }
@@ -61,24 +80,30 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   }, [run, resolvedOffset, onError]);
 
   function updateRule(mappingId: string, strategy: RuleStrategy | "") {
-    setPreview(null);
-    setDraft((current) => {
-      const next = { ...current };
+    invalidatePreview();
+    setDraftState((current) => {
+      const existing = current.runId === run.runId ? current.fields : savedRules(run);
+      const next = { ...existing };
       if (!strategy) delete next[mappingId];
       else next[mappingId] = { semanticField: mappingId, strategy,
-        ...(strategy === "prefer_trusted_source" ? { trustedSource: current[mappingId]?.trustedSource ?? "A" as const } : {}),
-        ...(strategy === "prefer_newest" ? { timestampMappingId: current[mappingId]?.timestampMappingId ?? dateMappings[0]?.mappingId ?? "" } : {}),
+        ...(strategy === "prefer_trusted_source" ? { trustedSource: existing[mappingId]?.trustedSource ?? "A" as const } : {}),
+        ...(strategy === "prefer_newest" ? { timestampMappingId: existing[mappingId]?.timestampMappingId ?? dateMappings[0]?.mappingId ?? "" } : {}),
       };
-      return next;
+      return { runId: run.runId, fields: next };
     });
   }
 
   function updateOption(mappingId: string, option: Partial<FieldPolicyInput>) {
-    setPreview(null);
-    setDraft((current) => ({ ...current, [mappingId]: { ...current[mappingId]!, ...option } }));
+    invalidatePreview();
+    setDraftState((current) => {
+      const existing = current.runId === run.runId ? current.fields : savedRules(run);
+      return { runId: run.runId, fields: { ...existing, [mappingId]: { ...existing[mappingId]!, ...option } } };
+    });
   }
 
   async function planRequest(kind: "preview" | "apply") {
+    if (kind === "apply" && (!preview || previewState?.generation !== previewGeneration.current)) return;
+    const generation = kind === "preview" ? ++previewGeneration.current : previewGeneration.current;
     onBusy(true); onError(null);
     try {
       const response = await fetch(`/api/runs/${encodeURIComponent(run.runId)}/merge-plan-${kind}`, {
@@ -88,22 +113,29 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
       if (!response.ok) throw await apiError(response);
       if (kind === "preview") {
         const value = MergePlanPreviewSchema.parse(await response.json());
-        setPreview(value);
+        if (value.runId !== run.runId) throw new Error("Merge preview did not match the active reconciliation.");
+        if (generation !== previewGeneration.current) return;
+        setPreviewState({ generation, data: value });
         setAnnouncement(`Merge plan preview: ${value.willHandle} will be handled; ${value.willRemain} will remain unresolved.`);
       } else {
         const value = await response.json() as { run: unknown; appliedCount: number };
-        onRun(RunSummarySchema.parse(value.run));
-        setPreview(null);
+        if (generation !== previewGeneration.current) return;
+        const updated = RunSummarySchema.parse(value.run);
+        if (updated.runId !== run.runId) throw new Error("Merge plan response did not match the active reconciliation.");
+        onRun(updated);
+        invalidatePreview();
         setAnnouncement(`Merge plan applied to ${value.appliedCount} differences.`);
       }
     } catch (error) {
-      setPreview(null);
-      onError(error instanceof Error ? error.message : "Merge plan request failed.");
+      if (generation === previewGeneration.current) {
+        invalidatePreview();
+        onError(error instanceof Error ? error.message : "Merge plan request failed.");
+      }
     } finally { onBusy(false); }
   }
 
   async function resolve(conflictId: string, action: "use_a" | "use_b" | "keep_both", replace = false) {
-    onBusy(true); onError(null); setPreview(null);
+    onBusy(true); onError(null); invalidatePreview();
     try {
       const response = await fetch(`/api/runs/${run.runId}/conflicts/${conflictId}/resolutions`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, replace }),
@@ -116,7 +148,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   }
 
   async function clear(conflictId: string) {
-    onBusy(true); onError(null); setPreview(null);
+    onBusy(true); onError(null); invalidatePreview();
     try {
       const response = await fetch(`/api/runs/${run.runId}/conflicts/${conflictId}/resolution`, { method: "DELETE" });
       if (!response.ok) throw await apiError(response);
@@ -138,10 +170,10 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
     <section className="merge-fields" aria-labelledby="merge-fields-title"><h2 id="merge-fields-title">Merge plan by field</h2>
       {fields.map((field) => { const rule = draft[field.mappingId] ?? null; const impact = preview?.fields.find((item) => item.semanticField === field.mappingId); return <article key={field.mappingId} className="merge-field-row">
         <div className="merge-field-heading"><div><h3>{field.label}</h3><small>{field.total} differences · {field.unresolved} still need attention</small></div><strong>{ruleLabel(rule)}</strong></div>
-        <div className="merge-field-controls"><label>Rule for {field.label}<select aria-label={`Rule for ${field.label}`} value={rule?.strategy ?? ""} onChange={(event) => updateRule(field.mappingId, event.target.value as RuleStrategy | "")}><option value="">Choose rule</option><option value="prefer_non_null">Use the value that exists</option><option value="prefer_newest" disabled={dateMappings.length === 0}>Use the most recently updated value</option><option value="prefer_trusted_source">Prefer a dataset when available</option><option value="keep_both">Preserve both values</option></select></label>
-          {rule?.strategy === "prefer_trusted_source" && <label>Trusted source<select aria-label={`Trusted source for ${field.label}`} value={rule.trustedSource ?? "A"} onChange={(event) => updateOption(field.mappingId, { trustedSource: event.target.value as "A" | "B" })}><option value="A">Dataset A</option><option value="B">Dataset B</option></select></label>}
-          {rule?.strategy === "prefer_newest" && <label>Timestamp mapping<select aria-label={`Timestamp for ${field.label}`} value={rule.timestampMappingId ?? ""} onChange={(event) => updateOption(field.mappingId, { timestampMappingId: event.target.value })}>{dateMappings.map((mapping) => <option key={mapping.mappingId} value={mapping.mappingId}>{mapping.label}</option>)}</select></label>}</div>
-        {field.suggestedRule && !rule && <p className="safe-suggestion">Suggested: <button type="button" className="secondary" onClick={() => updateRule(field.mappingId, "prefer_non_null")}>Use the value that exists</button> because every unresolved difference has a value on only one side. {field.unresolved} / {field.unresolved} handled, 0 remain if applied. Preview before applying.</p>}
+        <div className="merge-field-controls"><label>Rule for {field.label}<select aria-label={`Rule for ${field.label}`} disabled={busy} value={rule?.strategy ?? ""} onChange={(event) => updateRule(field.mappingId, event.target.value as RuleStrategy | "")}><option value="">Choose rule</option><option value="prefer_non_null">Use the value that exists</option><option value="prefer_newest" disabled={dateMappings.length === 0}>Use the most recently updated value</option><option value="prefer_trusted_source">Prefer a dataset when available</option><option value="keep_both">Preserve both values</option></select></label>
+          {rule?.strategy === "prefer_trusted_source" && <label>Trusted source<select aria-label={`Trusted source for ${field.label}`} disabled={busy} value={rule.trustedSource ?? "A"} onChange={(event) => updateOption(field.mappingId, { trustedSource: event.target.value as "A" | "B" })}><option value="A">Dataset A</option><option value="B">Dataset B</option></select></label>}
+          {rule?.strategy === "prefer_newest" && <label>Timestamp mapping<select aria-label={`Timestamp for ${field.label}`} disabled={busy} value={rule.timestampMappingId ?? ""} onChange={(event) => updateOption(field.mappingId, { timestampMappingId: event.target.value })}>{dateMappings.map((mapping) => <option key={mapping.mappingId} value={mapping.mappingId}>{mapping.label}</option>)}</select></label>}</div>
+        {field.suggestedRule && !rule && <p className="safe-suggestion">Suggested: <button type="button" className="secondary" disabled={busy} onClick={() => updateRule(field.mappingId, "prefer_non_null")}>Use the value that exists</button> because every unresolved difference has a value on only one side. {field.unresolved} / {field.unresolved} handled, 0 remain if applied. Preview before applying.</p>}
         <p className="merge-field-impact">{impact ? `${impact.willHandle} will be handled · ${impact.willRemain} will remain · ${impact.manualPreserved} manual decisions preserved` : `${field.resolved} handled · ${field.unresolved} remain`}</p>
       </article>; })}
     </section>
