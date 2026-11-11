@@ -35,6 +35,9 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   const draft = draftState.runId === run.runId ? draftState.fields : savedRules(run);
   const [previewState, setPreviewState] = useState<{ generation: number; data: MergePlanPreview } | null>(null);
   const previewGeneration = useRef(0);
+  // A request from an earlier run must not update this run, even after A → B → A.
+  const runScope = useRef({ runId: run.runId });
+  if (runScope.current.runId !== run.runId) runScope.current = { runId: run.runId };
   const preview = previewState?.generation === previewGeneration.current && previewState.data.runId === run.runId
     ? previewState.data : null;
   const [announcement, setAnnouncement] = useState("");
@@ -52,6 +55,8 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   // The request may finish after a rule edit, run switch, or unmount.
   // Never restore a preview that no longer describes the active policy.
   useEffect(() => () => { previewGeneration.current += 1; }, [run.runId]);
+  // Discard unsaved rules whenever a reconciliation is left, including on return.
+  useEffect(() => { setDraftState({ runId: run.runId, fields: savedRules(run) }); }, [run.runId]);
 
   function invalidatePreview() {
     previewGeneration.current += 1;
@@ -104,6 +109,7 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
   async function planRequest(kind: "preview" | "apply") {
     if (kind === "apply" && (!preview || previewState?.generation !== previewGeneration.current)) return;
     const generation = kind === "preview" ? ++previewGeneration.current : previewGeneration.current;
+    const requestScope = runScope.current;
     onBusy(true); onError(null);
     try {
       const response = await fetch(`/api/runs/${encodeURIComponent(run.runId)}/merge-plan-${kind}`, {
@@ -113,13 +119,13 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
       if (!response.ok) throw await apiError(response);
       if (kind === "preview") {
         const value = MergePlanPreviewSchema.parse(await response.json());
+        if (runScope.current !== requestScope || generation !== previewGeneration.current) return;
         if (value.runId !== run.runId) throw new Error("Merge preview did not match the active reconciliation.");
-        if (generation !== previewGeneration.current) return;
         setPreviewState({ generation, data: value });
         setAnnouncement(`Merge plan preview: ${value.willHandle} will be handled; ${value.willRemain} will remain unresolved.`);
       } else {
         const value = await response.json() as { run: unknown; appliedCount: number };
-        if (generation !== previewGeneration.current) return;
+        if (runScope.current !== requestScope || generation !== previewGeneration.current) return;
         const updated = RunSummarySchema.parse(value.run);
         if (updated.runId !== run.runId) throw new Error("Merge plan response did not match the active reconciliation.");
         onRun(updated);
@@ -127,35 +133,41 @@ export function SurvivorshipWorkspace({ run, busy, onRun, onBusy, onError, onRev
         setAnnouncement(`Merge plan applied to ${value.appliedCount} differences.`);
       }
     } catch (error) {
-      if (generation === previewGeneration.current) {
+      if (runScope.current === requestScope && generation === previewGeneration.current) {
         invalidatePreview();
         onError(error instanceof Error ? error.message : "Merge plan request failed.");
       }
-    } finally { onBusy(false); }
+    } finally { if (runScope.current === requestScope) onBusy(false); }
   }
 
   async function resolve(conflictId: string, action: "use_a" | "use_b" | "keep_both", replace = false) {
+    const requestScope = runScope.current;
     onBusy(true); onError(null); invalidatePreview();
     try {
       const response = await fetch(`/api/runs/${run.runId}/conflicts/${conflictId}/resolutions`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, replace }),
       });
       if (!response.ok) throw await apiError(response);
-      onRun(RunSummarySchema.parse(await response.json()));
+      const updated = RunSummarySchema.parse(await response.json());
+      if (runScope.current !== requestScope || updated.runId !== run.runId) return;
+      onRun(updated);
       setAnnouncement("Manual value decision recorded.");
-    } catch (error) { onError(error instanceof Error ? error.message : "Value decision failed."); }
-    finally { onBusy(false); }
+    } catch (error) { if (runScope.current === requestScope) onError(error instanceof Error ? error.message : "Value decision failed."); }
+    finally { if (runScope.current === requestScope) onBusy(false); }
   }
 
   async function clear(conflictId: string) {
+    const requestScope = runScope.current;
     onBusy(true); onError(null); invalidatePreview();
     try {
       const response = await fetch(`/api/runs/${run.runId}/conflicts/${conflictId}/resolution`, { method: "DELETE" });
       if (!response.ok) throw await apiError(response);
-      onRun(RunSummarySchema.parse(await response.json()));
+      const updated = RunSummarySchema.parse(await response.json());
+      if (runScope.current !== requestScope || updated.runId !== run.runId) return;
+      onRun(updated);
       setAnnouncement("Value decision cleared.");
-    } catch (error) { onError(error instanceof Error ? error.message : "Could not clear the value decision."); }
-    finally { onBusy(false); }
+    } catch (error) { if (runScope.current === requestScope) onError(error instanceof Error ? error.message : "Could not clear the value decision."); }
+    finally { if (runScope.current === requestScope) onBusy(false); }
   }
 
   if (unresolvedIdentity > 0) return <EmptyResolutionState title="Identity review isn't finished" description={`${unresolvedIdentity} possible match${unresolvedIdentity === 1 ? "" : "es"} still need${unresolvedIdentity === 1 ? "s" : ""} a Same entity or Different entities decision before merge values can be resolved.`} action="Go to Review matches" onAction={onReview} onBack={onBack} />;
