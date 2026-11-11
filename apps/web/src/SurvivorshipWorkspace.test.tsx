@@ -26,6 +26,22 @@ function previewResponse(runId = "run-1") {
   ] };
 }
 
+
+function conflictResponse(runId = "run-1", status: "resolved" | "unresolved" = "unresolved", offset = 0) {
+  return { contractVersion: "1.0.0", runId, ordering: "conflict_id_ascending", items: [{
+    conflictId: "conflict-1", runId, candidateId: "candidate-1", mappingId: "phone", aRowId: "A1", bRowId: "B1",
+    label: "Phone", aColumn: "phone", bColumn: "phone",
+    aValue: `A from ${runId}`, bValue: `B from ${runId}`,
+    identityDecisionId: null, identitySource: "system_matcher", status,
+    resolution: null, resolutionHistory: [],
+  }], page: { offset, limit: 50, total: 1, returned: 1, nextOffset: null, previousOffset: null } };
+}
+
+function reviewableConflicts(runId = "run-1"): RunSummary {
+  const value = run();
+  return run({ runId, conflictSummary: { ...value.conflictSummary, rulesApplied: true } });
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("merge plan workspace", () => {
@@ -184,6 +200,46 @@ describe("merge plan workspace", () => {
     rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
     await act(async () => { finish(new Response(JSON.stringify({ run: run(), appliedCount: 1 }), { status: 200 })); await pending; });
     expect(onBusy).toHaveBeenCalledTimes(count);
+  });
+
+
+  it("rejects conflict pages from another run before exposing value decisions", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(conflictResponse("run-other")), { status: 200 })));
+    render(<Harness initial={reviewableConflicts()} />);
+    fireEvent.click(screen.getByText("Review 2 exceptions"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Conflict response did not match the requested reconciliation");
+    expect(screen.queryByRole("button", { name: "Use A" })).not.toBeInTheDocument();
+  });
+
+  it("rejects a conflict page for the wrong status or offset", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(conflictResponse("run-1", "resolved")), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(conflictResponse("run-1", "unresolved", 50)), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Harness initial={reviewableConflicts()} />);
+    fireEvent.click(screen.getByText("Review 2 exceptions"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Conflict response did not match the requested reconciliation");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Conflict response did not match the requested reconciliation");
+    expect(screen.queryByRole("button", { name: "Use A" })).not.toBeInTheDocument();
+  });
+
+  it("hides an earlier run's conflicts immediately while the new run is loading", async () => {
+    let resolveNext!: (response: Response) => void;
+    const next = new Promise<Response>((resolve) => { resolveNext = resolve; });
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => String(input).includes("run-2")
+      ? next : Promise.resolve(new Response(JSON.stringify(conflictResponse()), { status: 200 }))));
+    const props = { busy: false, onRun: vi.fn(), onBusy: vi.fn(), onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={reviewableConflicts()} {...props} />);
+    fireEvent.click(screen.getByText("Review 2 exceptions"));
+    expect(await screen.findByText("A from run-1")).toBeInTheDocument();
+
+    rerender(<SurvivorshipWorkspace run={reviewableConflicts("run-2")} {...props} />);
+    expect(screen.queryByText("A from run-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use A" })).not.toBeInTheDocument();
+    await act(async () => { resolveNext(new Response(JSON.stringify(conflictResponse("run-2")), { status: 200 })); await next; });
+    expect(await screen.findByText("A from run-2")).toBeInTheDocument();
   });
 
   it("rejects an apply response from another run without replacing the authoritative state", async () => {

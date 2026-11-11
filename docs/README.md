@@ -10,6 +10,7 @@
 - [SW-046 review input safety](sw-046-review-input-safety.md): global shortcut ownership and stable review context during pending decisions.
 - [SW-047 results evidence context](sw-047-results-evidence-context.md): reject mismatched result projections and keep displayed evidence scoped to its run and row.
 - [SW-048 merge-plan preview safety](sw-048-survivorship-preview-safety.md): keep displayed previews and Apply responses bound to the current run and draft rules.
+- [SW-049 conflict evidence scope](sw-049-conflict-evidence-scope.md): reject foreign conflict pages and hide stale field-resolution controls across run changes.
 - [Social preview](assets/social-preview.png): GitHub-ready image; [editable SVG source](assets/social-preview.svg). Render with `node scripts/render-social-preview.mjs` after setting `SAMEWISE_RUNTIME_NODE_MODULES` to the existing Playwright module directory.
 
 ## Design decisions
