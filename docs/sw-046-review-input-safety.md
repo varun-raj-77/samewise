@@ -24,6 +24,8 @@ Independent regression tests reproduced both unintended decision submissions aga
 4. During an unresolved batch request, other groups and individual cases cannot be opened and the confirmation checkbox cannot be changed.
 5. Full repository verification, production web build, and pull-request CI must pass before merging.
 
+The synthetic public-demo Playwright smoke additionally opens the real **New reconciliation** dialog during an unresolved case, presses `S`/`D`, asserts that no decision request was submitted, then returns focus to the case heading and verifies that `S` records exactly one identity decision in Chrome.
+
 ## Boundaries
 
 This is user-input safety hardening, not evidence of improved reviewer speed or accuracy. It does not change candidate generation, matching scores, server-side decision validation, one-to-one policy, source datasets, survivorship, exports, persistence, or deployment infrastructure. Browser and server concurrency in separate tabs remain governed by the existing API revision and conflict rules.

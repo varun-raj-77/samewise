@@ -71,7 +71,24 @@ try {
   await page.getByRole("heading", { name: "Could these be the same entity?" }).waitFor();
   await page.getByRole("heading", { name: "Could A-1024 and B-2024 be the same entity?" }).waitFor();
   check("the intuitive Orchard Signal case reached the normal review UI", await page.getByText("Orchard Signal Creative", { exact: true }).first().isVisible());
-  await page.getByRole("button", { name: "Same entity" }).click();
+
+  // A global review shortcut must never submit an identity decision behind
+  // the real native New reconciliation dialog. Verify the API request itself,
+  // then focus review content and confirm that the normal shortcut still works.
+  const decisionRequests = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && /\/candidates\/[^/]+\/decisions$/.test(request.url())) decisionRequests.push(request);
+  });
+  await page.getByRole("button", { name: "New reconciliation" }).click();
+  await page.getByRole("dialog", { name: "Start a new reconciliation?" }).waitFor();
+  await page.keyboard.press("s");
+  await page.keyboard.press("d");
+  check("review shortcuts cannot post identity decisions while the new-run dialog is open", decisionRequests.length === 0);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("heading", { name: "Could A-1024 and B-2024 be the same entity?" }).focus();
+  const reviewed = page.waitForResponse((response) => response.request().method() === "POST" && /\/decisions$/.test(response.url()));
+  await page.keyboard.press("s");
+  check("normal review shortcut still records the intended identity decision", (await reviewed).status() === 200 && decisionRequests.length === 1);
   await page.getByRole("button", { name: "Continue to Merge values" }).click();
   await page.getByRole("heading", { name: "Choose which values to keep." }).waitFor();
   check("normal identity decision produced visible merge differences", Number(await page.locator(".survivorship-summary strong").first().textContent()) > 0);
