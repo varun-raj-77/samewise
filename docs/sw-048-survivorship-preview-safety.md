@@ -24,7 +24,9 @@ milestone closes the client-side evidence and navigation gap.
 - The preview response must identify the requested run. An Apply response
   must also identify that run before the app accepts its updated summary.
 - Switching reconciliations drops the previous preview and unsaved draft
-  rules. A late Apply response from the old run must not replace the new one.
+  rules, even when returning to a previously visited run ID. Late preview,
+  Apply, or manual-resolution responses must not replace a new run's state
+  or clear its pending busy indicator.
 - An unchanged, valid preview continues to require an explicit Apply action.
 
 ## Verification
