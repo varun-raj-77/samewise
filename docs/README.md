@@ -7,6 +7,7 @@
 - [API](api.md): current route inventory and behavior.
 - [Deployment](deployment.md): constrained public demo topology.
 - [Demo storyboard](demo.md): a one-minute product walkthrough.
+- [SW-046 review input safety](sw-046-review-input-safety.md): global shortcut ownership and stable review context during pending decisions.
 - [Social preview](assets/social-preview.png): GitHub-ready image; [editable SVG source](assets/social-preview.svg). Render with `node scripts/render-social-preview.mjs` after setting `SAMEWISE_RUNTIME_NODE_MODULES` to the existing Playwright module directory.
 
 ## Design decisions
