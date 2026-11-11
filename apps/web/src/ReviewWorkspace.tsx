@@ -62,7 +62,9 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const [groupList, setGroupList] = useState<ReviewGroupList | null>(null);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [groupPreview, setGroupPreview] = useState<ReviewGroupPreview | null>(null);
+  // A preview is actionable only for the precise run projection and group it
+  // was fetched for. A newer authoritative run invalidates that evidence.
+  const [groupPreviewRecord, setGroupPreviewRecord] = useState<{ run: RunSummary; groupId: string; preview: ReviewGroupPreview } | null>(null);
   const [batchConfirmed, setBatchConfirmed] = useState(false);
   const [filter, setFilter] = useState<ReviewFilter>("unresolved");
   const [sort, setSort] = useState<ReviewSort>("ambiguity");
@@ -84,6 +86,8 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const mutationInFlight = useRef(false);
   const [localBusy, setLocalBusy] = useState(false);
   const actionBusy = busy || localBusy;
+  const groupPreview = groupPreviewRecord?.run === run && groupPreviewRecord.groupId === selectedGroupId && viewMode === "groups"
+    ? groupPreviewRecord.preview : null;
   const pinnedCandidateId = useRef<string | null>(initialCandidateId ?? null);
   const detailCache = useRef(new Map<string, CandidateEvidenceDetail>());
   const previousRunProjection = useRef(run);
@@ -111,14 +115,16 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   }, [run.runId, run.reviewProgress, run.reviewUndo, viewMode]);
 
   useEffect(() => {
-    if (!selectedGroupId || viewMode !== "groups") { setGroupPreview(null); return; }
+    if (!selectedGroupId || viewMode !== "groups") { setGroupPreviewRecord(null); return; }
     let active = true;
+    setGroupPreviewRecord(null);
     setBatchConfirmed(false);
+    setGroupError(null);
     void loadGroupPreview(run.runId, selectedGroupId)
-      .then((loaded) => { if (active) setGroupPreview(loaded); })
+      .then((loaded) => { if (active) setGroupPreviewRecord({ run, groupId: selectedGroupId, preview: loaded }); })
       .catch((caught) => { if (active) setGroupError(caught instanceof Error ? caught.message : "Group preview could not be loaded."); });
     return () => { active = false; };
-  }, [run.runId, selectedGroupId, viewMode]);
+  }, [run, selectedGroupId, viewMode]);
 
   useEffect(() => { setOffset(0); }, [filter, sort, deferredQuery]);
 
@@ -202,6 +208,15 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
 
   function viewDeferredCases() { setFilter("deferred"); }
 
+  function selectGroup(groupId: string | null) {
+    if (groupId === selectedGroupId || actionBusy) return;
+    // Disarm immediately in the click handler, before the next fetch/effect.
+    setGroupPreviewRecord(null);
+    setBatchConfirmed(false);
+    setGroupError(null);
+    setSelectedGroupId(groupId);
+  }
+
   function selectRelative(delta: number) {
     const items = page?.items ?? [];
     if (!items.length) return;
@@ -256,20 +271,27 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   }
 
   async function applyBatch(group: ReviewGroupSummary) {
-    if (!group.suggestedDecision || !batchConfirmed || actionBusy) return;
+    if (viewMode !== "groups" || selectedGroupId !== group.groupId || groupPreview?.group.groupId !== group.groupId
+      || !group.suggestedDecision || !batchConfirmed || actionBusy) return;
     const updated = await guardedMutation(() => onBatchDecision(group.groupId, group.suggestedDecision!));
     if (!updated) return;
     detailCache.current.clear();
     setDetailRequestVersion((value) => value + 1);
     setSelectedGroupId(null);
-    setGroupPreview(null);
+    setGroupPreviewRecord(null);
+    setBatchConfirmed(false);
     setAnnouncement(`${group.suggestedDecision === "same_entity" ? "Same entity" : "Different entities"} applied to ${group.suggestedDecision === "same_entity" ? group.eligibleSameCount : group.eligibleDifferentCount} eligible cases in the reviewed pattern.`);
   }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey || actionBusy || detailLoading) return;
+      // The individual-review handler stays mounted while the grouped view is
+      // displayed. Never let a hidden selection receive an identity decision.
+      if (viewMode !== "individual" || event.defaultPrevented || isTypingTarget(event.target)
+        || event.altKey || event.ctrlKey || event.metaKey || actionBusy || detailLoading) return;
       const key = event.key.toLocaleLowerCase();
+      // A held decision/undo key is never interpreted as multiple judgments.
+      if (event.repeat && (key === "s" || key === "d" || key === "e" || key === "u")) return;
       if (key === "s") { event.preventDefault(); void decide("same_entity"); }
       else if (key === "d") { event.preventDefault(); void decide("different_entity"); }
       else if (key === "e" && selectedState === "needs_review") { event.preventDefault(); void deferCurrent(true); }
@@ -280,9 +302,9 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [alternatives, actionBusy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page]);
+  }, [alternatives, actionBusy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page, viewMode]);
 
-  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={actionBusy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { inspectOutsideQueue(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
+  if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={actionBusy} onSelectGroup={selectGroup} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { inspectOutsideQueue(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
 
   return <section className="review-product" aria-labelledby="review-workspace-title">
     <header className="review-product-header"><div><p className="eyebrow">Step 3 · Review matches</p><h1 id="review-workspace-title">Could these be the same entity?</h1><p>Compare the source records, then make the identity decision. Values are merged later.</p><button type="button" className="secondary" onClick={() => setViewMode("groups")}>Back to grouped review</button></div><div className="review-progress" aria-label="Overall review progress"><span><strong>{run.reviewProgress.reviewed}</strong> Reviewed</span><span><strong>{run.reviewProgress.remaining}</strong> Remaining</span><span><strong>{run.reviewProgress.deferred}</strong> Deferred</span><div aria-hidden="true"><i style={{ width: `${run.reviewProgress.total ? (run.reviewProgress.reviewed / run.reviewProgress.total) * 100 : 0}%` }} /></div></div></header>

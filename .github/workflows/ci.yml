@@ -86,17 +86,21 @@ jobs:
       - name: Build production web app
         run: pnpm --filter @samewise/web build
 
-      - name: Install isolated Playwright browser for public sample
+      - name: Install isolated Playwright controller for public sample
         if: github.event_name == 'pull_request'
         run: |
           npm install --prefix "$RUNNER_TEMP/samewise-playwright" --no-save playwright@1.56.1
-          "$RUNNER_TEMP/samewise-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          # The ubuntu-24.04 runner ships Google Chrome. Using the existing
+          # browser avoids an unrelated apt mirror/DNS dependency during CI.
+          command -v google-chrome
+          google-chrome --version
 
       - name: Verify synthetic public sample in browser
         if: github.event_name == 'pull_request'
         env:
           SAMEWISE_PYTHON: ${{ github.workspace }}/services/matcher/.venv/bin/python
           SAMEWISE_RUNTIME_NODE_MODULES: ${{ runner.temp }}/samewise-playwright/node_modules
+          SAMEWISE_CI_USE_SYSTEM_CHROME: "1"
           NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           pnpm --filter @samewise/api start > "$RUNNER_TEMP/samewise-api.log" 2>&1 &

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { CandidatePair, ReviewFilter, RunSummary } from "@samewise/contracts";
+import type { CandidatePair, ReviewFilter, ReviewGroupSummary, RunSummary } from "@samewise/contracts";
 import { ReviewWorkspace } from "./ReviewWorkspace.js";
 
 const evidence = { mappingId: "name", label: "Name", aColumn: "name", bColumn: "name", aValue: "Acme", bValue: "Acme Inc", normalizedA: "acme", normalizedB: "acme inc", fieldKind: "name_or_title" as const, featurePipelineVersion: "feature-pipeline-v0.2.0" as const, features: [{ name: "token_similarity", value: 0.9 }], outcome: "similar" as const, evidenceClass: "partial_agreement" as const, weight: 2, positiveContribution: 0.8, conflictContribution: 0, contribution: 0.8, explanationCode: "name_partial", explanation: "Names partially agree." };
@@ -37,6 +37,30 @@ function filteredReviewPage(deferred: boolean, filter: ReviewFilter) {
 
 function fetchSuccess() {
   return vi.fn((input: string | URL | Request) => Promise.resolve(new Response(JSON.stringify(String(input).includes("/review?") ? reviewPage() : detail(String(input).endsWith("c12") ? "c12" : "c11")), { status: 200, headers: { "Content-Type": "application/json" } })));
+}
+
+function quickReviewGroup(groupId: string, caseCount: number): ReviewGroupSummary {
+  return {
+    groupId, signatureVersion: "review-signature-v1.0.0",
+    signature: `review-signature-v1.0.0|name_or_title:exact_agreement:distinctive|${groupId}`,
+    safetyClass: "quick_decision", caseCount, eligibleSameCount: caseCount,
+    eligibleDifferentCount: 0, suggestedDecision: "same_entity",
+    pattern: [{ semanticFamily: "name_or_title", evidenceClass: "exact_agreement", informationClass: "distinctive", labels: ["Organization name"] }],
+    marginBand: "clear", alternativeBand: "single", collision: false, strongContradiction: false,
+  };
+}
+
+function reviewGroupsFixture(groups: ReviewGroupSummary[]) {
+  const total = groups.reduce((sum, group) => sum + group.caseCount, 0);
+  return {
+    contractVersion: "1.0.0", runId: "run-review",
+    workload: { signatureVersion: "review-signature-v1.0.0", totalNeedsAttention: total, quickDecisions: total, competingCandidates: 0, strongContradictions: 0, lowInformationNoise: 0, individualReview: 0, deferred: 0, groupCount: groups.length },
+    groups,
+  };
+}
+
+function reviewGroupPreviewFixture(group: ReviewGroupSummary) {
+  return { contractVersion: "1.0.0", runId: "run-review", group, items: reviewPage().items, page: { offset: 0, limit: 20, total: group.caseCount, returned: 1, nextOffset: group.caseCount > 1 ? 1 : null, previousOffset: null } };
 }
 
 const noop = vi.fn(async () => run());
@@ -227,6 +251,106 @@ describe("bounded review workspace", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /Undo/ })).toBeEnabled());
     fireEvent.keyDown(window, { key: "u" });
     await waitFor(() => expect(onUndo).toHaveBeenCalled());
+  });
+
+  it("SW-045 prevents hidden individual decisions and undo from grouped review shortcuts", async () => {
+    const groups = reviewGroupsFixture([]);
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(new Response(JSON.stringify(String(input).endsWith("/review-groups") ? groups : String(input).includes("/review?") ? reviewPage() : detail()), { status: 200 }))));
+    const onDecision = vi.fn(async () => run());
+    const onDefer = vi.fn(async () => run());
+    const onUndo = vi.fn(async () => run());
+    const undoRun = run({ reviewUndo: { decisionId: "d1", candidateId: "c11", aRowId: "A1", bRowId: "B1", humanDecision: "different_entity", canUndo: true, blockedReason: null, decisionOrigin: "human_individual", affectedCount: 1, reviewGroupId: null } });
+    render(<ReviewWorkspace run={undoRun} busy={false} onDecision={onDecision} onBatchDecision={noopBatch} onDefer={onDefer} onUndo={onUndo} onGoResolution={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+    fireEvent.click(screen.getByRole("button", { name: "Back to grouped review" }));
+    expect(await screen.findByRole("heading", { name: "Matching review" })).toBeInTheDocument();
+    for (const key of ["s", "d", "e", "u"]) fireEvent.keyDown(window, { key });
+    await act(async () => { await Promise.resolve(); });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(onDefer).not.toHaveBeenCalled();
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it("SW-045 ignores held repeat keys for destructive review shortcuts", async () => {
+    vi.stubGlobal("fetch", fetchSuccess());
+    const onDecision = vi.fn(async () => run());
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision} onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" });
+    fireEvent.keyDown(window, { key: "d", repeat: true });
+    await act(async () => { await Promise.resolve(); });
+    expect(onDecision).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "d", repeat: false });
+    await waitFor(() => expect(onDecision).toHaveBeenCalledExactlyOnceWith("c11", "different_entity"));
+  });
+
+  it("SW-045 hides old preview and requires fresh consent when switching groups", async () => {
+    const first = quickReviewGroup("review-group-0123456789abcdef0123", 30);
+    const second = quickReviewGroup("review-group-0123456789abcdef0124", 12);
+    const groups = reviewGroupsFixture([first, second]);
+    let resolveSecond!: (response: Response) => void;
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(`/review-groups/${second.groupId}`)) return new Promise<Response>((resolve) => { resolveSecond = resolve; });
+      const payload = url.includes(`/review-groups/${first.groupId}`) ? reviewGroupPreviewFixture(first)
+        : url.endsWith("/review-groups") ? groups : url.includes("/review?") ? reviewPage() : detail();
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onBatchDecision = vi.fn(async () => run());
+    render(<ReviewWorkspace run={run({ reviewProgress: { total: 42, reviewed: 0, remaining: 42, deferred: 0 } })} busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Matching review" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Preview cases" })).toHaveLength(2));
+    fireEvent.click(screen.getAllByRole("button", { name: "Preview cases" })[0]!);
+    expect(await screen.findByRole("heading", { name: "30 cases share this evidence pattern" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: "Apply to eligible cases" })).toBeEnabled();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Preview cases" })[1]!);
+    expect(screen.queryByRole("heading", { name: "30 cases share this evidence pattern" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply to eligible cases" })).not.toBeInTheDocument();
+    expect(screen.getByText("Loading a bounded preview…")).toBeInTheDocument();
+    expect(onBatchDecision).not.toHaveBeenCalled();
+    await act(async () => { resolveSecond(new Response(JSON.stringify(reviewGroupPreviewFixture(second)), { status: 200 })); });
+    expect(await screen.findByRole("heading", { name: "12 cases share this evidence pattern" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Apply to eligible cases" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply to eligible cases" }));
+    await waitFor(() => expect(onBatchDecision).toHaveBeenCalledExactlyOnceWith(second.groupId, "same_entity"));
+  });
+
+  it("SW-045 invalidates and reconfirms group evidence after authoritative run changes", async () => {
+    const group = quickReviewGroup("review-group-0123456789abcdef0123", 30);
+    let resolveRefresh!: (response: Response) => void;
+    let previewCalls = 0;
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(`/review-groups/${group.groupId}`)) {
+        previewCalls += 1;
+        if (previewCalls === 2) return new Promise<Response>((resolve) => { resolveRefresh = resolve; });
+        return Promise.resolve(new Response(JSON.stringify(reviewGroupPreviewFixture(group)), { status: 200 }));
+      }
+      const payload = url.endsWith("/review-groups") ? reviewGroupsFixture([group]) : url.includes("/review?") ? reviewPage() : detail();
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onBatchDecision = vi.fn(async () => run());
+    const props = { busy: false, onDecision: noop, onBatchDecision, onDefer: noop, onUndo: noop, onGoResolution: vi.fn() };
+    const rendered = render(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } })} {...props} />);
+    await screen.findByRole("button", { name: "Preview cases" });
+    fireEvent.click(screen.getByRole("button", { name: "Preview cases" }));
+    expect(await screen.findByRole("heading", { name: "30 cases share this evidence pattern" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: "Apply to eligible cases" })).toBeEnabled();
+
+    rendered.rerender(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 1, remaining: 29, deferred: 0 } })} {...props} />);
+    expect(screen.queryByRole("button", { name: "Apply to eligible cases" })).not.toBeInTheDocument();
+    await waitFor(() => expect(previewCalls).toBe(2));
+    await act(async () => { resolveRefresh(new Response(JSON.stringify(reviewGroupPreviewFixture(group)), { status: 200 })); });
+    expect(await screen.findByRole("heading", { name: "30 cases share this evidence pattern" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Apply to eligible cases" })).toBeDisabled();
+    expect(onBatchDecision).not.toHaveBeenCalled();
   });
 
   it("shows evidence loading without stale evidence", async () => {
