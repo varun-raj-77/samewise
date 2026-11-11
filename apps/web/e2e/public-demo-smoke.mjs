@@ -20,7 +20,12 @@ const fieldTypes = [
 ];
 const normalizers = ["text", "text", "text", "text", "text", "text", "text", "email", "phone", "text", "date"];
 
-const browser = await chromium.launch({ headless: true });
+// CI's pinned Ubuntu runner already provides Chrome; local runs keep using
+// Playwright's bundled Chromium unless this explicit CI opt-in is enabled.
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.SAMEWISE_CI_USE_SYSTEM_CHROME === "1" ? { channel: "chrome" } : {}),
+});
 const context = await browser.newContext({ viewport: { width: 1500, height: 1050 }, acceptDownloads: true });
 const page = await context.newPage();
 const checks = [];

@@ -143,7 +143,10 @@ async function verifyFailure(page, phrase) {
   check("browser rejected " + phrase,
     (await page.locator(".export-verifier-error").innerText()).includes(phrase));
 }
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.SAMEWISE_CI_USE_SYSTEM_CHROME === "1" ? { channel: "chrome" } : {}),
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 850 } });
 const apiMutations = [];
 let capture = false;
