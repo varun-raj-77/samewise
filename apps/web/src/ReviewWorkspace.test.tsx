@@ -115,6 +115,45 @@ describe("bounded review workspace", () => {
     expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
   });
 
+
+  it("SW-050 rejects review queues from another reconciliation before exposing decisions", async () => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...reviewPage(), runId: "run-other" }), { status: 200 })));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review queue response did not match the requested reconciliation");
+    expect(screen.queryByRole("heading", { name: "Could A1 and B1 be the same entity?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-050 rejects evidence for a different candidate without enabling identity actions", async () => {
+    const onDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(
+      new Response(JSON.stringify(String(input).includes("/review?") ? reviewPage() : detail("c12")), { status: 200 }),
+    )));
+    render(<ReviewWorkspace run={run()} busy={false} onDecision={onDecision}
+      onBatchDecision={noopBatch} onDefer={noop} onUndo={noop} onGoResolution={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Candidate evidence did not match the requested reconciliation or candidate.");
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+    expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it("SW-050 hides old queue and candidate evidence synchronously on a run switch", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => String(input).includes("run-2")
+      ? new Promise<Response>(() => undefined)
+      : Promise.resolve(new Response(JSON.stringify(String(input).includes("/review?") ? reviewPage() : detail()), { status: 200 }))));
+    const props = { busy: false, onDecision: noop, onBatchDecision: noopBatch, onDefer: noop, onUndo: noop, onGoResolution: vi.fn() };
+    const { rerender } = render(<ReviewWorkspace run={run()} {...props} />);
+    expect(await screen.findByRole("heading", { name: "Could A1 and B1 be the same entity?" })).toBeInTheDocument();
+
+    rerender(<ReviewWorkspace run={run({ runId: "run-2" })} {...props} />);
+    expect(screen.queryByRole("heading", { name: "Could A1 and B1 be the same entity?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Same entity" })).not.toBeInTheDocument();
+  });
+
   it("loads a bounded queue and full evidence separately", async () => {
     const fetchMock = fetchSuccess();
     vi.stubGlobal("fetch", fetchMock);
