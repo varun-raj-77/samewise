@@ -37,8 +37,9 @@ async function loadReviewPage(runId: string, offset: number, filter: ReviewFilte
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/review?${params}`);
   if (!response.ok) throw new Error("The review queue could not be loaded.");
   const page = ReviewQueuePageSchema.parse(await response.json());
-  if (page.runId !== runId || page.page.offset !== offset) {
-    throw new Error("Review queue response did not match the requested reconciliation or page.");
+  if (page.runId !== runId || page.page.offset !== offset || page.page.limit !== 50
+    || page.filter !== filter || page.sort !== sort || page.query !== query) {
+    throw new Error("Review queue response did not match the requested reconciliation, page, or filters.");
   }
   return page;
 }
