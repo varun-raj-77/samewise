@@ -29,7 +29,7 @@ function previewResponse(runId = "run-1") {
 
 function conflictResponse(runId = "run-1", status: "resolved" | "unresolved" = "unresolved", offset = 0) {
   return { contractVersion: "1.0.0", runId, ordering: "conflict_id_ascending", items: [{
-    conflictId: "conflict-1", runId, candidateId: "candidate-1", mappingId: "phone",
+    conflictId: "conflict-1", runId, candidateId: "candidate-1", mappingId: "phone", aRowId: "A1", bRowId: "B1",
     label: "Phone", aColumn: "phone", bColumn: "phone",
     aValue: `A from ${runId}`, bValue: `B from ${runId}`,
     identityDecisionId: null, identitySource: "system_matcher", status,
