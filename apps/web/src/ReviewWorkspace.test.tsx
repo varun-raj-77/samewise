@@ -141,6 +141,28 @@ describe("bounded review workspace", () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
+
+  it("SW-050 rejects a group preview for another group before batch consent is offered", async () => {
+    const expected = quickReviewGroup("review-group-0123456789abcdef0123", 30);
+    const foreign = quickReviewGroup("review-group-0123456789abcdef0124", 30);
+    const onBatchDecision = vi.fn(async () => run());
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.endsWith("/review-groups") ? reviewGroupsFixture([expected])
+        : url.includes("/review-groups/") ? reviewGroupPreviewFixture(foreign)
+        : url.includes("/review?") ? reviewPage() : detail();
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    }));
+    render(<ReviewWorkspace run={run({ reviewProgress: { total: 30, reviewed: 0, remaining: 30, deferred: 0 } })}
+      busy={false} onDecision={noop} onBatchDecision={onBatchDecision} onDefer={noop} onUndo={noop}
+      onGoResolution={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Preview cases" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Group preview did not match the requested reconciliation or group.");
+    expect(screen.queryByRole("button", { name: "Apply to eligible cases" })).not.toBeInTheDocument();
+    expect(onBatchDecision).not.toHaveBeenCalled();
+  });
+
   it("SW-050 hides old queue and candidate evidence synchronously on a run switch", async () => {
     vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => String(input).includes("run-2")
       ? new Promise<Response>(() => undefined)
