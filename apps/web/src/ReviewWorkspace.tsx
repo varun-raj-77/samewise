@@ -86,6 +86,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [offset, setOffset] = useState(0);
+  const [queueRequestVersion, setQueueRequestVersion] = useState(0);
   const [pageState, setPageState] = useState<{
     run: RunSummary; offset: number; filter: ReviewFilter; sort: ReviewSort; query: string;
     requestVersion: number; page: ReviewQueuePage;
@@ -94,7 +95,6 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     && pageState.sort === sort && pageState.query === deferredQuery
     && pageState.requestVersion === queueRequestVersion ? pageState.page : null;
   const [queueError, setQueueError] = useState<string | null>(null);
-  const [queueRequestVersion, setQueueRequestVersion] = useState(0);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(initialCandidateId ?? null);
   const [detailState, setDetailState] = useState<{ run: RunSummary; candidateId: string; detail: CandidateEvidenceDetail } | null>(null);
   const detail = detailState?.run === run && detailState.candidateId === selectedCandidateId ? detailState.detail : null;
