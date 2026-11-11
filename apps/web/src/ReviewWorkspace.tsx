@@ -135,7 +135,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
       .then((loaded) => { if (active) setGroupListState({ run, list: loaded }); })
       .catch((caught) => { if (active) setGroupError(caught instanceof Error ? caught.message : "Review groups could not be loaded."); });
     return () => { active = false; };
-  }, [run.runId, run.reviewProgress, run.reviewUndo, viewMode]);
+  }, [run, viewMode]);
 
   useEffect(() => {
     if (!selectedGroupId || viewMode !== "groups") { setGroupPreviewRecord(null); return; }
