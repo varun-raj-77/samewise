@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RunSummary } from "@samewise/contracts";
@@ -18,6 +18,12 @@ function run(overrides: Partial<RunSummary> = {}): RunSummary {
 function Harness({ initial = run(), onContinue = vi.fn() }: { initial?: RunSummary; onContinue?: () => void }) {
   const [value, setValue] = useState(initial);
   return <SurvivorshipWorkspace run={value} busy={false} onRun={setValue} onBusy={() => undefined} onError={() => undefined} onReview={() => undefined} onBack={() => undefined} onContinue={onContinue} />;
+}
+
+function previewResponse(runId = "run-1") {
+  return { contractVersion: "1.0.0", runId, previewToken: "a".repeat(64), policyVersion: "survivorship-policy-v1-abc", configuredFields: 1, totalDifferences: 2, willHandle: 1, willRemain: 1, manualPreserved: 0, preservedBoth: 0, fields: [
+    { semanticField: "phone", label: "Phone", differences: 1, willHandle: 1, willRemain: 0, manualPreserved: 0, alreadyHandled: 0, preservedBoth: 0 },
+  ] };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -57,5 +63,142 @@ describe("merge plan workspace", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("button", { name: "Continue to Export" })).toBeInTheDocument();
     expect(screen.getByText("All merge differences have an explicit outcome.")).toBeInTheDocument();
+  });
+
+  it("does not resurrect an obsolete preview that completes after a rule edit", async () => {
+    let resolveResponse!: (response: Response) => void;
+    const request = new Promise<Response>((resolve) => { resolveResponse = resolve; });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(request));
+    render(<Harness />);
+
+    const phoneRule = screen.getByRole("combobox", { name: "Rule for Phone" });
+    fireEvent.change(phoneRule, { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    fireEvent.change(phoneRule, { target: { value: "keep_both" } });
+    await act(async () => { resolveResponse(new Response(JSON.stringify(previewResponse()), { status: 200 })); await request; });
+
+    expect(screen.queryByRole("heading", { name: "Merge plan preview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply merge plan" })).not.toBeInTheDocument();
+  });
+
+  it("rejects a preview belonging to another reconciliation", async () => {
+    const onError = vi.fn();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(previewResponse("run-other")), { status: 200 })));
+    render(<SurvivorshipWorkspace run={run()} busy={false} onRun={vi.fn()} onBusy={vi.fn()} onError={onError} onReview={vi.fn()} onBack={vi.fn()} onContinue={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("Merge preview did not match the active reconciliation."));
+    expect(screen.queryByRole("heading", { name: "Merge plan preview" })).not.toBeInTheDocument();
+  });
+
+  it("locks rule selectors while a merge-plan request is pending", async () => {
+    const request = new Promise<Response>(() => undefined);
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(request));
+    function BusyHarness() {
+      const [busy, setBusy] = useState(false);
+      return <SurvivorshipWorkspace run={run()} busy={busy} onRun={vi.fn()} onBusy={setBusy} onError={vi.fn()} onReview={vi.fn()} onBack={vi.fn()} onContinue={vi.fn()} />;
+    }
+    render(<BusyHarness />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    expect(screen.getByRole("combobox", { name: "Rule for Phone" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Rule for Email" })).toBeDisabled();
+  });
+
+  it("does not replace the active run when an old merge-plan apply finishes late", async () => {
+    let resolveApply!: (response: Response) => void;
+    const pendingApply = new Promise<Response>((resolve) => { resolveApply = resolve; });
+    const fetchMock = vi.fn((input: string | URL | Request) => String(input).endsWith("preview")
+      ? Promise.resolve(new Response(JSON.stringify(previewResponse()), { status: 200 }))
+      : pendingApply);
+    vi.stubGlobal("fetch", fetchMock);
+    const onRun = vi.fn();
+    const props = { busy: false, onRun, onBusy: vi.fn(), onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={run()} {...props} />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply merge plan" }));
+    rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
+
+    await act(async () => {
+      resolveApply(new Response(JSON.stringify({ run: run({ conflictSummary: { total: 2, resolved: 2, unresolved: 0, rulesApplied: true } }), appliedCount: 2 }), { status: 200 }));
+      await pendingApply;
+    });
+    expect(onRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Merge plan preview" })).not.toBeInTheDocument();
+  });
+
+  it("does not reuse an earlier reconciliation's unsaved merge rules", () => {
+    const props = { busy: false, onRun: vi.fn(), onBusy: vi.fn(), onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={run()} {...props} />);
+    const phoneRule = screen.getByRole("combobox", { name: "Rule for Phone" });
+    fireEvent.change(phoneRule, { target: { value: "prefer_non_null" } });
+    expect(phoneRule).toHaveValue("prefer_non_null");
+
+    rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
+    expect(screen.getByRole("combobox", { name: "Rule for Phone" })).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Preview merge plan" })).toBeDisabled();
+  });
+
+
+  it("drops unsaved rules when returning to an earlier reconciliation", () => {
+    const props = { busy: false, onRun: vi.fn(), onBusy: vi.fn(), onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={run()} {...props} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
+    rerender(<SurvivorshipWorkspace run={run()} {...props} />);
+    expect(screen.getByRole("combobox", { name: "Rule for Phone" })).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Preview merge plan" })).toBeDisabled();
+  });
+
+  it("discards delayed previews after leaving and returning to the same run", async () => {
+    let finish!: (response: Response) => void;
+    const request = new Promise<Response>((resolve) => { finish = resolve; });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(request));
+    const onBusy = vi.fn();
+    const props = { busy: false, onRun: vi.fn(), onBusy, onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={run()} {...props} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
+    rerender(<SurvivorshipWorkspace run={run()} {...props} />);
+    await act(async () => { finish(new Response(JSON.stringify(previewResponse()), { status: 200 })); await request; });
+    expect(screen.queryByRole("heading", { name: "Merge plan preview" })).not.toBeInTheDocument();
+    expect(onBusy).not.toHaveBeenCalledWith(false);
+  });
+
+  it("does not clear a new run's busy state when an old apply finishes", async () => {
+    let finish!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { finish = resolve; });
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => String(input).endsWith("preview")
+      ? Promise.resolve(new Response(JSON.stringify(previewResponse()), { status: 200 })) : pending));
+    const onBusy = vi.fn();
+    const props = { busy: false, onRun: vi.fn(), onBusy, onError: vi.fn(), onReview: vi.fn(), onBack: vi.fn(), onContinue: vi.fn() };
+    const { rerender } = render(<SurvivorshipWorkspace run={run()} {...props} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply merge plan" }));
+    const count = onBusy.mock.calls.length;
+    rerender(<SurvivorshipWorkspace run={run({ runId: "run-2" })} {...props} />);
+    await act(async () => { finish(new Response(JSON.stringify({ run: run(), appliedCount: 1 }), { status: 200 })); await pending; });
+    expect(onBusy).toHaveBeenCalledTimes(count);
+  });
+
+  it("rejects an apply response from another run without replacing the authoritative state", async () => {
+    const onRun = vi.fn();
+    const onError = vi.fn();
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => Promise.resolve(new Response(JSON.stringify(
+      String(input).endsWith("preview") ? previewResponse() : { run: run({ runId: "run-other" }), appliedCount: 1 },
+    ), { status: 200 }))));
+    render(<SurvivorshipWorkspace run={run()} busy={false} onRun={onRun} onBusy={vi.fn()} onError={onError} onReview={vi.fn()} onBack={vi.fn()} onContinue={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Rule for Phone" }), { target: { value: "prefer_non_null" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview merge plan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply merge plan" }));
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("Merge plan response did not match the active reconciliation."));
+    expect(onRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Apply merge plan" })).not.toBeInTheDocument();
   });
 });
