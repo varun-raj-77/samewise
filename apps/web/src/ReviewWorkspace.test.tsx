@@ -128,12 +128,13 @@ describe("bounded review workspace", () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
-  it.each([
+  const mismatchedQueueCases: Array<[string, Record<string, unknown>]> = [
     ["filter", { filter: "deferred" }],
     ["sort order", { sort: "score_desc" }],
     ["search query", { query: "different organization" }],
     ["page size", { page: { ...reviewPage().page, limit: 25 } }],
-  ])("SW-050 rejects a review queue with a mismatched %s", async (_label, override) => {
+  ];
+  it.each(mismatchedQueueCases)("SW-050 rejects a review queue with a mismatched %s", async (_label, override) => {
     const onDecision = vi.fn(async () => run());
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
       JSON.stringify({ ...reviewPage(), ...override }), { status: 200 },
