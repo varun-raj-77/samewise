@@ -268,8 +268,13 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey || actionBusy || detailLoading) return;
+      // The individual-review handler stays mounted while the grouped view is
+      // displayed. Never let a hidden selection receive an identity decision.
+      if (viewMode !== "individual" || event.defaultPrevented || isTypingTarget(event.target)
+        || event.altKey || event.ctrlKey || event.metaKey || actionBusy || detailLoading) return;
       const key = event.key.toLocaleLowerCase();
+      // A held decision/undo key is never interpreted as multiple judgments.
+      if (event.repeat && (key === "s" || key === "d" || key === "e" || key === "u")) return;
       if (key === "s") { event.preventDefault(); void decide("same_entity"); }
       else if (key === "d") { event.preventDefault(); void decide("different_entity"); }
       else if (key === "e" && selectedState === "needs_review") { event.preventDefault(); void deferCurrent(true); }
@@ -280,7 +285,7 @@ export function ReviewWorkspace({ run, initialCandidateId, busy, onDecision, onB
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [alternatives, actionBusy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page]);
+  }, [alternatives, actionBusy, detailLoading, run.reviewUndo, selectedCandidate, selectedCandidateId, selectedState, page, viewMode]);
 
   if (viewMode === "groups") return <ReviewGroupsLanding run={run} groups={groupList} preview={groupPreview} error={groupError} selectedGroupId={selectedGroupId} batchConfirmed={batchConfirmed} busy={actionBusy} onSelectGroup={setSelectedGroupId} onBatchConfirmed={setBatchConfirmed} onApplyBatch={applyBatch} onOpenIndividual={(candidateId) => { inspectOutsideQueue(candidateId); setViewMode("individual"); }} onOpenAll={() => setViewMode("individual")} onUndo={undoRecent} onGoResolution={onGoResolution} />;
 
