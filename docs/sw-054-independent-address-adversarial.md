@@ -12,6 +12,25 @@ The 12 explicit scenarios are written as labeled records, but the actual candida
 
 The test suite checks the current behavior, including unsafe behavior, instead of silently changing the production matcher to make tests green.
 
+## Findings: four new incorrect automatic matches
+
+On 2026-11-11 ET / 2026-11-12 UTC, GitHub Actions [push CI #43131238938](https://github.com/varun-raj-77/samewise/actions/runs/43131238938) passed the 12 independent scenarios at tested commit 01be8efebba13742dc68d255b941f4b5b9d11675. The evaluated code is the hypothetical address-only pass plus the existing v0.3 matcher scoring/decision policy, not deployed product behavior.
+
+| Explicit hand-authored scenario | New false auto-match score | Baseline candidate? |
+| --- | ---: | --- |
+| Alpha Analytics / Aloha Facilities — unrelated office tenants | 0.622746 | No |
+| Harbor Consulting / Horizon Contractors — replacement tenant | 0.571795 | No |
+| Same address and city but confirmed state conflict | 0.546211 | No |
+| Velocity Transport / Veracity Trading — source-only unrelated tenants | 0.623228 | No |
+
+**All four are different canonical entities.** All four pairs were admitted by the evaluation-only address pass and auto-matched incorrectly by the **unchanged matcher rules** once admitted. These are counterexamples sufficient to invalidate a categorical *zero additional false auto-matches* claim; they are **not** representative false-positive rates.
+
+The current probe's separate-key treatment of geography admits a pair when city matches despite a conflicting confirmed state. That is a correctness risk independent of the name-similarity score.
+
+The same-name-unrelated scenario also yields an incorrect automatic match in the **existing baseline** without the experimental blocker. This is recorded separately (1 baseline false auto, 0 incremental false autos). It deserves later attention, but must not be attributed to this address-rescue experiment.
+
+A legitimate same-location rebrand was recovered, and relocated entities, mismatched street names/cities, or missing locality did not gain an address-only candidate in these targeted cases. This does **not** offset the safety failures.
+
 ## Release decision gate — not safe to activate automatically
 
 Address-only candidate admission must not implicitly qualify a proposed pair for auto-match merely because its name is somewhat similar and its street and city agree. These are plausible recurring business patterns, not exotic catastrophes.
