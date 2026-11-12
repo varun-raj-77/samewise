@@ -77,7 +77,9 @@ def test_1k_strict_cap_measures_recall_vs_shared_address_false_candidates() -> N
     strict = run_address_rescue_benchmark(1000, max_bucket_pair_count=4)
     default_metrics = regular["candidateMetrics"]
     limited_metrics = strict["candidateMetrics"]
-    assert limited_metrics["baselineCandidates"] == default_metrics["baselineCandidates"]
+    assert limited_metrics["baselineCandidates"] == (
+        default_metrics["baselineCandidates"]
+    )
     assert limited_metrics["addressKeysSuppressed"] > 0
     assert limited_metrics["addressRelationshipsSuppressed"] > 0
     assert limited_metrics["newlyAdmittedKnownHardNegatives"] == 0
