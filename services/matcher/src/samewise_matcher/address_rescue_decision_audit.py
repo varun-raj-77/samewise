@@ -74,7 +74,7 @@ def _decision_metrics(
             if auto_pairs else None
         ),
         "reviewEntityRows": len(review_a_ids),
-        "reviewCandidatePairs": sum(
+        "needsReviewBandCandidates": sum(
             item.band == "needs_review" for item in result.candidates
         ),
         "collisionTopCandidates": sum(item.collision for item in first_rank),
@@ -157,6 +157,17 @@ def run_decision_audit(
         for c in combined_result.candidates
         if c.rank == 1 and c.band == "auto_match"
     }
+    baseline_displayed_true = {
+        (c.aRowId, c.bRowId)
+        for c in baseline_result.candidates
+        if (c.aRowId, c.bRowId) in fixture.truth_pairs
+    }
+    combined_displayed_true = {
+        (c.aRowId, c.bRowId)
+        for c in combined_result.candidates
+        if (c.aRowId, c.bRowId) in fixture.truth_pairs
+    }
+    rescued_truth = added_pairs & fixture.truth_pairs
     return {
         "auditVersion": AUDIT_VERSION,
         "fixtureSha256": fixture.fingerprint,
@@ -174,15 +185,24 @@ def run_decision_audit(
             "truePairsNewlyGenerated": len(
                 combined_pairs & fixture.truth_pairs
             ) - len(base_pairs & fixture.truth_pairs),
-            "truePairsNewlyDisplayed": (
-                combined["displayedTruePairs"] - baseline["displayedTruePairs"]
+            "newlyGeneratedTruePairsDisplayed": len(
+                rescued_truth & combined_displayed_true
+            ),
+            "newlyGeneratedTruePairsPruned": len(
+                rescued_truth - combined_displayed_true
+            ),
+            "preexistingDisplayedTruePairsDisplaced": len(
+                baseline_displayed_true - combined_displayed_true
+            ),
+            "netDisplayedTruePairsChange": (
+                len(combined_displayed_true) - len(baseline_displayed_true)
             ),
             "reviewEntityRowsChange": (
                 combined["reviewEntityRows"] - baseline["reviewEntityRows"]
             ),
-            "reviewCandidatePairsChange": (
-                combined["reviewCandidatePairs"]
-                - baseline["reviewCandidatePairs"]
+            "needsReviewBandCandidatesChange": (
+                combined["needsReviewBandCandidates"]
+                - baseline["needsReviewBandCandidates"]
             ),
             "newlyAutoMatchedTruePairs": len(
                 (combined_auto - baseline_auto) & fixture.truth_pairs
