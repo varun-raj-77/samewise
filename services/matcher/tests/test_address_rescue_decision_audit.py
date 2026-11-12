@@ -29,6 +29,12 @@ def test_audit_is_truth_isolated_and_preserves_baseline(seed: int) -> None:
         "incorrectAutoMatchedPairs"
     ] == combined["autoMatchedPairs"]
     assert delta["truePairsNewlyGenerated"] >= 0
+    assert (
+        delta["newlyGeneratedTruePairsDisplayed"]
+        + delta["newlyGeneratedTruePairsPruned"]
+        == delta["truePairsNewlyGenerated"]
+    )
+    assert delta["preexistingDisplayedTruePairsDisplaced"] >= 0
     assert delta["additionalCandidatePairs"] > 0
     assert delta["formerlyAutoMatchedPairsDisplaced"] >= 0
 
@@ -63,3 +69,21 @@ def test_empty_review_or_auto_matches_have_explicit_denominators() -> None:
         assert metrics["onlyBRows"] >= 0
         assert metrics["topRankedFalsePairs"] >= 0
         assert metrics["displayedFalsePairs"] >= 0
+
+
+def test_1k_default_probe_exposes_truth_lost_in_review_alternative_cutoff() -> None:
+    default = run_decision_audit(1000, max_bucket_pair_count=100)
+    strict = run_decision_audit(1000, max_bucket_pair_count=4)
+    loose_delta = default["delta"]
+    strict_delta = strict["delta"]
+    assert loose_delta["truePairsNewlyGenerated"] == 221
+    assert loose_delta["newlyGeneratedTruePairsDisplayed"] == 180
+    assert loose_delta["newlyGeneratedTruePairsPruned"] == 41
+    assert loose_delta["preexistingDisplayedTruePairsDisplaced"] == 0
+    assert loose_delta["netDisplayedTruePairsChange"] == 180
+    assert strict_delta["truePairsNewlyGenerated"] == 176
+    assert strict_delta["newlyGeneratedTruePairsDisplayed"] == 176
+    assert strict_delta["newlyGeneratedTruePairsPruned"] == 0
+    assert strict_delta["preexistingDisplayedTruePairsDisplaced"] == 0
+    assert default["withAddressProbe"]["incorrectAutoMatchedPairs"] == 0
+    assert default["delta"]["newlyAutoMatchedFalsePairs"] == 0
