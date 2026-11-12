@@ -1,5 +1,7 @@
 """Deterministic adversarial gates before any address-only product activation."""
 
+import pytest
+
 from samewise_matcher.address_adversarial import (
     ADVERSARIAL_VERSION,
     adversarial_scenarios,
@@ -107,3 +109,23 @@ def test_all_results_replay_and_keep_truth_out_of_visible_source() -> None:
     assert all(item["scope"].startswith("hand-constructed") for item in first)
     assert any(item["newWrongAutoMatches"] > 0 for item in first)
     assert any(item["probeOnlyTruePairs"] > 0 for item in first)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "minimum_score"),
+    [
+        ("unrelated_tenant_false_auto", 0.62),
+        ("previous_tenant_successor", 0.57),
+        ("same_city_different_state", 0.54),
+        ("shared_address_b_with_no_counterpart", 0.62),
+    ],
+)
+def test_new_address_only_pairs_can_be_wrong_auto_matches(
+    scenario: str, minimum_score: float,
+) -> None:
+    report = by_key()[scenario]
+    assert report["truePairs"] == 0
+    assert report["baselineWrongAutoMatches"] == 0
+    assert report["probeOnlyFalsePairs"] == 1
+    assert report["newWrongAutoMatches"] == 1
+    assert report["newWrongAutoPairScores"][0]["score"] >= minimum_score
