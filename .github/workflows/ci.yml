@@ -83,6 +83,9 @@ jobs:
       - name: Diagnose SW-026 duplicate-heavy matcher review demand
         run: pnpm benchmark:sw026
 
+      - name: Benchmark SW-052 synthetic address rescue at 1K and 10K rows per side
+        run: uv run --project services/matcher python -m samewise_matcher.address_location_benchmark --sizes 1000 10000
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
 
