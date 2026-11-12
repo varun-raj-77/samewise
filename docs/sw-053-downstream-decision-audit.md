@@ -28,6 +28,23 @@ The cached scorer classifies normalized-field frequencies; the direct scorer doe
 - No change to production blocking, matcher configuration, API, run manifests, identity decisions, survivorship or source datasets.
 - Do not interpret synthetic outcomes as calibrated customer-data performance. Scenario construction is inherited from SW-052; multiple seeds do not constitute a genuinely independent real-data holdout.
 
+## Observed frozen-matcher outcomes (synthetic only)
+
+[GitHub Actions push run #43128478853](https://github.com/varun-raj-77/samewise/actions/runs/43128478853) passed on commit c291a22460b425894533663395a1e0618ed02a5a. The run includes both 1K seeds and the 10K seed under strict/default address bucket caps, and uses the unchanged matcher version explainable-matcher-v0.3.0. The subsequent audit fixes separated *newly generated truth displayed* from *net changes to all displayed truth*; the values below are confirmed by that refined run.
+
+| Rows/side | Address cap | New true candidates | Newly generated truth displayed | Newly generated truth pruned | New correct auto-matches | New incorrect auto-matches | Change in review entity rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 4 | 176 | 176 | 0 | 176 | 0 | 0 |
+| 1,000 | 100 | 221 | 180 | 41 | 176 | 0 | 0 |
+| 10,000 | 4 | 1,768 | 1,768 | 0 | 1,768 | 0 | 0 |
+| 10,000 | 100 | 2,209 | 1,807 | 402 | 1,768 | 0 | 0 |
+
+For this fixture, the 10K default cap's candidate-recall improvement does **not** imply that 2,209 additional true links are visible to reviewers: **402 of those 2,209** never appear in the result alternatives under the unchanged matcher. The baseline also had four generated true links already pruned; the combined result had 406. No previously displayed true link was displaced in the measured runs.
+
+The no-new-false-auto-match result is narrowly scoped to the deliberately stylized synthetic names and shared-address construction. It is *not* evidence that name-independent address matching is safe to auto-match on representative business data. These scenarios also do not measure actual human review time.
+
+Both 1K seeds produced identical quality counts because the generator's seed only changes row ordering and B row-ID permutation, not the underlying corruption assignments. This is a **reproducibility/ordering check, not a statistically independent holdout**. A separately constructed adversarial fixture is still required before any product decision.
+
 ## Decision gate
 
 A product blocker proposal needs all of the following: (a) candidate recall improves on independently designed hidden-truth adversarial fixtures, (b) incorrect auto-match rate does not rise unacceptably, (c) review workload and collision demand stay manageable, (d) precision/recall tradeoffs and bucket suppression are documented, (e) versioned provenance and deterministic replay, and (f) tests for multigeography mappings, moved businesses, shared addresses, and identity-vs-survivorship separation.
