@@ -93,6 +93,9 @@ jobs:
           uv run --project services/matcher python -m samewise_matcher.address_rescue_decision_audit --sizes 1000 --seeds 5201 5301 --bucket-caps 4 100
           uv run --project services/matcher python -m samewise_matcher.address_rescue_decision_audit --sizes 10000 --seeds 5201 --bucket-caps 4 100
 
+      - name: SW-054 independent address identity adversarial audit
+        run: uv run --project services/matcher python -m samewise_matcher.address_adversarial
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
 
