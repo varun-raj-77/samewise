@@ -13,6 +13,7 @@
 - [SW-049 conflict evidence scope](sw-049-conflict-evidence-scope.md): reject foreign conflict pages and hide stale field-resolution controls across run changes.
 - [SW-052 address-rescue benchmark](sw-052-address-location-probe.md): reproducible 1K/10K candidate-recall and false-candidate experiment, intentionally not enabled in the product.
 - [SW-053 downstream matcher audit](sw-053-downstream-decision-audit.md): verify whether candidate recall survives scoring, auto-match decisions, collision checks, and the reviewer alternatives cutoff.
+- [SW-054 independent address adversarial cases](sw-054-independent-address-adversarial.md): evaluate unrelated tenants, rebrands, source-only entities and conflicting regions before any address-only blocker ships.
 - [Social preview](assets/social-preview.png): GitHub-ready image; [editable SVG source](assets/social-preview.svg). Render with `node scripts/render-social-preview.mjs` after setting `SAMEWISE_RUNTIME_NODE_MODULES` to the existing Playwright module directory.
 
 ## Design decisions
