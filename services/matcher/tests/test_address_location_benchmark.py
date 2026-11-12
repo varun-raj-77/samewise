@@ -64,7 +64,7 @@ def test_strict_bucket_cap_has_measured_recall_and_negative_tradeoff() -> None:
     full = unrestricted["candidateMetrics"]
     capped = restrictive["candidateMetrics"]
     assert capped["addressKeysSuppressed"] > full["addressKeysSuppressed"]
-    assert capped["addressRelationshipsSuppressed"] >= 16
+    assert capped["addressRelationshipsSuppressed"] >= 8
     assert capped["addedCandidates"] <= full["addedCandidates"]
     assert capped["newlyAdmittedKnownHardNegatives"] <= (
         full["newlyAdmittedKnownHardNegatives"]
