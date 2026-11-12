@@ -70,6 +70,24 @@ Fingerprint for the 10K fixture: 387cfd4cb9515b9848fd7e2b22fd589060da7f1c5d140fb
 
 The memory numbers use tracemalloc per stage; they are **not** resident-process memory, and the probe stage starts with the baseline result already alive. Time measurements are single GitHub-run observations, not confidence intervals or speed guarantees.
 
+### Measured strict-cap comparison
+
+The same fixtures were rerun with only the experimental address pass's maximum bucket-pair count reduced from 100 to **4**. The existing product baseline was unchanged. Verified by [GitHub Actions #43126000497](https://github.com/varun-raj-77/samewise/actions/runs/43126000497) on code commit 97b02a4cc117b78ccc23af6a09ed2cc5ab0db4f0.
+
+| Measure | 1K default cap | 1K strict cap | 10K default cap | 10K strict cap |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline candidate recall | 75.00% | 75.00% | 75.00% | 75.00% |
+| Combined candidate recall | 97.10% | 92.60% | 97.09% | 92.68% |
+| Rescued true pairs | 221 | 176 | 2,209 | 1,768 |
+| Newly admitted false candidates | 135 | 0 | 1,323 | 0 |
+| Newly admitted candidates | 356 | 176 | 3,532 | 1,768 |
+| Suppressed address buckets | 0 | 50 | 0 | 500 |
+| Suppressed address relationships | 0 | 708 | 0 | 7,072 |
+
+With the 10K fixture, the strict cap excludes **441** true-pair rescues that the default cap would have retained, while avoiding **1,323** additional false candidates. The disappearance of all added false candidates is a deliberately constructed property of this fixture: nonshared addresses have unique street numbers, and the shared four-way buildings exceed a strict pair cap of four. It should **not** be projected onto real business data.
+
+This cap is not a recommended product default. The experiment isolates the recall/review-volume tradeoff and demonstrates why bucket suppression must be evaluated against labeled truth rather than assumed safe.
+
 ### Decision
 
 The additional pass recovers many deliberately renamed pairs, but 37.5% of its additional candidates (at 10K: 1,323/3,532) are confirmed nonmatching on the complete synthetic truth. This raises review workload even though candidate recall rises. **Keep this experimental pass isolated** until held-out corruption distributions, stronger realistic near-collisions, unknown/unlabeled data, multiple seeds, cap-sensitivity, score/rank quality, and one-to-one conflict behavior are evaluated. No auto-matching based solely on address.
