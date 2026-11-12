@@ -32,6 +32,48 @@ The normal CI matcher benchmarks and synthetic browser acceptance must remain gr
 
 **Before considering a product blocker:** freeze independent 1K/10K+ adversarial fixtures with genuine renames, address reuse, incomplete geography, stale/moved addresses, and missing fields; measure candidate recall, incremental candidate volume, hard-negative admissions, bucket suppression, runtime, and memory against an unchanged v0.4.0 baseline. Evaluate larger datasets and scoring/one-to-one conflicts if initial results justify expansion. A later product change would require a new blocker ID and candidate-engine/config version, provenance, and fresh regression gates.
 
+## Versioned synthetic 1K/10K benchmark
+
+Run from the repository root:
+
+    uv run --project services/matcher python -m samewise_matcher.address_location_benchmark --sizes 1000 10000 --seed 5201
+    uv run --project services/matcher python -m samewise_matcher.address_location_benchmark --sizes 1000 10000 --seed 5201 --max-bucket-pairs 4
+
+The generator creates an independent B row-ID permutation and independently shuffled A/B rows. Hidden complete 1:1 truth and deliberately constructed shared-address negatives stay outside both generation functions. Source-visible fields contain no truth identifiers. The deterministic scenario includes 25% complete organization renames, 20% entities at four-organization shared addresses, plus moved addresses, missing B addresses and missing B geography. Rebranding and corruption rates are *constructed*, not representative of actual customer datasets. No real organizations or user uploads are involved.
+
+The baseline is the unchanged candidate-engine-v0.4.0 with its existing blockers and default caps (20 records per bucket side, 100 pairs per bucket). The added pass uses exact normalized street/locality without name similarity. Evaluation occurs after both candidate passes complete. With complete synthetic truth, an added candidate that is not the true 1:1 link can be counted as a false candidate; it is **not** a false *auto-match*, because no scoring or automatic decision is performed.
+
+### Measured default-cap results
+
+Measured by [GitHub Actions #43125189740](https://github.com/varun-raj-77/samewise/actions/runs/43125189740) on commit e5e06ddb0c62ec2df0822acc2caf47ff161177ba, seed 5201, Ubuntu 24.04, Python 3.13. These numbers are synthetic candidate-generation results only.
+
+| Measure | 1K per side | 10K per side |
+| --- | ---: | ---: |
+| A x B theoretical pairs | 1,000,000 | 100,000,000 |
+| Baseline candidates | 1,158 | 11,592 |
+| Baseline retained truth | 750 / 1,000 | 7,500 / 10,000 |
+| Baseline candidate recall | 75.00% | 75.00% |
+| Combined candidates | 1,514 | 15,124 |
+| Combined retained truth | 971 / 1,000 | 9,709 / 10,000 |
+| Combined candidate recall | 97.10% | 97.09% |
+| True pairs rescued | 221 | 2,209 |
+| Extra candidates | 356 | 3,532 |
+| Extra false candidates (complete truth) | 135 | 1,323 |
+| Extra known shared-address hard negatives | 135 | 1,323 |
+| Baseline generation (GitHub runner) | 0.370215 s | 4.160846 s |
+| Added address probe (GitHub runner) | 0.045699 s | 0.508176 s |
+| Baseline peak traced Python allocations | 7,675,299 bytes | 76,578,484 bytes |
+| Probe peak traced Python allocations | 713,489 bytes | 6,745,385 bytes |
+
+Fingerprint for the 1K fixture: 0b148a6c491da3f1ff70603a5f4ae729ca2a2e73a3a0d3f7f8f0c5c83112d272.
+Fingerprint for the 10K fixture: 387cfd4cb9515b9848fd7e2b22fd589060da7f1c5d140fb2701dcd78c75e9066.
+
+The memory numbers use tracemalloc per stage; they are **not** resident-process memory, and the probe stage starts with the baseline result already alive. Time measurements are single GitHub-run observations, not confidence intervals or speed guarantees.
+
+### Decision
+
+The additional pass recovers many deliberately renamed pairs, but 37.5% of its additional candidates (at 10K: 1,323/3,532) are confirmed nonmatching on the complete synthetic truth. This raises review workload even though candidate recall rises. **Keep this experimental pass isolated** until held-out corruption distributions, stronger realistic near-collisions, unknown/unlabeled data, multiple seeds, cap-sensitivity, score/rank quality, and one-to-one conflict behavior are evaluated. No auto-matching based solely on address.
+
 ## Known limits
 
 The probe does exact *normalized* address and locality equality, not geocoding. It may miss changed or incomplete addresses and may admit many unrelated organizations at a shared building. Mappings are assumed already human-confirmed. It deliberately makes no geographic equivalence or residential/business occupancy inference.
