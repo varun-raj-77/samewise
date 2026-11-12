@@ -88,6 +88,11 @@ jobs:
           uv run --project services/matcher python -m samewise_matcher.address_location_benchmark --sizes 1000 10000
           uv run --project services/matcher python -m samewise_matcher.address_location_benchmark --sizes 1000 10000 --max-bucket-pairs 4
 
+      - name: SW-053 audit frozen matcher decisions with address rescue
+        run: |
+          uv run --project services/matcher python -m samewise_matcher.address_rescue_decision_audit --sizes 1000 --seeds 5201 5301 --bucket-caps 4 100
+          uv run --project services/matcher python -m samewise_matcher.address_rescue_decision_audit --sizes 10000 --seeds 5201 --bucket-caps 4 100
+
       - name: Build production web app
         run: pnpm --filter @samewise/web build
 
