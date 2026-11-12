@@ -70,3 +70,21 @@ def test_strict_bucket_cap_has_measured_recall_and_negative_tradeoff() -> None:
         full["newlyAdmittedKnownHardNegatives"]
     )
     assert capped["combinedCandidateRecall"] <= full["combinedCandidateRecall"]
+
+
+def test_1k_strict_cap_measures_recall_vs_shared_address_false_candidates() -> None:
+    regular = run_address_rescue_benchmark(1000)
+    strict = run_address_rescue_benchmark(1000, max_bucket_pair_count=4)
+    default_metrics = regular["candidateMetrics"]
+    limited_metrics = strict["candidateMetrics"]
+    assert limited_metrics["baselineCandidates"] == default_metrics["baselineCandidates"]
+    assert limited_metrics["addressKeysSuppressed"] > 0
+    assert limited_metrics["addressRelationshipsSuppressed"] > 0
+    assert limited_metrics["newlyAdmittedKnownHardNegatives"] == 0
+    assert limited_metrics["completeTruthNewlyAdmittedFalseCandidates"] == 0
+    assert limited_metrics["newlyRecoveredTruePairs"] < (
+        default_metrics["newlyRecoveredTruePairs"]
+    )
+    assert limited_metrics["combinedCandidateRecall"] < (
+        default_metrics["combinedCandidateRecall"]
+    )
