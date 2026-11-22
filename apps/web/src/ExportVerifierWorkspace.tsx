@@ -38,8 +38,10 @@ export function ExportVerifierWorkspace() {
       let payload: unknown;
       try { payload = JSON.parse(await manifest.text()); }
       catch { throw new BrowserExportVerificationError("invalid_json", "The selected manifest is not valid JSON."); }
+      if (current !== generation.current) return;
       const files = await Promise.all([report, trusted].filter((file): file is File => file !== null)
         .map(async (file) => ({ filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()) })));
+      if (current !== generation.current) return;
       const result = await verifyBrowserExport(payload, files);
       if (current === generation.current) setVerification(result);
     } catch (failure) {
@@ -58,9 +60,15 @@ export function ExportVerifierWorkspace() {
     <div className="export-verifier-body">
       <p>Check that the downloaded CSV files match their provenance manifest byte for byte. The files are processed in this browser and are not uploaded for verification.</p>
       <div className="export-verifier-fields">
-        <label>Provenance manifest (.json)<input type="file" accept=".json,application/json" aria-label="Provenance manifest for verification" onChange={(event) => selectFile(event.target.files?.[0] ?? null, setManifest)} /></label>
-        <label>Reconciliation report (.csv)<input type="file" accept=".csv,text/csv" aria-label="Reconciliation report for verification" onChange={(event) => selectFile(event.target.files?.[0] ?? null, setReport)} /></label>
-        <label>Trusted merged output (.csv) — if exported<input type="file" accept=".csv,text/csv" aria-label="Trusted merged output for verification" onChange={(event) => selectFile(event.target.files?.[0] ?? null, setTrusted)} /></label>
+        <VerifierFileField label="Provenance manifest (.json)" inputLabel="Provenance manifest for verification"
+          removeLabel="Remove provenance manifest" accept=".json,application/json" file={manifest}
+          onSelect={(file) => selectFile(file, setManifest)} />
+        <VerifierFileField label="Reconciliation report (.csv)" inputLabel="Reconciliation report for verification"
+          removeLabel="Remove reconciliation report" accept=".csv,text/csv" file={report}
+          onSelect={(file) => selectFile(file, setReport)} />
+        <VerifierFileField label="Trusted merged output (.csv) — if exported" inputLabel="Trusted merged output for verification"
+          removeLabel="Remove trusted merged output" accept=".csv,text/csv" file={trusted}
+          onSelect={(file) => selectFile(file, setTrusted)} />
       </div>
       <button type="button" className="secondary" onClick={() => void verify()} disabled={busy || !manifest || !report}>{busy ? "Checking files…" : "Check file integrity"}</button>
       {error && <p className="export-verifier-error" role="alert"><strong>Verification failed.</strong> {error}</p>}
@@ -68,4 +76,30 @@ export function ExportVerifierWorkspace() {
       <p className="export-verifier-caveat">This checks consistency, not who created the files, whether the underlying records are correct, or whether the matches are accurate. A replaced manifest and replaced CSVs can still pass.</p>
     </div>
   </details>;
+}
+
+
+function VerifierFileField({ label, inputLabel, removeLabel, accept, file, onSelect }: {
+  label: string;
+  inputLabel: string;
+  removeLabel: string;
+  accept: string;
+  file: File | null;
+  onSelect: (file: File | null) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+
+  function remove() {
+    if (input.current) {
+      input.current.value = "";
+      input.current.focus();
+    }
+    onSelect(null);
+  }
+
+  return <div className="export-verifier-field">
+    <label>{label}<input ref={input} type="file" accept={accept} aria-label={inputLabel}
+      onChange={(event) => onSelect(event.target.files?.[0] ?? null)} /></label>
+    {file && <button type="button" className="secondary" onClick={remove}>{removeLabel}</button>}
+  </div>;
 }

@@ -179,6 +179,15 @@ try {
   await page.getByLabel("Trusted merged output for verification").setInputFiles([]);
   await verifyFailure(page, "exactly the CSV files");
   await select(page, false);
+  const trustedInput = page.getByLabel("Trusted merged output for verification");
+  await trustedInput.setInputFiles(payload(trustedName, trustedBytes));
+  await verifyFailure(page, "exactly the CSV files");
+  await page.getByRole("button", { name: "Remove trusted merged output" }).click();
+  check("removing a chosen optional CSV empties only that browser input and restores its focus",
+    await trustedInput.evaluate((input) => input.files.length === 0 && document.activeElement === input) &&
+    await page.getByLabel("Reconciliation report for verification").evaluate((input) => input.files.length === 1) &&
+    await page.getByLabel("Provenance manifest for verification").evaluate((input) => input.files.length === 1) &&
+    await page.locator(".export-verifier-error").count() === 0);
   await verifySuccess(page, 1);
 
   await select(page, true);
@@ -194,7 +203,10 @@ try {
   });
   await page.getByRole("button", { name: "Check file integrity" }).click();
   await page.waitForFunction(() => typeof window.__samewiseReleaseFile === "function");
-  await page.getByLabel("Reconciliation report for verification").setInputFiles(payload(reportName, tampered));
+  await page.getByRole("button", { name: "Remove reconciliation report" }).click();
+  check("removing a required CSV during a read stops it from being submitted for verification",
+    await page.getByRole("button", { name: "Check file integrity" }).isDisabled() &&
+    await page.getByLabel("Reconciliation report for verification").evaluate((input) => input.files.length === 0));
   await page.evaluate(() => window.__samewiseReleaseFile());
   await page.waitForTimeout(100);
   check("in-flight obsolete verification produced no success", await page.locator(".export-verifier-success").count() === 0);
