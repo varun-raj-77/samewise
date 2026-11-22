@@ -44,6 +44,22 @@ async function parseRun(response: Response): Promise<RunSummary> {
   return RunSummarySchema.parse(await response.json());
 }
 
+async function savedSourcePairMatches(run: RunSummary, aFile: File, bFile: File): Promise<boolean> {
+  const savedA = run.datasets.A;
+  const savedB = run.datasets.B;
+  if (!savedA || !savedB || !globalThis.crypto?.subtle) return false;
+  try {
+    const hashFile = async (file: File) => Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+    const [hashA, hashB] = await Promise.all([hashFile(aFile), hashFile(bFile)]);
+    return hashA === savedA.sha256 && hashB === savedB.sha256;
+  } catch {
+    return false;
+  }
+}
+
 async function parseSuggestionResponse(response: Response): Promise<MappingSuggestionResponse> {
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
@@ -176,11 +192,29 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Samewise could not complete that request.";
       try {
-        const synchronized = await parseRun(await fetch(`/api/runs/${run.runId}`));
+        const synchronized = await parseRun(await fetch(`/api/runs/${encodeURIComponent(run.runId)}`));
+        if (synchronized.runId !== run.runId) throw new Error("Upload recovery returned a different run.");
         latestAuthoritativeRun = synchronized;
         setRun(synchronized);
       } catch {
         setRun(latestAuthoritativeRun);
+      }
+      const recovered = latestAuthoritativeRun;
+      if (recovered.datasets.A && recovered.datasets.B) {
+        setDraftMappings(recovered.mappings);
+        serverConfirmedMappings.current = recovered.mappings;
+        // Both slots can be filled even if our second response was lost, or
+        // a different browser tab saved its own bytes first. Do not conflate them.
+        if (await savedSourcePairMatches(recovered, aFile, bFile)) {
+          setUsingSampleData(samplePair);
+          setError(null);
+          setScreen(recovered.stage === "upload" ? "profile" : recovered.stage);
+        } else {
+          setUsingSampleData(false);
+          setError("Both datasets are already saved for this run but could not be verified against the selected files. Inspect the saved datasets or start a new reconciliation.");
+          setScreen("upload");
+        }
+        return;
       }
       setUsingSampleData(false);
       setError(latestAuthoritativeRun.datasets.A || latestAuthoritativeRun.datasets.B
@@ -468,7 +502,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     <main className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
       <section className={screen === "review" ? "content review-content" : "content"}>
         {error && <div className="error-banner" role="alert">{error}</div>}{busy && <div className="busy" aria-live="polite">Working…</div>}
-        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header><div className="upload-privacy-notice" role="note" aria-label="Public demo data notice"><span aria-hidden="true">!</span><p><strong>Public demo — use non-sensitive CSVs.</strong> Uploaded records are processed on Samewise's server. This demo has no sign-in or guaranteed deletion schedule; avoid personal, confidential, or regulated data. Try the synthetic sample if you're exploring.</p></div>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p>{(!run.datasets.A || !run.datasets.B) && <div className="partial-source-recovery" aria-label="Finish source pair"><p role="status">Dataset {run.datasets.A ? "A" : "B"} is saved as <strong>{run.datasets.A?.originalFilename ?? run.datasets.B?.originalFilename}</strong>. Upload only the missing dataset to finish this reconciliation.</p>{!run.datasets.A && <><FilePicker key={`${run.runId}-recovery-A`} side="A" file={fileA} onChange={(file) => { setFileA(file); setUsingSampleData(false); setError(null); }} /><button className="primary" onClick={() => void uploadMissingSource("A")} disabled={busy}>Upload remaining Dataset A</button></>}{!run.datasets.B && <><FilePicker key={`${run.runId}-recovery-B`} side="B" file={fileB} onChange={(file) => { setFileB(file); setUsingSampleData(false); setError(null); }} /><button className="primary" onClick={() => void uploadMissingSource("B")} disabled={busy}>Upload remaining Dataset B</button></>}</div>}<button className="primary" onClick={requestNewReconciliation} disabled={busy}>New reconciliation</button></section> : <><section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker key={`${run?.runId ?? "new"}-A`} side="A" file={fileA} onChange={(file) => { setFileA(file); setUsingSampleData(false); setError(null); }} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker key={`${run?.runId ?? "new"}-B`} side="B" file={fileB} onChange={(file) => { setFileB(file); setUsingSampleData(false); setError(null); }} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section><section className="sample-data-callout" aria-labelledby="sample-data-title"><div><h2 id="sample-data-title">No data handy?</h2><p>Try Samewise with two small synthetic vendor datasets containing missing values, formatting differences, and a few uncertain matches.</p></div><div className="sample-data-actions"><button ref={sampleButton} className="secondary" onClick={requestSampleData} disabled={busy} aria-label="Try sample data">Try sample data</button><span>Want to inspect them first?</span><a href={SAMPLE_A_URL} download={SAMPLE_A_FILENAME} aria-label="Download sample Dataset A CSV">Download Dataset A</a><a href={SAMPLE_B_URL} download={SAMPLE_B_FILENAME} aria-label="Download sample Dataset B CSV">Download Dataset B</a></div></section></>}<ExportVerifierWorkspace /></section>}
+        {screen === "upload" && <section className="upload-screen" aria-labelledby="upload-title"><header className="page-heading"><h1 id="upload-title">Upload datasets</h1><p>Connect two sources that may describe the same entities.</p></header><div className="upload-privacy-notice" role="note" aria-label="Public demo data notice"><span aria-hidden="true">!</span><p><strong>Public demo — use non-sensitive CSVs.</strong> Uploaded records are processed on Samewise's server. This demo has no sign-in or guaranteed deletion schedule; avoid personal, confidential, or regulated data. Try the synthetic sample if you're exploring.</p></div>{run && (run.datasets.A || run.datasets.B) ? <section className="locked-sources" aria-labelledby="locked-sources-title"><h2 id="locked-sources-title">Source files are locked for this run</h2><p>Uploaded sources remain immutable. Start a new reconciliation to use different files; this run will remain unchanged.</p>{(!run.datasets.A || !run.datasets.B) && <div className="partial-source-recovery" aria-label="Finish source pair"><p role="status">Dataset {run.datasets.A ? "A" : "B"} is saved as <strong>{run.datasets.A?.originalFilename ?? run.datasets.B?.originalFilename}</strong>. Upload only the missing dataset to finish this reconciliation.</p>{!run.datasets.A && <><FilePicker key={`${run.runId}-recovery-A`} side="A" file={fileA} onChange={(file) => { setFileA(file); setUsingSampleData(false); setError(null); }} /><button className="primary" onClick={() => void uploadMissingSource("A")} disabled={busy}>Upload remaining Dataset A</button></>}{!run.datasets.B && <><FilePicker key={`${run.runId}-recovery-B`} side="B" file={fileB} onChange={(file) => { setFileB(file); setUsingSampleData(false); setError(null); }} /><button className="primary" onClick={() => void uploadMissingSource("B")} disabled={busy}>Upload remaining Dataset B</button></>}</div>}<div className="actions">{run.datasets.A && run.datasets.B && <button type="button" className="secondary" disabled={busy} onClick={() => { setError(null); setScreen("profile"); }}>Inspect saved datasets</button>}<button className="primary" onClick={requestNewReconciliation} disabled={busy}>New reconciliation</button></div></section> : <><section className="source-pair-panel" aria-label="Source pair"><header><div><span className="panel-kicker">Source pair</span><h2>Choose the datasets to reconcile</h2></div><span className="panel-meta">2 CSV files</span></header><div className="source-pair"><FilePicker key={`${run?.runId ?? "new"}-A`} side="A" file={fileA} onChange={(file) => { setFileA(file); setUsingSampleData(false); setError(null); }} /><div className="pair-relationship" aria-hidden="true"><span>→</span><small>paired with</small></div><FilePicker key={`${run?.runId ?? "new"}-B`} side="B" file={fileB} onChange={(file) => { setFileB(file); setUsingSampleData(false); setError(null); }} /></div><footer><p><strong>Original files remain unchanged.</strong><span>CSV · up to 2 MiB each</span></p><button className="primary" onClick={() => void upload()} disabled={busy}>Upload & profile <span aria-hidden="true">→</span></button></footer></section><section className="sample-data-callout" aria-labelledby="sample-data-title"><div><h2 id="sample-data-title">No data handy?</h2><p>Try Samewise with two small synthetic vendor datasets containing missing values, formatting differences, and a few uncertain matches.</p></div><div className="sample-data-actions"><button ref={sampleButton} className="secondary" onClick={requestSampleData} disabled={busy} aria-label="Try sample data">Try sample data</button><span>Want to inspect them first?</span><a href={SAMPLE_A_URL} download={SAMPLE_A_FILENAME} aria-label="Download sample Dataset A CSV">Download Dataset A</a><a href={SAMPLE_B_URL} download={SAMPLE_B_FILENAME} aria-label="Download sample Dataset B CSV">Download Dataset B</a></div></section></>}<ExportVerifierWorkspace /></section>}
         {screen === "profile" && run?.datasets.A && run.datasets.B && <section aria-labelledby="profile-title"><p className="eyebrow">File details</p><h1 id="profile-title">Your files are ready.</h1>{usingSampleData && <div className="sample-data-notice" role="status">Using synthetic sample data.</div>}<p className="lede">Review the bounded file profile, then set up how corresponding fields should be used.</p><div className="profile-grid"><ProfileCard profile={run.datasets.A} /><ProfileCard profile={run.datasets.B} /></div><button className="primary" onClick={() => setScreen("mapping")}>Set up matching</button></section>}
         {screen === "mapping" && run?.datasets.A && run.datasets.B && <section aria-labelledby="mapping-title">
           <p className="eyebrow">Step 2 · Match setup</p>

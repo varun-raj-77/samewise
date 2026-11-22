@@ -1,3 +1,4 @@
+import { createHash, webcrypto } from "node:crypto";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -341,6 +342,56 @@ describe("Samewise vertical slice", () => {
       "/api/runs/run-1/datasets/A", "/api/runs/run-1/datasets/B", "/api/runs/run-1",
     ]);
   });
+
+  it.each(["matching bytes", "same filename with different bytes", "unverified readback", "different run"] as const)(
+    "recovers a lost initial source-pair acknowledgement with %s", async (readback) => {
+      const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+      const source = (name: string, text: string) => {
+        const file = new File([text], name);
+        const bytes = new TextEncoder().encode(text);
+        Object.defineProperty(file, "arrayBuffer", { value: async () => bytes.buffer });
+        return { file, sha256: createHash("sha256").update(text).digest("hex") };
+      };
+      const a = source("a.csv", "id\n1");
+      const b = source("b.csv", "id\n2");
+      const afterA = { ...empty, datasets: { A: { ...profile("A"), sha256: a.sha256 } } };
+      const complete = runView({
+        ...afterA, stage: "profile", runId: readback === "different run" ? "run-2" : afterA.runId,
+        datasets: { ...afterA.datasets, B: { ...profile("B"), sha256: readback === "same filename with different bytes" ? a.sha256 : b.sha256 } },
+      });
+      vi.stubGlobal("crypto", readback === "unverified readback" ? {} : webcrypto);
+      const requests: string[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        requests.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.endsWith("/datasets/A")) return new Response(JSON.stringify(afterA), { status: 201 });
+        if (url.endsWith("/datasets/B")) throw new Error("Connection lost after uploading B");
+        if (url === "/api/runs/run-1") return new Response(JSON.stringify(complete));
+        throw new Error(`Unexpected request ${url}`);
+      }));
+
+      render(<App initialRun={empty} initialScreen="upload" />);
+      fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [a.file] } });
+      fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [b.file] } });
+      fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+
+      if (readback === "matching bytes") {
+        expect(await screen.findByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      } else if (readback === "different run") {
+        expect(await screen.findByRole("alert")).toHaveTextContent("The saved dataset remains locked");
+        expect(screen.getByRole("button", { name: "Upload remaining Dataset B" })).toBeEnabled();
+        expect(screen.queryByRole("button", { name: "Inspect saved datasets" })).not.toBeInTheDocument();
+      } else {
+        expect(await screen.findByRole("alert")).toHaveTextContent("could not be verified against the selected files");
+        expect(screen.queryByRole("button", { name: /Upload remaining Dataset/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Inspect saved datasets" }));
+        expect(screen.getByRole("heading", { name: "Your files are ready." })).toBeInTheDocument();
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      }
+      expect(requests).toEqual(["POST /api/runs/run-1/datasets/A", "POST /api/runs/run-1/datasets/B", "GET /api/runs/run-1"]);
+    },
+  );
 
   it("SW-040 retries only Dataset B after its first profiling failure", async () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
