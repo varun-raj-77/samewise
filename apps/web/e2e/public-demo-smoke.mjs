@@ -67,6 +67,45 @@ try {
   const run = await (await fetch(`http://127.0.0.1:3000/api/runs/${runId}`)).json();
   check("fixture outcome is 23 automatic, 1 review, 4 A-only, and 4 B-only", JSON.stringify(run.summary) === JSON.stringify({ matched: 23, needsReview: 1, onlyA: 4, onlyB: 4 }));
 
+  async function downloadFile(label, endpoint) {
+    const requested = page.waitForResponse((response) =>
+      response.request().method() === "GET" && new URL(response.url()).pathname.endsWith(`/api/runs/${runId}/${endpoint}`));
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: label, exact: true }).click();
+    const [response, download] = await Promise.all([requested, downloaded]);
+    assert.equal(response.status(), 200, `${label} must return HTTP 200`);
+    const filePath = await download.path();
+    assert(filePath, `${label} must produce a browser download`);
+    const bytes = await readFile(filePath);
+    return {
+      filename: download.suggestedFilename(),
+      bytes,
+      pin: response.headers()["x-samewise-export-snapshot"],
+      url: response.url(),
+    };
+  }
+
+  await page.getByRole("button", { name: "Open audit files" }).click();
+  const auditTitle = page.getByRole("heading", { name: "Download audit files." });
+  await auditTitle.waitFor();
+  check("unfinished runs expose audit files, not trusted output",
+    await auditTitle.evaluate((heading) => document.activeElement === heading) &&
+    await page.getByText(/may include unfinished decisions/).isVisible() &&
+    await page.getByRole("button", { name: "Download reconciled data", exact: true }).isDisabled());
+  const earlyReport = await downloadFile("Download reconciliation report", "export");
+  const earlyManifestFile = await downloadFile("Download provenance manifest", "manifest");
+  const earlyManifest = JSON.parse(earlyManifestFile.bytes.toString("utf8"));
+  const earlyReportArtifact = earlyManifest.export.artifacts[0];
+  check("unfinished audit files share a pinned snapshot and declare no trusted artifact",
+    earlyManifest.run.runId === runId && earlyManifest.run.status === "identity_unresolved" &&
+    earlyManifest.export.artifacts.length === 1 && earlyReportArtifact?.kind === "reconciliation_report" &&
+    earlyReport.pin === earlyManifestFile.pin &&
+    earlyManifest.run.snapshot.authoritativeStateSha256 === earlyReport.pin &&
+    new URL(earlyManifestFile.url).searchParams.get("expectedSnapshot") === earlyReport.pin &&
+    createHash("sha256").update(earlyReport.bytes).digest("hex") === earlyReportArtifact.sha256);
+  await page.getByRole("button", { name: "Back to results" }).click();
+  await page.getByRole("heading", { name: "Matching complete." }).waitFor();
+
   await page.getByRole("button", { name: "Review 1 uncertain match" }).click();
   await page.getByRole("heading", { name: "Could these be the same entity?" }).waitFor();
   await page.getByRole("heading", { name: "Could A-1024 and B-2024 be the same entity?" }).waitFor();
@@ -115,24 +154,15 @@ try {
   await page.getByRole("button", { name: "Continue to Export" }).click();
   await page.getByRole("heading", { name: "Download reconciled data." }).waitFor();
 
-  async function downloadFile(label, endpoint) {
-    const requested = page.waitForResponse((response) =>
-      response.request().method() === "GET" && new URL(response.url()).pathname.endsWith(`/api/runs/${runId}/${endpoint}`));
-    const downloaded = page.waitForEvent("download");
-    await page.getByRole("button", { name: label, exact: true }).click();
-    const [response, download] = await Promise.all([requested, downloaded]);
-    assert.equal(response.status(), 200, `${label} must return HTTP 200`);
-    const filePath = await download.path();
-    assert(filePath, `${label} must produce a browser download`);
-    const bytes = await readFile(filePath);
-    return {
-      filename: download.suggestedFilename(),
-      bytes,
-      pin: response.headers()["x-samewise-export-snapshot"],
-      url: response.url(),
-    };
-  }
-
+  const rejectedPin = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname.endsWith(`/api/runs/${runId}/trusted-export`) &&
+      url.searchParams.get("expectedSnapshot") === earlyReport.pin;
+  });
+  await page.getByRole("button", { name: "Download reconciled data", exact: true }).click();
+  check("a completed run does not mix new trusted data with an earlier audit snapshot",
+    (await rejectedPin).status() === 409 &&
+    await page.getByText(/Download all report files again/).isVisible());
   const trustedFile = await downloadFile("Download reconciled data", "trusted-export");
   await page.locator(".audit-files summary").click();
   const reportFile = await downloadFile("Download reconciliation report", "export");
