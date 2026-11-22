@@ -74,6 +74,7 @@ export function ResultsWorkspace({ run, onReview, onResolution, onOpenReview, on
     && page?.items.some((item) => item.aRowId === explanationRowId) ? explanationState : null;
 
   const unresolvedReviewCount = run.reviewProgress.remaining + run.reviewProgress.deferred;
+  const trustedReady = run.trustedExportReadiness.ready;
 
   useEffect(() => {
     let active = true;
@@ -132,7 +133,14 @@ export function ResultsWorkspace({ run, onReview, onResolution, onOpenReview, on
       {page && page.items.length === 0 && <p className="empty">No result rows are available.</p>}
       {page && <div className="actions" aria-label="Result pagination"><button type="button" className="secondary" disabled={page.page.previousOffset === null} onClick={() => setPagination({ runId: run.runId, offset: page.page.previousOffset ?? 0 })}>Previous</button><button type="button" className="secondary" disabled={page.page.nextOffset === null} onClick={() => setPagination({ runId: run.runId, offset: page.page.nextOffset ?? offset })}>Next</button></div>}
     </details>
-    <div className="actions">{unresolvedReviewCount > 0 ? <span role="status">Merge values and trusted Export unlock after identity review.</span> : run.conflictSummary.unresolved > 0 ? <><button className="primary" onClick={onResolution}>Continue to Merge values</button><button className="secondary" onClick={onOpenReview} disabled={run.reviewProgress.total === 0}>Inspect reviewed matches</button></> : <><button className="primary" onClick={onExport}>Continue to Export</button><button className="secondary" onClick={onResolution}>Inspect merge values</button></>}</div>
+    <div className="actions">
+      {unresolvedReviewCount > 0
+        ? <span role="status">Finish identity review before merging values or downloading trusted data.</span>
+        : trustedReady
+          ? <><button className="primary" onClick={onExport}>Continue to Export</button><button className="secondary" onClick={onResolution}>Inspect merge values</button></>
+          : <><button className="primary" onClick={onResolution}>Continue to Merge values</button><button className="secondary" onClick={onOpenReview} disabled={run.reviewProgress.total === 0}>Inspect reviewed matches</button></>}
+      {!trustedReady && <button type="button" className="secondary" onClick={onExport}>Open audit files</button>}
+    </div>
   </section>;
 }
 

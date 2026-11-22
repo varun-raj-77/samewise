@@ -996,7 +996,6 @@ describe("Samewise vertical slice", () => {
       } });
     }));
     render(<App initialRun={runView()} initialScreen="export" />);
-    fireEvent.click(screen.getByText("Audit & technical files"));
     fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
     await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
@@ -1024,7 +1023,6 @@ describe("Samewise vertical slice", () => {
       return new Response("export bytes", { status: 200, headers: requests.length === 1 ? { "X-Samewise-Export-Snapshot": pin } : {} });
     }));
     render(<App initialRun={runView()} initialScreen="export" />);
-    fireEvent.click(screen.getByText("Audit & technical files"));
     fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
     await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
@@ -1051,7 +1049,6 @@ describe("Samewise vertical slice", () => {
       } });
     }));
     render(<App initialRun={runView()} initialScreen="export" />);
-    fireEvent.click(screen.getByText("Audit & technical files"));
     fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
     await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
@@ -1060,11 +1057,51 @@ describe("Samewise vertical slice", () => {
     expect(requests).toEqual(["/api/runs/run-1/export", `/api/runs/run-1/manifest?expectedSnapshot=${first}`]);
   });
 
+  it.each([
+    { blocker: "identity review", run: runView(), resume: "Review identity" },
+    {
+      blocker: "field conflicts",
+      run: runView({
+        reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 },
+        conflictSummary: { total: 1, resolved: 0, unresolved: 1 },
+        trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 1,
+          eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["1 field conflict remains."] },
+      }),
+      resume: "Review unresolved conflicts",
+    },
+  ])("opens audit files from Results without unlocking trusted data during $blocker", async ({ run, resume }) => {
+    const downloads = stubBrowserDownloads();
+    const pin = "a".repeat(64);
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requests.push(url);
+      if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+      return new Response("audit bytes", { headers: { "X-Samewise-Export-Snapshot": pin } });
+    }));
+    render(<App initialRun={run} initialScreen="results" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open audit files" }));
+    expect(screen.getByRole("heading", { name: "Download audit files." })).toHaveFocus();
+    expect(screen.getByText(/may include unfinished decisions/)).toBeVisible();
+    expect(screen.getByRole("button", { name: resume })).toBeEnabled();
+    const trusted = screen.getByRole("button", { name: "Download reconciled data" });
+    expect(trusted).toBeDisabled();
+    fireEvent.click(trusted);
+    fireEvent.click(screen.getByRole("button", { name: "Download reconciliation report" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Download provenance manifest" }));
+    await waitFor(() => expect(downloads.click).toHaveBeenCalledTimes(2));
+    expect(requests.filter((url) => !url.includes("/results?"))).toEqual([
+      "/api/runs/run-1/export", `/api/runs/run-1/manifest?expectedSnapshot=${pin}`,
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
+    expect(screen.getByRole("heading", { name: "Matching complete." })).toBeInTheDocument();
+  });
+
   it("keeps the reconciliation report available while trusted merged output is blocked", () => {
     render(<App initialRun={runView()} initialScreen="export" />);
     expect(screen.getByRole("heading", { name: "Identity review isn't finished" })).toBeInTheDocument();
     expect(screen.getByText("Reconciled data").parentElement).toHaveTextContent("Blocked");
-    fireEvent.click(screen.getByText("Audit & technical files"));
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Download provenance manifest" })).toBeEnabled();
@@ -1091,7 +1128,6 @@ describe("Samewise vertical slice", () => {
     render(<App initialRun={runView({ reviewProgress: { total: 1, reviewed: 1, remaining: 0, deferred: 0 }, trustedExportReadiness: { ready: false, unresolvedIdentityCount: 0, unresolvedConflictCount: 3, eligibleConfirmedCount: 1, onlyACount: 0, onlyBCount: 0, blockers: ["3 comparison-field conflict(s) remain unresolved."] } })} initialScreen="export" />);
     expect(screen.getByRole("heading", { name: "Field conflicts still need resolution" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("3 comparison-field conflict(s) remain unresolved.");
-    fireEvent.click(screen.getByText("Audit & technical files"));
     expect(screen.getByRole("button", { name: "Download reconciliation report" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Download reconciled data" })).toBeDisabled();
   });

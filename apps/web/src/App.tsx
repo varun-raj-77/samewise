@@ -546,29 +546,43 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
   onReview: () => void;
   onResolution: () => void;
 }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, []);
+  const trustedReady = run.trustedExportReadiness.ready;
   const comparisonCount = run.mappings.filter((mapping) => mapping.includeInMerge).length;
   const unresolvedIdentity = run.trustedExportReadiness.unresolvedIdentityCount;
   const readiness = unresolvedIdentity > 0
     ? { tone: "blocked", title: "Identity review isn't finished", detail: `${unresolvedIdentity} identity decision${unresolvedIdentity === 1 ? "" : "s"} must be resolved before trusted output is ready.` }
-    : comparisonCount === 0
-      ? { tone: "informational", title: "Identity resolved · no merge fields configured", detail: "Reconciled output is ready for resolved identity and unmatched records, but it contains no merged business fields." }
-      : run.trustedExportReadiness.unresolvedConflictCount > 0
-        ? { tone: "blocked", title: "Field conflicts still need resolution", detail: `${run.trustedExportReadiness.unresolvedConflictCount} comparison-field conflict${run.trustedExportReadiness.unresolvedConflictCount === 1 ? "" : "s"} must be resolved before trusted output is ready.` }
-        : { tone: "ready", title: "Ready to export", detail: "Identity is resolved and every surfaced merge-value difference has an explicit outcome." };
-  const trustedLabel = run.trustedExportReadiness.ready ? (comparisonCount === 0 ? "Ready · identity only" : "Ready") : "Blocked";
+    : run.trustedExportReadiness.unresolvedConflictCount > 0
+      ? { tone: "blocked", title: "Field conflicts still need resolution", detail: `${run.trustedExportReadiness.unresolvedConflictCount} comparison-field conflict${run.trustedExportReadiness.unresolvedConflictCount === 1 ? "" : "s"} must be resolved before trusted output is ready.` }
+      : !trustedReady
+        ? { tone: "blocked", title: "Trusted data is not ready", detail: "Review the blockers below before downloading trusted data." }
+        : comparisonCount === 0
+          ? { tone: "informational", title: "Identity resolved · no merge fields configured", detail: "Reconciled output is ready for resolved identity and unmatched records, but it contains no merged business fields." }
+          : { tone: "ready", title: "Ready to export", detail: "Identity is resolved and every surfaced merge-value difference has an explicit outcome." };
+  const trustedLabel = trustedReady ? (comparisonCount === 0 ? "Ready · identity only" : "Ready") : "Blocked";
 
   return <section aria-labelledby="export-title">
-    <p className="eyebrow">Step 5 · Export</p><h1 id="export-title">Download reconciled data.</h1>
-    <p className="lede">Ready to export means every surfaced reconciliation decision has an explicit outcome. It does not guarantee that every possible real-world match was found.</p>
+    <p className="eyebrow">Step 5 · Export</p><h1 id="export-title" ref={heading} tabIndex={-1}>{trustedReady ? "Download reconciled data." : "Download audit files."}</h1>
+    <p className="lede">{trustedReady
+      ? "Ready to export means every surfaced reconciliation decision has an explicit outcome. It does not guarantee that every possible real-world match was found."
+      : "The report and manifest show this run as it stands and may include unfinished decisions. They are not trusted merged data."}</p>
     <section className={`readiness-status ${readiness.tone}`} role="note" aria-labelledby="readiness-title"><div><small>Current readiness</small><h2 id="readiness-title">{readiness.title}</h2></div><p>{readiness.detail}</p></section>
     <div className="export-run-context"><span><small>Run</small><code>{run.runId}</code></span><span><small>Dataset A</small><code>{run.datasets.A?.sha256.slice(0, 12)}…</code></span><span><small>Dataset B</small><code>{run.datasets.B?.sha256.slice(0, 12)}…</code></span></div>
     <div className="export-artifact-list">
-      <article className="export-artifact primary-export"><div><small>Reconciled data</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>{run.trustedExportReadiness.eligibleConfirmedCount} matched {run.trustedExportReadiness.eligibleConfirmedCount === 1 ? "entity" : "entities"} · {run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed} human identity {(run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed) === 1 ? "decision" : "decisions"} · {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0)} {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0) === 1 ? "difference" : "differences"} handled by rules · {run.conflictSummary.manualDecisions ?? 0} manual value {(run.conflictSummary.manualDecisions ?? 0) === 1 ? "decision" : "decisions"} · {run.conflictSummary.unresolved} unfinished decisions.</p>{(run.conflictSummary.preservedBoth ?? 0) > 0 && <p>Some fields intentionally preserve both source values.</p>}</div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !run.trustedExportReadiness.ready}>Download reconciled data</button></article>
-      <details className="audit-files"><summary>Audit & technical files</summary><article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human match outcomes, deferred work, unmatched records, and resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article><article className="export-artifact"><div><small>Provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher versions, decisions, policies, and hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article></details>
+      <article className="export-artifact primary-export"><div><small>Reconciled data</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>{run.trustedExportReadiness.eligibleConfirmedCount} matched {run.trustedExportReadiness.eligibleConfirmedCount === 1 ? "entity" : "entities"} · {run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed} human identity {(run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed) === 1 ? "decision" : "decisions"} · {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0)} {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0) === 1 ? "difference" : "differences"} handled by rules · {run.conflictSummary.manualDecisions ?? 0} manual value {(run.conflictSummary.manualDecisions ?? 0) === 1 ? "decision" : "decisions"} · {run.conflictSummary.unresolved} unfinished decisions.</p>{(run.conflictSummary.preservedBoth ?? 0) > 0 && <p>Some fields intentionally preserve both source values.</p>}</div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !trustedReady}>Download reconciled data</button></article>
+      <details className="audit-files" open={!trustedReady}><summary>Audit & technical files</summary><article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human match outcomes, deferred work, unmatched records, and resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article><article className="export-artifact"><div><small>Provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher versions, decisions, policies, and hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article></details>
     </div>
     <ExportVerifierWorkspace />
-    {!run.trustedExportReadiness.ready && <div className="warning" role="status"><strong>Trusted export blocked.</strong><ul>{run.trustedExportReadiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div>}
-    <div className="actions">{unresolvedIdentity > 0 ? <button className="secondary" onClick={onReview}>Review identity</button> : run.trustedExportReadiness.unresolvedConflictCount > 0 ? <button className="secondary" onClick={onResolution}>Review unresolved conflicts</button> : <button className="secondary" onClick={onResults}>Back to results</button>}</div>
+    {!trustedReady && <div className="warning" role="status"><strong>Trusted export blocked.</strong><ul>{run.trustedExportReadiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div>}
+    <div className="actions">
+      {unresolvedIdentity > 0
+        ? <button className="secondary" onClick={onReview}>Review identity</button>
+        : run.trustedExportReadiness.unresolvedConflictCount > 0
+          ? <button className="secondary" onClick={onResolution}>Review unresolved conflicts</button>
+          : null}
+      <button className="secondary" onClick={onResults}>Back to results</button>
+    </div>
   </section>;
 }
 
