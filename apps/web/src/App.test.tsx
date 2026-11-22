@@ -937,6 +937,74 @@ describe("Samewise vertical slice", () => {
     },
   );
 
+  function mappingLeaveWouldWarn() {
+    return !window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+  }
+
+  it("warns only when the local match setup differs and does not silently save changes", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialRun={runView({ stage: "mapping" })} initialScreen="mapping" />);
+    const label = screen.getAllByLabelText("Mapping label")[0]!;
+    expect(mappingLeaveWouldWarn()).toBe(false);
+    expect(screen.queryByText("Unsaved match setup")).not.toBeInTheDocument();
+
+    fireEvent.change(label, { target: { value: "Local editing" } });
+    expect(mappingLeaveWouldWarn()).toBe(true);
+    expect(screen.getByText("Unsaved match setup")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    expect(screen.getByRole("dialog", { name: "Start a new reconciliation?" })).toHaveTextContent(
+      "Unsaved match setup changes on this page will be discarded",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(label).toHaveValue("Local editing");
+
+    fireEvent.change(label, { target: { value: mapping.label } });
+    expect(mappingLeaveWouldWarn()).toBe(false);
+    expect(screen.queryByText("Unsaved match setup")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["nothing changed during save", "newer local edit"] as const)(
+    "reconciles the normalized save acknowledgement with %s", async (scenario) => {
+      const original: RunSummary["mappings"][number] = { ...mapping };
+      delete original.semanticFamily;
+      const run = runView({
+        stage: "mapping", summary: null, matcherVersion: null, matcherProvenance: null, mappings: [original],
+      });
+      const normalized: RunSummary = { ...run, mappings: [{ ...original, label: "Submitted label", semanticFamily: "name_or_title" }] };
+      let finishSave!: (response: Response) => void;
+      const saved = new Promise<Response>((resolve) => { finishSave = resolve; });
+      const requests: string[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+        requests.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.endsWith("/mappings")) return saved;
+        if (url.endsWith("/match")) return new Response(JSON.stringify(runView({ mappings: normalized.mappings })));
+        throw new Error(`Unexpected request ${url}`);
+      }));
+      render(<App initialRun={run} initialScreen="mapping" />);
+      const label = screen.getByLabelText("Mapping label");
+      fireEvent.change(label, { target: { value: "Submitted label" } });
+      expect(mappingLeaveWouldWarn()).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Confirm setup & run matching" }));
+      if (scenario === "newer local edit") {
+        fireEvent.change(label, { target: { value: "Newer local label" } });
+      }
+      finishSave(new Response(JSON.stringify(normalized)));
+      await screen.findByRole("heading", { name: "Matching complete." });
+      expect(mappingLeaveWouldWarn()).toBe(scenario === "newer local edit");
+      expect(requests).toEqual(["PUT /api/runs/run-1/mappings", "POST /api/runs/run-1/match"]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+      fireEvent.click(screen.getByRole("button", { name: "Match setup Completed" }));
+      expect(screen.getByLabelText("Mapping label")).toHaveValue(
+        scenario === "newer local edit" ? "Newer local label" : "Submitted label",
+      );
+    },
+  );
+
   it("presents matching and merge participation as independent choices", () => {
     render(<App initialRun={runView()} initialScreen="mapping" />);
     expect(screen.getByText(/A field can do both/)).toBeInTheDocument();
