@@ -10,7 +10,7 @@ import {
   type SemanticMappingProposal,
   type RunSummary,
 } from "@samewise/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ReviewWorkspace } from "./ReviewWorkspace.js";
 import { ResultsWorkspace } from "./ResultsWorkspace.js";
@@ -42,6 +42,13 @@ async function parseRun(response: Response): Promise<RunSummary> {
     throw new Error(payload?.error?.message ?? "Samewise could not complete that request.");
   }
   return RunSummarySchema.parse(await response.json());
+}
+
+function mappingDraftKey(mappings: ManualMapping[]): string {
+  return JSON.stringify(mappings.map((mapping) => [
+    mapping.mappingId, mapping.label, mapping.aColumn, mapping.bColumn, mapping.normalizer,
+    mapping.useForMatching, mapping.includeInMerge, mapping.semanticFamily ?? null,
+  ]));
 }
 
 async function recoverCompletedMatch(saved: RunSummary): Promise<RunSummary> {
@@ -123,6 +130,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
   const [draftMappings, setDraftMappings] = useState<ManualMapping[]>(initialRun?.mappings ?? []);
+  const [savedMappingKey, setSavedMappingKey] = useState(() => mappingDraftKey(initialRun?.mappings ?? []));
+  const currentMappingKey = useMemo(() => mappingDraftKey(draftMappings), [draftMappings]);
+  const hasUnsavedMappings = currentMappingKey !== savedMappingKey;
   const [mappingProposal, setMappingProposal] = useState<SemanticMappingProposal | null>(null);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionNotice, setSuggestionNotice] = useState<string | null>(null);
@@ -156,6 +166,20 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const mobileMenuDialog = useRef<HTMLDialogElement>(null);
   const hasUnuploadedSelections = Boolean((fileA && !run?.datasets.A) || (fileB && !run?.datasets.B));
+  const adoptConfirmedMappings = useCallback((mappings: ManualMapping[]) => {
+    serverConfirmedMappings.current = mappings;
+    setSavedMappingKey(mappingDraftKey(mappings));
+  }, []);
+
+  useEffect(() => {
+    if (!hasUnsavedMappings) return;
+    function warnOnLeave(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
+    window.addEventListener("beforeunload", warnOnLeave);
+    return () => window.removeEventListener("beforeunload", warnOnLeave);
+  }, [hasUnsavedMappings]);
 
   useEffect(() => {
     if (initialRun) return;
@@ -167,12 +191,13 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         if (!active) return;
         setRun(loaded);
         setDraftMappings(loaded.mappings);
+        adoptConfirmedMappings(loaded.mappings);
         if (!new URLSearchParams(window.location.search).get("screen")) setScreen(loaded.stage);
       })
       .catch(() => { if (active) setError(runId ? "This run is no longer available in the live API process. Start a new run to continue." : "The API is unavailable. Start the Samewise API and try again."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [initialRun]);
+  }, [initialRun, adoptConfirmedMappings]);
 
   useEffect(() => {
     if (!run || initialRun) return;
@@ -263,7 +288,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       const recovered = latestAuthoritativeRun;
       if (recovered.datasets.A && recovered.datasets.B) {
         setDraftMappings(recovered.mappings);
-        serverConfirmedMappings.current = recovered.mappings;
+        adoptConfirmedMappings(recovered.mappings);
         // Both slots can be filled even if our second response was lost, or
         // a different browser tab saved its own bytes first. Do not conflate them.
         if (await savedSourcePairMatches(recovered, aFile, bFile)) {
@@ -370,7 +395,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
 
   function requestNewReconciliation() {
     if (busy || uploadInFlight.current || sampleInFlight.current || newRunInFlight.current) return;
-    if ((run && hasMeaningfulWork(run)) || hasUnuploadedSelections) setConfirmNewRun(true);
+    if ((run && hasMeaningfulWork(run)) || hasUnuploadedSelections || hasUnsavedMappings) setConfirmNewRun(true);
     else void startNewReconciliation();
   }
 
@@ -388,7 +413,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       suggestionScope.current = null;
       setSuggestionsLoading(false);
       setRun(freshRun); setFileA(null); setFileB(null); setDraftMappings([]);
-      removedMappingIds.current.clear(); serverConfirmedMappings.current = [];
+      removedMappingIds.current.clear(); adoptConfirmedMappings([]);
       setMappingProposal(null); setSuggestionNotice(null); setSelectedCandidateId(null);
       setUsingSampleData(false); setConfirmSampleReplacement(false);
       setScreen("upload");
@@ -437,7 +462,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       );
       if (!isCurrent()) return;
       setMappingProposal(response.proposal);
-      serverConfirmedMappings.current = response.confirmedMappings;
+      adoptConfirmedMappings(response.confirmedMappings);
       setDraftMappings((current) => mergeConfirmedMappings(current, response.confirmedMappings, removedMappingIds.current));
     }, "AI suggestions unavailable. You can continue mapping columns manually.");
   }
@@ -457,7 +482,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           },
         ), runId);
         if (!isCurrent()) return;
-        serverConfirmedMappings.current = latest.confirmedMappings;
+        adoptConfirmedMappings(latest.confirmedMappings);
         setMappingProposal(latest.proposal);
         setDraftMappings((current) => mergeConfirmedMappings(current, latest.confirmedMappings, removedMappingIds.current));
         applied += 1;
@@ -492,7 +517,10 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         // A successful mapping replacement has already cleared the old result,
         // even if the following match request fails.
         setRun(mapped);
-        serverConfirmedMappings.current = mapped.mappings;
+        adoptConfirmedMappings(mapped.mappings);
+        // Normalize only the draft that was actually sent. Typing while the
+        // acknowledgement is pending must keep the newer draft unsaved.
+        setDraftMappings((current) => mappingDraftKey(current) === currentMappingKey ? mapped.mappings : current);
         const result = await requestMatchResult(mapped);
         if (result.runId !== run.runId) throw new Error("Match results did not match this reconciliation.");
         return result;
@@ -657,6 +685,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
             <button className="secondary" onClick={addMapping}>+ Add manual mapping</button>
           </details>
           <MatchingSafetyGuidance mappings={draftMappings} run={run} />
+          <div aria-live="polite">{hasUnsavedMappings && <p className="mapping-notice">
+            <strong>Unsaved match setup</strong>. Review your field changes, then confirm the setup to save them.
+          </p>}</div>
           <div className="actions"><button ref={matchButton} className="primary" onClick={requestMatch} disabled={busy || suggestionsLoading || !draftMappings.some((mapping) => mapping.useForMatching)}>Confirm setup & run matching</button></div>
         </section>}
         {screen === "results" && run?.summary && <ResultsWorkspace run={run} onReview={review} onResolution={() => setScreen("resolution")} onOpenReview={() => setScreen("review")} onExport={() => setScreen("export")} />}
@@ -668,7 +699,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     </main>
     {confirmNewRun && <dialog ref={newRunDialog} className="new-run-dialog" aria-modal="true" aria-labelledby="new-run-title" aria-describedby="new-run-description" onCancel={(event) => { event.preventDefault(); cancelNewReconciliation(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelNewReconciliation(); } }}>
       <h2 id="new-run-title">Start a new reconciliation?</h2>
-      <p id="new-run-description">Your current run will remain unchanged.{hasUnuploadedSelections && " Selected CSV files that have not been uploaded will be cleared from this page."}</p>
+      <p id="new-run-description">Your current run will remain unchanged.{hasUnuploadedSelections && " Selected CSV files that have not been uploaded will be cleared from this page."}{hasUnsavedMappings && " Unsaved match setup changes on this page will be discarded."}</p>
       <div className="dialog-actions"><button ref={cancelNewRunButton} className="secondary" onClick={cancelNewReconciliation}>Cancel</button><button className="primary" onClick={() => void startNewReconciliation()} disabled={busy}>Start new reconciliation</button></div>
     </dialog>}
     {confirmSampleReplacement && <dialog ref={sampleDialog} className="new-run-dialog" aria-modal="true" aria-labelledby="sample-replacement-title" aria-describedby="sample-replacement-description" onCancel={(event) => { event.preventDefault(); cancelSampleReplacement(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelSampleReplacement(); } }}>

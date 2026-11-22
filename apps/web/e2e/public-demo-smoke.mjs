@@ -381,6 +381,39 @@ try {
       `PUT /api/runs/${runId}/mappings`, `POST /api/runs/${runId}/match`, `GET /api/runs/${runId}`,
     ]));
 
+  function planIsClean() {
+    return window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+  }
+  check("an authoritative matching setup save leaves no unload warning", await page.evaluate(planIsClean));
+  await page.goto(`http://127.0.0.1:5173/?run=${runId}&screen=mapping`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Set up matching." }).waitFor();
+  const unsavedNotice = page.getByText("Unsaved match setup", { exact: true });
+  check("opening the saved plan does not warn or mark it dirty", await page.evaluate(planIsClean) && !await unsavedNotice.isVisible());
+  const draftLabel = page.getByRole("textbox", { name: "Mapping label" }).first();
+  const savedLabel = await draftLabel.inputValue();
+  const draftWrites = [];
+  const captureDraftWrites = (request) => {
+    if (request.method() === "PUT" && new URL(request.url()).pathname === `/api/runs/${runId}/mappings`) {
+      draftWrites.push(request.method());
+    }
+  };
+  page.on("request", captureDraftWrites);
+  await draftLabel.click(); // user activation is required for a native beforeunload prompt
+  await draftLabel.fill("Unsaved synthetic label");
+  await unsavedNotice.waitFor();
+  const leavePrompt = page.waitForEvent("dialog", { timeout: 8000 });
+  const reloading = page.reload({ timeout: 10000 }).catch(() => null);
+  const opening = await leavePrompt;
+  check("reloading a locally edited match setup raises a native browser warning", opening.type() === "beforeunload");
+  await opening.dismiss();
+  await reloading;
+  check("dismissing the reload keeps the draft and does not save it",
+    await draftLabel.inputValue() === "Unsaved synthetic label" && await unsavedNotice.isVisible() && draftWrites.length === 0);
+  await draftLabel.fill(savedLabel);
+  await unsavedNotice.waitFor({ state: "hidden" });
+  page.off("request", captureDraftWrites);
+  check("reverting the unsaved edit removes the warning without a write", await page.evaluate(planIsClean) && draftWrites.length === 0);
+
   console.log(JSON.stringify({ status: "PASS", runId, checks }, null, 2));
 } finally {
   await browser.close();
