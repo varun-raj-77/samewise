@@ -200,6 +200,36 @@ try {
   await page.getByRole("button", { name: "Cancel" }).click();
   check("replacement Cancel preserves the manually selected file", await page.getByText("samewise_sample_vendors_a.csv").isVisible());
 
+  // Forward the real B upload to the API but drop its response before the
+  // page can receive it. The UI must confirm the immutable pair by readback.
+  let committedB = null;
+  const lostAckRequests = [];
+  const captureRecovery = (request) => {
+    const url = new URL(request.url());
+    const match = /^\/api\/runs\/([^/]+)(?:\/datasets\/(A|B))?$/.exec(url.pathname);
+    if (match) lostAckRequests.push({ id: match[1], side: match[2], method: request.method() });
+  };
+  await page.route("**/api/runs/*/datasets/B", async (route) => {
+    const response = await route.fetch();
+    committedB = { status: response.status(), id: new URL(route.request().url()).pathname.split("/")[3] };
+    await route.abort("failed");
+  }, { times: 1 });
+  page.on("request", captureRecovery);
+  await page.getByRole("button", { name: "Try sample data" }).click();
+  await page.getByRole("button", { name: "Use sample data", exact: true }).click();
+  await page.getByRole("heading", { name: "Your files are ready." }).waitFor();
+  page.off("request", captureRecovery);
+  check("lost upload acknowledgement recovered the actual saved sample without reporting a partial pair",
+    committedB?.status === 201 && await page.getByText("Using synthetic sample data.").isVisible() &&
+    await page.getByRole("alert").count() === 0);
+  const recovery = lostAckRequests.filter((request) => request.id === committedB?.id);
+  check("lost upload acknowledgement checked the original run without retrying either immutable upload",
+    JSON.stringify(recovery.map(({ method, side }) => [method, side])) ===
+      JSON.stringify([["POST", "A"], ["POST", "B"], ["GET", null]]));
+  await page.getByRole("button", { name: "Set up matching" }).click();
+  await page.getByRole("heading", { name: "Set up matching." }).waitFor();
+  check("matching setup can continue on the recovered source pair", true);
+
   console.log(JSON.stringify({ status: "PASS", runId, checks }, null, 2));
 } finally {
   await browser.close();
