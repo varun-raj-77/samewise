@@ -158,6 +158,34 @@ describe("Samewise vertical slice", () => {
     await waitFor(() => expect(menuButton).toHaveFocus());
   });
 
+  it("links the mobile Export step to audit files without unlocking trusted output", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(resultsPage()))));
+    render(<App initialRun={runView()} initialScreen="results" />);
+    const menu = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(menu);
+    const auditStep = screen.getByRole("button", { name: "Export Audit files available" });
+    expect(auditStep).toBeEnabled();
+    fireEvent.click(auditStep);
+    expect(screen.queryByRole("dialog", { name: "Samewise menu" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Download audit files." })).toHaveFocus();
+    expect(screen.getByLabelText("Step 5 of 5, Audit files")).toBeInTheDocument();
+    const report = screen.getByRole("button", { name: "Download reconciliation report" });
+    const trusted = screen.getByRole("button", { name: "Download reconciled data" });
+    expect(report).toBeEnabled();
+    expect(trusted).toBeDisabled();
+    expect(report.compareDocumentPosition(trusted) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(menu);
+    expect(screen.getByRole("button", { name: "Export Current step" })).toHaveAttribute("aria-current", "step");
+  });
+
+  it("keeps the mobile Export step disabled before any match results exist", () => {
+    const run = runView({ stage: "upload", datasets: {}, mappings: [], summary: null, matcherVersion: null, matcherProvenance: null });
+    render(<App initialRun={run} initialScreen="upload" />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getByRole("button", { name: "Export Not yet available" })).toBeDisabled();
+  });
+
   it("SW-036 makes the public-demo upload boundary visible before and after source locking", () => {
     const empty = runView({ stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
     const { unmount } = render(<App initialRun={empty} initialScreen="upload" />);
