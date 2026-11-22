@@ -291,6 +291,50 @@ try {
     await page.getByRole("button", { name: "Use recommended setup" }).isEnabled() &&
     await page.getByText("Reviewing schema metadata…").count() === 0);
 
+  // Revisit the first synthetic run after it accumulated human decisions
+  // and merge rules. Do not replace that work without explicit confirmation.
+  const priorUrl = `http://127.0.0.1:3000/api/runs/${runId}`;
+  const prior = await (await fetch(priorUrl)).json();
+  check("the revisited run contains prior review and merge work",
+    prior.reviewProgress.reviewed === 1 && prior.trustedExportReadiness.ready && prior.survivorshipPolicy !== null);
+  await page.goto(`http://127.0.0.1:5173/?run=${runId}&screen=mapping`);
+  const runMatchButton = page.getByRole("button", { name: "Confirm setup & run matching" });
+  const rematchDialog = page.getByRole("dialog", { name: "Replace existing match results?" });
+  const rematchRequests = [];
+  const captureRematch = (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path === `/api/runs/${runId}/mappings` || path === `/api/runs/${runId}/match`) {
+      rematchRequests.push(`${request.method()} ${path.split("/").at(-1)}`);
+    }
+  };
+  page.on("request", captureRematch);
+  await runMatchButton.click();
+  const cancelRematch = rematchDialog.getByRole("button", { name: "Cancel" });
+  check("replacement confirmation warns what will be cleared and defaults focus to Cancel",
+    (await rematchDialog.innerText()).includes("recorded review decisions, field resolutions, and merge rules") &&
+    await cancelRematch.evaluate((button) => document.activeElement === button));
+  await cancelRematch.click();
+  await rematchDialog.waitFor({ state: "hidden" });
+  await runMatchButton.click();
+  await page.keyboard.press("Escape");
+  await rematchDialog.waitFor({ state: "hidden" });
+  const unchanged = await (await fetch(priorUrl)).json();
+  check("Cancel and Escape make no writes and preserve review and merge state",
+    rematchRequests.length === 0 && JSON.stringify(prior) === JSON.stringify(unchanged) &&
+    await runMatchButton.evaluate((button) => document.activeElement === button));
+  await runMatchButton.click();
+  const rematched = page.waitForResponse((response) => response.request().method() === "POST" &&
+    new URL(response.url()).pathname === `/api/runs/${runId}/match`);
+  await rematchDialog.getByRole("button", { name: "Replace results and run matching" }).click();
+  const rematchResponse = await rematched;
+  const updated = await rematchResponse.json();
+  await page.getByRole("heading", { name: "Matching complete." }).waitFor();
+  page.off("request", captureRematch);
+  check("confirmed replacement reruns the matcher once and retains immutable source fingerprints",
+    rematchResponse.status() === 200 && JSON.stringify(rematchRequests) === JSON.stringify(["PUT mappings", "POST match"]) &&
+    updated.reviewProgress.reviewed === 0 && updated.survivorshipPolicy === null &&
+    updated.datasets.A.sha256 === prior.datasets.A.sha256 && updated.datasets.B.sha256 === prior.datasets.B.sha256);
+
   console.log(JSON.stringify({ status: "PASS", runId, checks }, null, 2));
 } finally {
   await browser.close();

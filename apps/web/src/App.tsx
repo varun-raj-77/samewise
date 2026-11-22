@@ -90,12 +90,14 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [confirmNewRun, setConfirmNewRun] = useState(false);
   const [confirmSampleReplacement, setConfirmSampleReplacement] = useState(false);
+  const [confirmRematch, setConfirmRematch] = useState(false);
   const [usingSampleData, setUsingSampleData] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const uploadInFlight = useRef(false);
   const sampleInFlight = useRef(false);
   const newRunInFlight = useRef(false);
   const downloadInFlight = useRef(false);
+  const matchInFlight = useRef(false);
   const suggestionScope = useRef<symbol | null>(null);
   // Track deliberate draft removals separately from server-accepted suggestions.
   const removedMappingIds = useRef(new Set<string>());
@@ -107,6 +109,9 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const sampleButton = useRef<HTMLButtonElement>(null);
   const sampleDialog = useRef<HTMLDialogElement>(null);
   const cancelSampleButton = useRef<HTMLButtonElement>(null);
+  const matchButton = useRef<HTMLButtonElement>(null);
+  const rematchDialog = useRef<HTMLDialogElement>(null);
+  const cancelRematchButton = useRef<HTMLButtonElement>(null);
   const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const mobileMenuDialog = useRef<HTMLDialogElement>(null);
   const hasUnuploadedSelections = Boolean((fileA && !run?.datasets.A) || (fileB && !run?.datasets.B));
@@ -153,6 +158,16 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     }
     cancelSampleButton.current?.focus();
   }, [confirmSampleReplacement]);
+
+  useEffect(() => {
+    const dialog = rematchDialog.current;
+    if (!confirmRematch || !dialog) return;
+    if (!dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
+    cancelRematchButton.current?.focus();
+  }, [confirmRematch]);
 
   useEffect(() => {
     const dialog = mobileMenuDialog.current;
@@ -412,13 +427,38 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     }, "The recommended setup could not be applied. Manual setup remains available.");
   }
 
+  function requestMatch() {
+    if (!run || busy || suggestionScope.current !== null || matchInFlight.current) return;
+    if (run.summary) setConfirmRematch(true);
+    else void saveAndRun();
+  }
+
+  function cancelRematch() {
+    setConfirmRematch(false);
+    queueMicrotask(() => matchButton.current?.focus());
+  }
+
   async function saveAndRun() {
-    if (!run) return;
+    if (!run || busy || suggestionScope.current !== null || matchInFlight.current) return;
     if (!draftMappings.some((mapping) => mapping.useForMatching)) { setError("Choose at least one field Samewise can use to look for the same record."); return; }
-    await action(async () => {
-      const mapped = await parseRun(await fetch(`/api/runs/${run.runId}/mappings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mappings: draftMappings }) }));
-      return parseRun(await fetch(`/api/runs/${mapped.runId}/match`, { method: "POST" }));
-    }, "results");
+    matchInFlight.current = true;
+    setConfirmRematch(false);
+    const runId = encodeURIComponent(run.runId);
+    try {
+      await action(async () => {
+        const mapped = await parseRun(await fetch(`/api/runs/${runId}/mappings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mappings: draftMappings }) }));
+        if (mapped.runId !== run.runId) throw new Error("Saved mappings did not match this reconciliation.");
+        // A successful mapping replacement has already cleared the old result,
+        // even if the following match request fails.
+        setRun(mapped);
+        serverConfirmedMappings.current = mapped.mappings;
+        const result = await parseRun(await fetch(`/api/runs/${runId}/match`, { method: "POST" }));
+        if (result.runId !== run.runId) throw new Error("Match results did not match this reconciliation.");
+        return result;
+      }, "results");
+    } finally {
+      matchInFlight.current = false;
+    }
   }
 
   // A 409 means another action may have changed the run. Reload the
@@ -555,7 +595,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
             <button className="secondary" onClick={addMapping}>+ Add manual mapping</button>
           </details>
           <MatchingSafetyGuidance mappings={draftMappings} run={run} />
-          <div className="actions"><button className="primary" onClick={() => void saveAndRun()} disabled={busy || suggestionsLoading || !draftMappings.some((mapping) => mapping.useForMatching)}>Confirm setup & run matching</button></div>
+          <div className="actions"><button ref={matchButton} className="primary" onClick={requestMatch} disabled={busy || suggestionsLoading || !draftMappings.some((mapping) => mapping.useForMatching)}>Confirm setup & run matching</button></div>
         </section>}
         {screen === "results" && run?.summary && <ResultsWorkspace run={run} onReview={review} onResolution={() => setScreen("resolution")} onOpenReview={() => setScreen("review")} onExport={() => setScreen("export")} />}
         {screen === "review" && run && <ReviewWorkspace run={run} initialCandidateId={selectedCandidateId} busy={busy} onDecision={decide} onBatchDecision={batchDecide} onDefer={setDeferred} onUndo={undoReview} onGoResolution={() => setScreen("resolution")} />}
@@ -573,6 +613,17 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       <h2 id="sample-replacement-title">Replace your selected files with the sample datasets?</h2>
       <p id="sample-replacement-description">Your selected files have not been uploaded and will remain unchanged.</p>
       <div className="dialog-actions"><button ref={cancelSampleButton} className="secondary" onClick={cancelSampleReplacement}>Cancel</button><button className="primary" onClick={() => void useSampleData()} disabled={busy}>Use sample data</button></div>
+    </dialog>}
+    {confirmRematch && <dialog ref={rematchDialog} className="new-run-dialog" aria-modal="true"
+      aria-labelledby="rematch-title" aria-describedby="rematch-description"
+      onCancel={(event) => { event.preventDefault(); cancelRematch(); }}
+      onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelRematch(); } }}>
+      <h2 id="rematch-title">Replace existing match results?</h2>
+      <p id="rematch-description">Saving this setup replaces the existing results and clears any recorded review decisions, field resolutions, and merge rules. Original source files stay the same. To keep the current results, cancel or start a new reconciliation.</p>
+      <div className="dialog-actions">
+        <button ref={cancelRematchButton} className="secondary" onClick={cancelRematch}>Cancel</button>
+        <button className="primary" onClick={() => void saveAndRun()} disabled={busy}>Replace results and run matching</button>
+      </div>
     </dialog>}
     {mobileMenuOpen && <dialog ref={mobileMenuDialog} className="mobile-menu-drawer" aria-modal="true" aria-label="Samewise menu" onClose={() => setMobileMenuOpen(false)} onCancel={(event) => { event.preventDefault(); closeMobileMenu(); }}>
       <header><div className="brand"><span className="mark">S</span><strong>Samewise</strong></div><button type="button" className="mobile-menu-close" aria-label="Close menu" onClick={closeMobileMenu}>×</button></header>
