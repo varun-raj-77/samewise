@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExportVerifierWorkspace } from "./ExportVerifierWorkspace.js";
@@ -60,6 +60,59 @@ describe("SW-034 export verification UI", () => {
     fireEvent.change(report, { target: { files: [browserFile("replacement.csv", "new content")] } });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("removes an optional trusted CSV without losing the audit manifest and report", async () => {
+    vi.mocked(verifyBrowserExport)
+      .mockRejectedValueOnce(new BrowserExportVerificationError("file_set_mismatch", "Select exactly the declared files."))
+      .mockResolvedValueOnce({
+        runId: "run-example", status: "identity_unresolved",
+        verified: [{ kind: "reconciliation_report", filename: "report.csv", byteLength: 19 }],
+      });
+    const { manifest, report, trusted, verifyButton } = openWithFiles();
+    const trustedFile = browserFile("trusted.csv", "id,name");
+    fireEvent.change(trusted, { target: { files: [trustedFile] } });
+    fireEvent.click(verifyButton);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Select exactly the declared files.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove trusted merged output" }));
+    expect(trusted).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Remove trusted merged output" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(verifyButton).toBeEnabled();
+    expect(manifest).toHaveProperty("files", [expect.objectContaining({ name: "manifest.json" })]);
+    expect(report).toHaveProperty("files", [expect.objectContaining({ name: "report.csv" })]);
+
+    fireEvent.click(verifyButton);
+    expect(await screen.findByRole("status")).toHaveTextContent("1 CSV file matched");
+    expect(vi.mocked(verifyBrowserExport)).toHaveBeenLastCalledWith(
+      { runId: "example" }, [{ filename: "report.csv", bytes: expect.anything() }],
+    );
+  });
+
+  it("ignores a late result after removing a required file and supports reselecting it", async () => {
+    let finish!: (result: Awaited<ReturnType<typeof verifyBrowserExport>>) => void;
+    const result = {
+      runId: "run-example", status: "identity_unresolved" as const,
+      verified: [{ kind: "reconciliation_report" as const, filename: "report.csv", byteLength: 19 }],
+    };
+    vi.mocked(verifyBrowserExport)
+      .mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValueOnce(result);
+    const { report, verifyButton } = openWithFiles();
+
+    fireEvent.click(verifyButton);
+    await waitFor(() => expect(verifyBrowserExport).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Remove reconciliation report" }));
+    expect(report).toHaveFocus();
+    expect(verifyButton).toBeDisabled();
+
+    await act(async () => { finish(result); });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.change(report, { target: { files: [browserFile("report.csv", "PRIVATE-ROW-CONTENT")] } });
+    fireEvent.click(verifyButton);
+    expect(await screen.findByRole("status")).toHaveTextContent("File integrity verified");
   });
 
   it("reports verification failures without showing CSV contents and clears errors on new selection", async () => {
