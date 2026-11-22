@@ -5,6 +5,8 @@
 .export-verifier-body { padding: 18px; }
 .export-verifier-body > p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
 .export-verifier-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 17px 0; }
+.export-verifier-field { min-width: 0; }
+.export-verifier-field > button { margin-top: 8px; font-size: 12px; }
 .export-verifier-fields label { display: grid; min-width: 0; gap: 10px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
 .export-verifier-fields input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border-strong); border-radius: 7px; color: var(--text-primary); background: var(--surface-2); font-size: 12px; }
 .export-verifier-success, .export-verifier-error { margin: 16px 0 0; padding: 13px; border: 1px solid rgba(34,197,94,.36); border-radius: 8px; background: rgba(34,197,94,.08); }
