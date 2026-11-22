@@ -546,9 +546,30 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.screens.includes(screen)));
   const reviewComplete = Boolean(run?.summary && run.reviewProgress.remaining === 0 && run.reviewProgress.deferred === 0);
   const mergeComplete = reviewComplete && Boolean(run?.trustedExportReadiness.ready);
+  const auditAvailable = Boolean(run?.summary);
   const currentStep = STEPS[currentStepIndex] ?? STEPS[0]!;
-  const stepState = (step: (typeof STEPS)[number], index: number) => step.id === "review" && reviewComplete ? "complete" : step.id === "resolution" && mergeComplete ? "complete" : step.id === "resolution" && !reviewComplete ? "upcoming" : step.id === "resolution" && reviewComplete && screen !== "resolution" ? "next" : step.id === "export" && !mergeComplete ? "upcoming" : step.id === "export" && mergeComplete && screen !== "export" ? "next" : step.screens.includes(screen) ? "active" : index < currentStepIndex ? "complete" : "upcoming";
-  const canOpenStep = (step: (typeof STEPS)[number]) => step.id === "upload" || step.id === "mapping" && Boolean(run?.datasets.A && run.datasets.B) || step.id === "review" && Boolean(run?.summary) || step.id === "resolution" && reviewComplete || step.id === "export" && mergeComplete;
+  const currentStepLabel = screen === "export" && auditAvailable && !mergeComplete ? "Audit files" : currentStep.label;
+  const stepState = (step: (typeof STEPS)[number], index: number) => {
+    if (step.id === "export") {
+      if (auditAvailable && screen === "export") return "active";
+      if (mergeComplete) return "next";
+      return auditAvailable ? "audit" : "upcoming";
+    }
+    if (step.id === "review" && reviewComplete) return "complete";
+    if (step.id === "resolution") {
+      if (mergeComplete) return "complete";
+      if (!reviewComplete) return "upcoming";
+      if (screen !== "resolution") return "next";
+    }
+    return step.screens.includes(screen) ? "active" : index < currentStepIndex ? "complete" : "upcoming";
+  };
+  const stepStatusLabel = { active: "Current step", complete: "Completed", next: "Ready",
+    audit: "Audit files available", upcoming: "Not yet available" };
+  const canOpenStep = (step: (typeof STEPS)[number]) =>
+    step.id === "upload"
+    || (step.id === "mapping" && Boolean(run?.datasets.A && run.datasets.B))
+    || ((step.id === "review" || step.id === "export") && auditAvailable)
+    || (step.id === "resolution" && reviewComplete);
   const navigateFromMobileMenu = (next: Screen) => { setMobileMenuOpen(false); setScreen(next); };
   const closeMobileMenu = () => { setMobileMenuOpen(false); queueMicrotask(() => mobileMenuButton.current?.focus()); };
 
@@ -566,7 +587,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     </aside>
     <header className="mobile-header">
       <div className="mobile-topbar"><div className="brand"><span className="mark">S</span><strong>Samewise</strong></div><button ref={mobileMenuButton} type="button" className="mobile-menu-button" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}>Menu</button></div>
-      <div className="mobile-progress" aria-label={screen === "evaluation" ? "Advanced, Matching quality" : `Step ${currentStepIndex + 1} of ${STEPS.length}, ${currentStep.label}`}><small>{screen === "evaluation" ? "Advanced" : `Step ${currentStepIndex + 1} of ${STEPS.length}`}</small><strong>{screen === "evaluation" ? "Matching quality" : currentStep.label}</strong></div>
+      <div className="mobile-progress" aria-label={screen === "evaluation" ? "Advanced, Matching quality" : `Step ${currentStepIndex + 1} of ${STEPS.length}, ${currentStepLabel}`}><small>{screen === "evaluation" ? "Advanced" : `Step ${currentStepIndex + 1} of ${STEPS.length}`}</small><strong>{screen === "evaluation" ? "Matching quality" : currentStepLabel}</strong></div>
     </header>
     <main className={screen === "evaluation" ? "workspace evaluation-layout" : "workspace"}>
       <section className={screen === "review" ? "content review-content" : "content"}>
@@ -633,7 +654,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           <button className="new-reconciliation" onClick={() => { setMobileMenuOpen(false); requestNewReconciliation(); }} disabled={busy}><span aria-hidden="true">+</span>New reconciliation</button>
           <details className="advanced-nav"><summary>Advanced</summary><button aria-current={screen === "evaluation" ? "page" : undefined} onClick={() => navigateFromMobileMenu("evaluation")}><span aria-hidden="true">Q</span>Matching quality</button></details>
         </div>
-        {screen !== "evaluation" && <div className="mobile-step-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const state = stepState(step, index); return <li key={step.id} className={state}><button type="button" aria-current={step.screens.includes(screen) ? "step" : undefined} disabled={!canOpenStep(step)} onClick={() => navigateFromMobileMenu(step.id)}><span aria-hidden="true">{state === "complete" ? "✓" : index + 1}</span><span>{step.label}<small>{state === "active" ? "Current step" : state === "complete" ? "Completed" : state === "next" ? "Ready" : "Not yet available"}</small></span></button></li>; })}</ol></div>}
+        {screen !== "evaluation" && <div className="mobile-step-navigation"><p>Your reconciliation</p><ol>{STEPS.map((step, index) => { const state = stepState(step, index); return <li key={step.id} className={state}><button type="button" aria-current={step.screens.includes(screen) ? "step" : undefined} disabled={!canOpenStep(step)} onClick={() => navigateFromMobileMenu(step.id)}><span aria-hidden="true">{state === "complete" ? "✓" : index + 1}</span><span>{step.label}<small>{stepStatusLabel[state]}</small></span></button></li>; })}</ol></div>}
       </nav>
     </dialog>}
   </div>;
@@ -675,6 +696,8 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
           ? { tone: "informational", title: "Identity resolved · no merge fields configured", detail: "Reconciled output is ready for resolved identity and unmatched records, but it contains no merged business fields." }
           : { tone: "ready", title: "Ready to export", detail: "Identity is resolved and every surfaced merge-value difference has an explicit outcome." };
   const trustedLabel = trustedReady ? (comparisonCount === 0 ? "Ready · identity only" : "Ready") : "Blocked";
+  const trustedArtifact = <article key="trusted" className="export-artifact primary-export"><div><small>Reconciled data</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>{run.trustedExportReadiness.eligibleConfirmedCount} matched {run.trustedExportReadiness.eligibleConfirmedCount === 1 ? "entity" : "entities"} · {run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed} human identity {(run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed) === 1 ? "decision" : "decisions"} · {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0)} {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0) === 1 ? "difference" : "differences"} handled by rules · {run.conflictSummary.manualDecisions ?? 0} manual value {(run.conflictSummary.manualDecisions ?? 0) === 1 ? "decision" : "decisions"} · {run.conflictSummary.unresolved} unfinished decisions.</p>{(run.conflictSummary.preservedBoth ?? 0) > 0 && <p>Some fields intentionally preserve both source values.</p>}</div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !trustedReady}>Download reconciled data</button></article>;
+  const auditArtifacts = <details key="audit" className="audit-files" open={!trustedReady}><summary>Audit & technical files</summary><article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human match outcomes, deferred work, unmatched records, and resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article><article className="export-artifact"><div><small>Provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher versions, decisions, policies, and hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article></details>;
 
   return <section aria-labelledby="export-title">
     <p className="eyebrow">Step 5 · Export</p><h1 id="export-title" ref={heading} tabIndex={-1}>{trustedReady ? "Download reconciled data." : "Download audit files."}</h1>
@@ -684,8 +707,7 @@ function ExportWorkspace({ run, busy, onDownload, onResults, onReview, onResolut
     <section className={`readiness-status ${readiness.tone}`} role="note" aria-labelledby="readiness-title"><div><small>Current readiness</small><h2 id="readiness-title">{readiness.title}</h2></div><p>{readiness.detail}</p></section>
     <div className="export-run-context"><span><small>Run</small><code>{run.runId}</code></span><span><small>Dataset A</small><code>{run.datasets.A?.sha256.slice(0, 12)}…</code></span><span><small>Dataset B</small><code>{run.datasets.B?.sha256.slice(0, 12)}…</code></span></div>
     <div className="export-artifact-list">
-      <article className="export-artifact primary-export"><div><small>Reconciled data</small><strong>{trustedLabel}</strong><code>{TRUSTED_EXPORT_VERSION}</code><p>{run.trustedExportReadiness.eligibleConfirmedCount} matched {run.trustedExportReadiness.eligibleConfirmedCount === 1 ? "entity" : "entities"} · {run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed} human identity {(run.conflictSummary.humanIdentityDecisions ?? run.reviewProgress.reviewed) === 1 ? "decision" : "decisions"} · {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0)} {run.conflictSummary.resolved - (run.conflictSummary.manualDecisions ?? 0) === 1 ? "difference" : "differences"} handled by rules · {run.conflictSummary.manualDecisions ?? 0} manual value {(run.conflictSummary.manualDecisions ?? 0) === 1 ? "decision" : "decisions"} · {run.conflictSummary.unresolved} unfinished decisions.</p>{(run.conflictSummary.preservedBoth ?? 0) > 0 && <p>Some fields intentionally preserve both source values.</p>}</div><button className="primary" onClick={() => void onDownload("trusted")} disabled={busy || !trustedReady}>Download reconciled data</button></article>
-      <details className="audit-files" open={!trustedReady}><summary>Audit & technical files</summary><article className="export-artifact"><div><small>Reconciliation report</small><strong>Available</strong><code>{RECONCILIATION_EXPORT_VERSION}</code><p>Includes automatic and human match outcomes, deferred work, unmatched records, and resolution state.</p></div><button className="secondary" onClick={() => void onDownload("reconciliation")} disabled={busy}>Download reconciliation report</button></article><article className="export-artifact"><div><small>Provenance manifest</small><strong>Available</strong><code>{RUN_MANIFEST_VERSION}</code><p>Records source fingerprints, mapping and matcher versions, decisions, policies, and hashes.</p></div><button className="secondary" onClick={() => void onDownload("manifest")} disabled={busy}>Download provenance manifest</button></article></details>
+      {trustedReady ? [trustedArtifact, auditArtifacts] : [auditArtifacts, trustedArtifact]}
     </div>
     <ExportVerifierWorkspace />
     {!trustedReady && <div className="warning" role="status"><strong>Trusted export blocked.</strong><ul>{run.trustedExportReadiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div>}

@@ -64,6 +64,7 @@ try {
   await menuButton.click();
   check("mobile menu opens", await page.getByRole("dialog", { name: "Samewise menu" }).isVisible());
   check("workflow navigation exposes the current Upload step", await page.getByRole("button", { name: /Upload Current step/ }).isVisible());
+  check("export is not yet available before matching", await page.getByRole("button", { name: "Export Not yet available" }).isDisabled());
   await page.getByRole("button", { name: "Close menu" }).click();
   check("mobile menu closes with its close control", await page.getByRole("dialog", { name: "Samewise menu" }).isHidden());
   await menuButton.click();
@@ -110,6 +111,27 @@ try {
   check("results keep Review uncertain matches dominant", await page.getByRole("button", { name: "Review 1 uncertain match" }).isVisible());
   check("all four result summary categories render", await page.locator(".summary-grid .metric").count() === 4);
   await auditScreen("results");
+  await menuButton.click();
+  const auditMenuItem = page.getByRole("button", { name: "Export Audit files available" });
+  const auditTapTarget = await auditMenuItem.boundingBox();
+  check("unfinished runs provide a usable mobile audit menu item",
+    await auditMenuItem.isEnabled() && Boolean(auditTapTarget && auditTapTarget.height >= 44));
+  await auditMenuItem.click();
+  const auditTitle = page.getByRole("heading", { name: "Download audit files." });
+  await auditTitle.waitFor();
+  check("audit navigation closes the menu, focuses the heading, and distinguishes the current progress screen",
+    await page.getByRole("dialog", { name: "Samewise menu" }).isHidden() &&
+    await auditTitle.evaluate((heading) => document.activeElement === heading) &&
+    await page.getByLabel("Step 5 of 5, Audit files").isVisible());
+  const auditBox = await page.locator(".audit-files").boundingBox();
+  const trustedBox = await page.locator(".primary-export").boundingBox();
+  check("available audit files appear above the blocked trusted card on phone",
+    Boolean(auditBox && trustedBox && auditBox.y < trustedBox.y) &&
+    await page.getByRole("button", { name: "Download reconciliation report" }).isEnabled() &&
+    await page.getByRole("button", { name: "Download reconciled data" }).isDisabled());
+  await auditScreen("audit");
+  await page.getByRole("button", { name: "Back to results" }).click();
+  await page.getByRole("heading", { name: "Matching complete." }).waitFor();
 
   await page.getByRole("button", { name: "Review 1 uncertain match" }).click();
   await page.getByRole("heading", { name: "Could these be the same entity?" }).waitFor();
@@ -141,6 +163,7 @@ try {
   await page.getByRole("button", { name: "Continue to Export" }).waitFor();
   await page.getByRole("button", { name: "Continue to Export" }).click();
   await page.getByRole("heading", { name: "Download reconciled data." }).waitFor();
+  check("trusted readiness restores the usual Export progress label", await page.getByLabel("Step 5 of 5, Export").isVisible());
   const exportCta = await page.getByRole("button", { name: "Download reconciled data" }).boundingBox();
   check("Export CTA is touch friendly and fits", Boolean(exportCta && exportCta.height >= 44 && exportCta.x + exportCta.width <= primaryViewport.width - 16));
   await auditScreen("export");
