@@ -1,5 +1,5 @@
 import { createHash, webcrypto } from "node:crypto";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MappingSuggestionResponse, RunSummary, SemanticMappingProposal } from "@samewise/contracts";
@@ -953,6 +953,111 @@ describe("Samewise vertical slice", () => {
     expect(await screen.findByText("Both columns appear to contain organization names.")).toBeInTheDocument();
     if (!screen.getByText("Advanced setup").parentElement?.hasAttribute("open")) fireEvent.click(screen.getByText("Advanced setup"));
     expect(screen.queryByLabelText("Mapping label")).not.toBeInTheDocument();
+  });
+
+  it.each(["successful", "failed"] as const)(
+    "isolates a late %s recommendation response from a newer reconciliation", async (outcome) => {
+      let finishOld!: (response: Response) => void;
+      let finishNew!: (response: Response) => void;
+      const oldResponse = new Promise<Response>((resolve) => { finishOld = resolve; });
+      const newResponse = new Promise<Response>((resolve) => { finishNew = resolve; });
+      const newRun = runView({ runId: "run-2", stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+      const afterA = { ...newRun, datasets: { A: profile("A") } };
+      const complete = runView({ ...newRun, stage: "profile", datasets: { A: profile("A"), B: profile("B") } });
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/runs/run-1/mapping-suggestions") return oldResponse;
+        if (url === "/api/runs") return new Response(JSON.stringify(newRun), { status: 201 });
+        if (url === "/api/runs/run-2/datasets/A") return new Response(JSON.stringify(afterA), { status: 201 });
+        if (url === "/api/runs/run-2/datasets/B") return new Response(JSON.stringify(complete), { status: 201 });
+        if (url === "/api/runs/run-2/mapping-suggestions") return newResponse;
+        throw new Error(`Unexpected request ${url}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      render(<App initialRun={runView({ stage: "mapping", mappings: [] })} initialScreen="mapping" />);
+      fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+      expect(screen.getByText("Reviewing schema metadata…")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+      fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+      await screen.findByRole("heading", { name: "Upload datasets" });
+      fireEvent.change(screen.getByLabelText("Dataset A CSV"), { target: { files: [new File(["id\n1"], "new-a.csv")] } });
+      fireEvent.change(screen.getByLabelText("Dataset B CSV"), { target: { files: [new File(["id\n2"], "new-b.csv")] } });
+      fireEvent.click(screen.getByRole("button", { name: "Upload & profile" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Set up matching" }));
+      const button = screen.getByRole("button", { name: "Get recommended setup" });
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+
+      const oldMapping = { ...mapping, label: "Old reconciliation mapping", mappingId: "old-run-mapping" };
+      await act(async () => {
+        finishOld(outcome === "successful"
+          ? new Response(JSON.stringify(suggestionResponse(proposal({ reason: "Old reconciliation recommendation." }), [oldMapping])), { status: 201 })
+          : new Response(JSON.stringify({ error: { message: "Old reconciliation request failed." } }), { status: 500 }));
+      });
+      expect(screen.getByText("Reviewing schema metadata…")).toBeInTheDocument();
+      expect(screen.queryByText(/Old reconciliation/)).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue("Old reconciliation mapping")).not.toBeInTheDocument();
+      expect(button).toBeDisabled();
+
+      finishNew(new Response(JSON.stringify(suggestionResponse(
+        { ...proposal({ reason: "New reconciliation recommendation." }), runId: "run-2" },
+      )), { status: 201 }));
+      expect(await screen.findByText("New reconciliation recommendation.")).toBeInTheDocument();
+      expect(screen.queryByText("Reviewing schema metadata…")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Use recommended setup" })).toBeEnabled();
+    },
+  );
+
+  it("stops applying old recommendations after leaving that reconciliation", async () => {
+    const pending = proposal();
+    const first = pending.suggestions[0]!;
+    const second = { ...first, suggestionId: "suggestion-2", rightColumn: "status" };
+    const batch = { ...pending, suggestions: [first, second] };
+    const acceptedMapping = { ...mapping, mappingId: "mapping-suggestion-1" };
+    const accepted: SemanticMappingProposal = {
+      ...pending, suggestions: [{ ...first, status: "accepted", finalMapping: acceptedMapping }, second],
+    };
+    const fresh = runView({ runId: "run-2", stage: "upload", datasets: {}, mappings: [], matcherVersion: null, matcherProvenance: null, summary: null });
+    let finishFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => { finishFirst = resolve; });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url === "/api/runs/run-1/mapping-suggestions") return new Response(JSON.stringify(suggestionResponse(batch)), { status: 201 });
+      if (url === "/api/runs") return new Response(JSON.stringify(fresh), { status: 201 });
+      if (url.endsWith("/suggestion-1")) return firstResponse;
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={runView({ stage: "mapping", mappings: [] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use recommended setup" }));
+    fireEvent.click(screen.getByRole("button", { name: "New reconciliation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start new reconciliation" }));
+    await screen.findByRole("heading", { name: "Upload datasets" });
+    await act(async () => {
+      finishFirst(new Response(JSON.stringify(suggestionResponse(accepted, [acceptedMapping]))));
+    });
+    expect(requests).toEqual([
+      "POST /api/runs/run-1/mapping-suggestions",
+      "PATCH /api/runs/run-1/mapping-suggestions/suggestion-1",
+      "POST /api/runs",
+    ]);
+  });
+
+  it("declines recommendations whose authoritative response describes a different reconciliation", async () => {
+    const foreignMapping = { ...mapping, label: "Foreign mapping", mappingId: "different-run-mapping" };
+    const foreign = { ...proposal(), runId: "run-2" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(
+      suggestionResponse(foreign, [foreignMapping]),
+    ), { status: 201 })));
+    render(<App initialRun={runView({ stage: "mapping", mappings: [] })} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Get recommended setup" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("did not match this reconciliation");
+    expect(screen.queryByDisplayValue("Foreign mapping")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use recommended setup" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add manual mapping" })).toBeEnabled();
   });
 
   it("keeps manual mapping available when AI is unavailable", async () => {

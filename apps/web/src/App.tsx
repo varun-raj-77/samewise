@@ -60,12 +60,16 @@ async function savedSourcePairMatches(run: RunSummary, aFile: File, bFile: File)
   }
 }
 
-async function parseSuggestionResponse(response: Response): Promise<MappingSuggestionResponse> {
+async function parseSuggestionResponse(response: Response, runId: string): Promise<MappingSuggestionResponse> {
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
     throw new Error(payload?.error?.message ?? "AI suggestions unavailable. You can continue mapping columns manually.");
   }
-  return MappingSuggestionResponseSchema.parse(await response.json());
+  const result = MappingSuggestionResponseSchema.parse(await response.json());
+  if (result.proposal.runId !== runId) {
+    throw new Error("The recommendations did not match this reconciliation. Refresh them or continue mapping manually.");
+  }
+  return result;
 }
 
 export function App({ initialRun, initialScreen }: AppProps = {}) {
@@ -92,6 +96,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
   const sampleInFlight = useRef(false);
   const newRunInFlight = useRef(false);
   const downloadInFlight = useRef(false);
+  const suggestionScope = useRef<symbol | null>(null);
   // Track deliberate draft removals separately from server-accepted suggestions.
   const removedMappingIds = useRef(new Set<string>());
   const serverConfirmedMappings = useRef<ManualMapping[]>(initialRun?.mappings ?? []);
@@ -324,6 +329,8 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     setConfirmNewRun(false); setBusy(true); setError(null);
     try {
       const freshRun = await parseRun(await fetch("/api/runs", { method: "POST" }));
+      suggestionScope.current = null;
+      setSuggestionsLoading(false);
       setRun(freshRun); setFileA(null); setFileB(null); setDraftMappings([]);
       removedMappingIds.current.clear(); serverConfirmedMappings.current = [];
       setMappingProposal(null); setSuggestionNotice(null); setSelectedCandidateId(null);
@@ -345,31 +352,55 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
     setDraftMappings([...draftMappings, { mappingId: `mapping-${crypto.randomUUID()}`, label: aColumn.replaceAll("_", " "), aColumn, bColumn, useForMatching: true, includeInMerge: true, normalizer: "text", semanticFamily: "unknown" }]);
   }
 
-  async function requestSuggestions() {
-    if (!run) return;
+  async function withSuggestionScope(
+    work: (runId: string, isCurrent: () => boolean) => Promise<void>,
+    fallback: string,
+  ) {
+    if (!run || busy || newRunInFlight.current || suggestionScope.current !== null) return;
+    const scope = Symbol();
+    suggestionScope.current = scope;
+    const isCurrent = () => suggestionScope.current === scope;
     setSuggestionsLoading(true); setSuggestionNotice(null);
     try {
-      const response = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions`, { method: "POST" }));
+      await work(run.runId, isCurrent);
+    } catch (caught) {
+      if (isCurrent()) setSuggestionNotice(caught instanceof Error ? caught.message : fallback);
+    } finally {
+      if (isCurrent()) {
+        suggestionScope.current = null;
+        setSuggestionsLoading(false);
+      }
+    }
+  }
+
+  async function requestSuggestions() {
+    await withSuggestionScope(async (runId, isCurrent) => {
+      const response = await parseSuggestionResponse(
+        await fetch(`/api/runs/${encodeURIComponent(runId)}/mapping-suggestions`, { method: "POST" }),
+        runId,
+      );
+      if (!isCurrent()) return;
       setMappingProposal(response.proposal);
       serverConfirmedMappings.current = response.confirmedMappings;
       setDraftMappings((current) => mergeConfirmedMappings(current, response.confirmedMappings, removedMappingIds.current));
-    } catch (caught) {
-      setSuggestionNotice(caught instanceof Error ? caught.message : "AI suggestions unavailable. You can continue mapping columns manually.");
-    } finally { setSuggestionsLoading(false); }
+    }, "AI suggestions unavailable. You can continue mapping columns manually.");
   }
 
   async function useRecommendedSetup() {
-    if (!run || !mappingProposal) return;
-    setSuggestionsLoading(true); setSuggestionNotice(null);
-    try {
+    if (!mappingProposal) return;
+    await withSuggestionScope(async (runId, isCurrent) => {
       let applied = 0;
       for (const suggestion of mappingProposal.suggestions.filter((item) => item.status === "pending")) {
+        if (!isCurrent() || newRunInFlight.current) return;
         // A prior PATCH may have committed even if its response was lost.
         if (serverConfirmedMappings.current.some((mapping) =>
           mapping.aColumn === suggestion.leftColumn && mapping.bColumn === suggestion.rightColumn)) continue;
-        const latest = await parseSuggestionResponse(await fetch(`/api/runs/${run.runId}/mapping-suggestions/${suggestion.suggestionId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "accept" }),
-        }));
+        const latest = await parseSuggestionResponse(await fetch(
+          `/api/runs/${encodeURIComponent(runId)}/mapping-suggestions/${encodeURIComponent(suggestion.suggestionId)}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "accept" }),
+          },
+        ), runId);
+        if (!isCurrent()) return;
         serverConfirmedMappings.current = latest.confirmedMappings;
         setMappingProposal(latest.proposal);
         setDraftMappings((current) => mergeConfirmedMappings(current, latest.confirmedMappings, removedMappingIds.current));
@@ -378,9 +409,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
       setSuggestionNotice(applied
         ? "Recommended setup added without replacing manual mappings. Inspect or adjust before matching."
         : "Existing confirmed mappings are already available. Your manual mappings were preserved.");
-    } catch (caught) {
-      setSuggestionNotice(caught instanceof Error ? caught.message : "The recommended setup could not be applied. Manual setup remains available.");
-    } finally { setSuggestionsLoading(false); }
+    }, "The recommended setup could not be applied. Manual setup remains available.");
   }
 
   async function saveAndRun() {
@@ -509,13 +538,13 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
           <h1 id="mapping-title">Set up matching.</h1>
           <p className="lede">Choose which corresponding fields help find the same record and which business values belong in the reconciled result. A field can do both.</p>
           <div className="ai-mapping-panel">
-            <header><div><small>Optional assistant</small><h2>{mappingProposal ? `Samewise found ${mappingProposal.suggestions.length} corresponding fields.` : "Find corresponding fields"}</h2></div><button className="secondary" onClick={() => void requestSuggestions()} disabled={suggestionsLoading}>{mappingProposal ? "Refresh recommendations" : "Get recommended setup"}</button></header>
+            <header><div><small>Optional assistant</small><h2>{mappingProposal ? `Samewise found ${mappingProposal.suggestions.length} corresponding fields.` : "Find corresponding fields"}</h2></div><button className="secondary" onClick={() => void requestSuggestions()} disabled={busy || suggestionsLoading}>{mappingProposal ? "Refresh recommendations" : "Get recommended setup"}</button></header>
             {suggestionsLoading && <p className="ai-loading" aria-live="polite">Reviewing schema metadata…</p>}
             {suggestionNotice && <div className="mapping-notice" role="status">{suggestionNotice}</div>}
             {mappingProposal && <>
               <p className="proposal-note">Recommendations use bounded profile metadata only. They do not inspect rows or decide identity.</p>
               <div className="setup-table-wrap"><table className="setup-table"><thead><tr><th>Field correspondence</th><th>Use to match</th><th>Keep in result</th><th>Recommendation</th></tr></thead><tbody>{mappingProposal.suggestions.map((suggestion) => <tr key={suggestion.suggestionId}><td data-label="Field correspondence"><strong>{suggestion.leftColumn}</strong><span> ↔ </span><strong>{suggestion.rightColumn}</strong><small>{suggestion.reason}</small></td><td data-label="Use to match">{suggestion.useForMatching ? "✓" : "—"}</td><td data-label="Keep in result">{suggestion.includeInMerge ? "✓" : "—"}</td><td data-label="Recommendation">{suggestion.sourceSpecific ? "Source-specific / metadata" : suggestion.relation.replaceAll("_", " ")}</td></tr>)}</tbody></table></div>
-              {mappingProposal.suggestions.some((item) => item.status === "pending") && <button className="primary recommended-setup" onClick={() => void useRecommendedSetup()} disabled={suggestionsLoading}>Use recommended setup</button>}
+              {mappingProposal.suggestions.some((item) => item.status === "pending") && <button className="primary recommended-setup" onClick={() => void useRecommendedSetup()} disabled={busy || suggestionsLoading}>Use recommended setup</button>}
               <p className="proposal-note">Model {mappingProposal.provenance.model} · {mappingProposal.provenance.promptVersion}. Recommendations stay inactive until you confirm them.</p>
             </>}
           </div>
