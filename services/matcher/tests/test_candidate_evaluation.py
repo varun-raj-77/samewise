@@ -1,3 +1,5 @@
+import pytest
+
 from samewise_matcher.candidate_engine import CandidateEngineConfig, generate_candidates
 from samewise_matcher.candidate_evaluation import evaluate_candidates
 from samewise_matcher.workflow_models import ManualMapping
@@ -80,3 +82,72 @@ def test_known_miss_and_no_candidates_produce_inspectable_diagnostic() -> None:
         "records emitted keys but none intersected"
     )
     assert miss["evaluationOnlyCorruptions"]["A"] == ["one_digit_error"]
+
+
+@pytest.mark.parametrize(
+    ("family", "left", "right", "expected"),
+    [
+        ("persistent_identifier", "ABC-001", "XYZ-002", "abc 001"),
+        ("source_local_identifier", "SRC-001", "SRC-002", "src 001"),
+        ("name_or_title", "Northwind LLC", "Southridge LLC", "northwind"),
+        ("contact_person", "Ada Lovelace", "Grace Hopper", "ada lovelace"),
+        ("email", "Ada@Example.COM", "grace@other.net", "ada@example.com"),
+        ("phone", "+1 (216) 555-0100", "+1 (216) 555-0101", "2165550100"),
+        ("domain", "https://www.Example.com/a", "https://other.net/b", "example.com"),
+        ("address", "42 High Street", "81 South Avenue", "42 high st"),
+        ("geography", " OH ", " PA ", "oh"),
+        ("categorical", "Priority-High", "Priority-Low", "priority high"),
+        ("numeric", "1,500", "2,500", "1 500"),
+        ("date_or_timestamp", "2026-03-04", "2026-03-05", "2026 03 04"),
+        ("free_text", "Primary Account", "Secondary Account", "primary account"),
+        ("unknown", "Reference-001", "Reference-002", "reference 001"),
+    ],
+)
+def test_missed_truth_with_confirmed_semantic_mapping_remains_inspectable(
+    family: str, left: str, right: str, expected: str,
+) -> None:
+    # Truth is deliberately separate from candidate generation; a different
+    # normalized value on B leaves the known pair outside the candidate set.
+    field = ManualMapping(
+        mappingId="semantic-identity",
+        label="Semantic identity",
+        aColumn="value",
+        bColumn="value",
+        role="identity",
+        normalizer="text",
+        semanticFamily=family,
+    )
+    a_rows = [{"id": "A1", "value": left}]
+    b_rows = [{"id": "B1", "value": right}]
+    generated = generate_candidates(
+        ["id", "value"], a_rows, ["id", "value"], b_rows, [field],
+    )
+    assert generated.candidates == []
+
+    report = evaluate_candidates(
+        generated,
+        {("A1", "B1")},
+        ["id", "value"], a_rows,
+        ["id", "value"], b_rows,
+        [field],
+    )
+    assert report["metrics"]["candidateRecall"] == 0
+    assert report["metrics"]["truePairsMissed"] == 1
+    assert report["missedTrueMatches"][0]["visibleMappedValues"]["A"][
+        "semantic-identity"
+    ]["normalized"] == expected
+
+
+def test_evaluation_rejects_truth_pairs_with_missing_source_rows() -> None:
+    field = mapping()
+    a_rows = [{"id": "A1", "phone": "5550101000"}]
+    b_rows = [{"id": "B1", "telephone": "5550102000"}]
+    result = generated(a_rows, b_rows)
+    with pytest.raises(ValueError, match="Ground truth references unknown source rows"):
+        evaluate_candidates(
+            result,
+            {("A1", "B-does-not-exist")},
+            ["id", "phone"], a_rows,
+            ["id", "telephone"], b_rows,
+            [field],
+        )
