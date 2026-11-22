@@ -891,6 +891,52 @@ describe("Samewise vertical slice", () => {
     expect(requests).toEqual(["PUT /api/runs/run-1/mappings", "POST /api/runs/run-1/match"]);
   });
 
+  it.each(["completed", "broken response body", "different plan", "different source", "different run", "unfinished", "no matcher provenance"] as const)(
+    "checks an interrupted match using only a same-plan completed readback (%s)", async (scenario) => {
+      const saved = runView({ stage: "mapping", summary: null, matcherVersion: null, matcherProvenance: null });
+      const completed = runView();
+      const recovered = scenario === "different plan"
+        ? { ...completed, mappings: [{ ...mapping, mappingId: "different-plan", includeInMerge: true }] }
+        : scenario === "different source"
+          ? { ...completed, datasets: { ...completed.datasets, B: { ...profile("B"), sha256: "c".repeat(64) } } }
+          : scenario === "different run"
+            ? { ...completed, runId: "run-2" }
+            : scenario === "unfinished"
+              ? { ...completed, summary: null }
+              : scenario === "no matcher provenance"
+                ? { ...completed, matcherProvenance: null }
+                : completed;
+      const requests: string[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+        requests.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.endsWith("/mappings")) return new Response(JSON.stringify(saved), { status: 200 });
+        if (url.endsWith("/match")) {
+          if (scenario === "broken response body") return new Response('{"runId":', { status: 200 });
+          throw new TypeError("Connection lost after matching");
+        }
+        if (url === "/api/runs/run-1") {
+          expect(init?.cache).toBe("no-store");
+          return new Response(JSON.stringify(recovered), { status: 200 });
+        }
+        throw new Error(`Unexpected request ${url}`);
+      }));
+      render(<App initialRun={saved} initialScreen="mapping" />);
+      fireEvent.click(screen.getByRole("button", { name: "Confirm setup & run matching" }));
+
+      if (scenario === "completed" || scenario === "broken response body") {
+        expect(await screen.findByRole("heading", { name: "Matching complete." })).toBeInTheDocument();
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      } else {
+        expect(await screen.findByRole("alert")).toHaveTextContent("could not confirm new results");
+        expect(screen.getByRole("heading", { name: "Set up matching." })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Matching complete." })).not.toBeInTheDocument();
+      }
+      expect(requests).toEqual(["PUT /api/runs/run-1/mappings", "POST /api/runs/run-1/match", "GET /api/runs/run-1"]);
+    },
+  );
+
   it("presents matching and merge participation as independent choices", () => {
     render(<App initialRun={runView()} initialScreen="mapping" />);
     expect(screen.getByText(/A field can do both/)).toBeInTheDocument();

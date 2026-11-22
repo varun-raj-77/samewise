@@ -209,15 +209,25 @@ try {
     const match = /^\/api\/runs\/([^/]+)(?:\/datasets\/(A|B))?$/.exec(url.pathname);
     if (match) lostAckRequests.push({ id: match[1], side: match[2], method: request.method() });
   };
-  await page.route("**/api/runs/*/datasets/B", async (route) => {
+  await page.waitForFunction((oldId) => {
+    const currentId = new URL(location.href).searchParams.get("run");
+    return currentId && currentId !== oldId;
+  }, runId);
+  const lostUploadRunId = new URL(page.url()).searchParams.get("run");
+  const dropUploadAckRoute = `**/api/runs/${lostUploadRunId}/datasets/B`;
+  const dropUploadAck = async (route) => {
     const response = await route.fetch();
-    committedB = { status: response.status(), id: new URL(route.request().url()).pathname.split("/")[3] };
+    committedB = { status: response.status(), id: lostUploadRunId };
     await route.abort("failed");
-  }, { times: 1 });
+  };
+  // Keep interception installed until the route has finished. Disabling the
+  // last one-shot handler while its request is pending can release it early.
+  await page.route(dropUploadAckRoute, dropUploadAck);
   page.on("request", captureRecovery);
   await page.getByRole("button", { name: "Try sample data" }).click();
   await page.getByRole("button", { name: "Use sample data", exact: true }).click();
   await page.getByRole("heading", { name: "Your files are ready." }).waitFor();
+  await page.unroute(dropUploadAckRoute, dropUploadAck);
   page.off("request", captureRecovery);
   check("lost upload acknowledgement recovered the actual saved sample without reporting a partial pair",
     committedB?.status === 201 && await page.getByText("Using synthetic sample data.").isVisible() &&
@@ -334,6 +344,42 @@ try {
     rematchResponse.status() === 200 && JSON.stringify(rematchRequests) === JSON.stringify(["PUT mappings", "POST match"]) &&
     updated.reviewProgress.reviewed === 0 && updated.survivorshipPolicy === null &&
     updated.datasets.A.sha256 === prior.datasets.A.sha256 && updated.datasets.B.sha256 === prior.datasets.B.sha256);
+
+  // Simulate a dropped acknowledgement after the real matcher finishes.
+  // The browser must read the saved run without repeating the mutation.
+  await page.goto(`http://127.0.0.1:5173/?run=${runId}&screen=mapping`, { waitUntil: "networkidle" });
+  let committedMatch = null;
+  const matchRecoveryRequests = [];
+  const captureMatchRecovery = (request) => {
+    const path = new URL(request.url()).pathname;
+    if ([`/api/runs/${runId}`, `/api/runs/${runId}/mappings`, `/api/runs/${runId}/match`].includes(path)) {
+      matchRecoveryRequests.push(`${request.method()} ${path}`);
+    }
+  };
+  const dropMatchAckRoute = `**/api/runs/${runId}/match`;
+  const dropMatchAck = async (route) => {
+    const response = await route.fetch();
+    committedMatch = { status: response.status(), run: await response.json() };
+    await route.abort("failed");
+  };
+  await page.route(dropMatchAckRoute, dropMatchAck);
+  page.on("request", captureMatchRecovery);
+  await runMatchButton.click();
+  await rematchDialog.getByRole("button", { name: "Replace results and run matching" }).click();
+  await page.getByRole("heading", { name: "Matching complete." }).waitFor();
+  await page.unroute(dropMatchAckRoute, dropMatchAck);
+  page.off("request", captureMatchRecovery);
+  check("an interrupted match acknowledgement recovered real, same-plan results",
+    committedMatch?.status === 200 && committedMatch.run.runId === runId &&
+    JSON.stringify(committedMatch.run.mappings) === JSON.stringify(prior.mappings) &&
+    committedMatch.run.matcherProvenance !== null && await page.getByRole("alert").count() === 0);
+  check("recovery does not treat uncertain matches as reviewed or trusted",
+    committedMatch.run.reviewProgress.remaining === 1 && !committedMatch.run.trustedExportReadiness.ready &&
+    await page.getByRole("button", { name: "Review 1 uncertain match" }).isVisible());
+  check("matching recovery performs one authoritative GET and no repeated mutation",
+    JSON.stringify(matchRecoveryRequests) === JSON.stringify([
+      `PUT /api/runs/${runId}/mappings`, `POST /api/runs/${runId}/match`, `GET /api/runs/${runId}`,
+    ]));
 
   console.log(JSON.stringify({ status: "PASS", runId, checks }, null, 2));
 } finally {

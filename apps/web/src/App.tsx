@@ -44,6 +44,47 @@ async function parseRun(response: Response): Promise<RunSummary> {
   return RunSummarySchema.parse(await response.json());
 }
 
+async function recoverCompletedMatch(saved: RunSummary): Promise<RunSummary> {
+  // The mapping acknowledgement must show that any old match was cleared.
+  // A readback proves completion only on the exact immutable inputs and plan.
+  if (saved.stage === "mapping" && saved.summary === null && saved.mappings.some((mapping) => mapping.useForMatching)) {
+    try {
+      const observed = await parseRun(await fetch(`/api/runs/${encodeURIComponent(saved.runId)}`, { cache: "no-store" }));
+      const sameSources = (["A", "B"] as const).every((side) => {
+        const expected = saved.datasets[side];
+        const actual = observed.datasets[side];
+        return expected && actual && actual.datasetId === expected.datasetId && actual.sha256 === expected.sha256;
+      });
+      if (observed.runId === saved.runId
+        && ["results", "review", "resolution", "export"].includes(observed.stage)
+        && observed.summary && observed.matcherVersion && observed.matcherProvenance?.matcherVersion === observed.matcherVersion
+        && sameSources && observed.mappingVersion === saved.mappingVersion
+        // Both values are schema-parsed; compare the ordered field plan exactly.
+        && JSON.stringify(observed.mappings) === JSON.stringify(saved.mappings)) {
+        return observed;
+      }
+    } catch { /* Keep the acknowledged mapping state and report uncertain completion. */ }
+  }
+  throw new Error("Mapping setup was saved, but Samewise could not confirm new results. Refresh this reconciliation before trying again.");
+}
+
+async function requestMatchResult(saved: RunSummary): Promise<RunSummary> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/runs/${encodeURIComponent(saved.runId)}/match`, { method: "POST" });
+  } catch {
+    return recoverCompletedMatch(saved);
+  }
+  // An explicit error response remains an error; only an interrupted or
+  // unreadable acknowledgement calls for a passive readback.
+  if (!response.ok) return parseRun(response);
+  try {
+    return await parseRun(response);
+  } catch {
+    return recoverCompletedMatch(saved);
+  }
+}
+
 async function savedSourcePairMatches(run: RunSummary, aFile: File, bFile: File): Promise<boolean> {
   const savedA = run.datasets.A;
   const savedB = run.datasets.B;
@@ -452,7 +493,7 @@ export function App({ initialRun, initialScreen }: AppProps = {}) {
         // even if the following match request fails.
         setRun(mapped);
         serverConfirmedMappings.current = mapped.mappings;
-        const result = await parseRun(await fetch(`/api/runs/${runId}/match`, { method: "POST" }));
+        const result = await requestMatchResult(mapped);
         if (result.runId !== run.runId) throw new Error("Match results did not match this reconciliation.");
         return result;
       }, "results");
