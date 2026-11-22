@@ -771,6 +771,98 @@ describe("Samewise vertical slice", () => {
     expect(screen.getByText("Choose at least one field Samewise can use to look for the same record.")).toBeInTheDocument();
   });
 
+  it("requires confirmation before replacing existing reconciliation outcomes", async () => {
+    const prior = readyExportRun();
+    const requested: string[] = [];
+    const mapped = { ...prior, stage: "mapping", summary: null };
+    let finishMapping!: (response: Response) => void;
+    const pendingMap = new Promise<Response>((resolve) => { finishMapping = resolve; });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+      requested.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/mappings")) return pendingMap;
+      if (url.endsWith("/match")) return new Response(JSON.stringify(runView()));
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={prior} initialScreen="mapping" />);
+    const requestMatch = screen.getByRole("button", { name: "Confirm setup & run matching" });
+    fireEvent.click(requestMatch);
+    const dialog = screen.getByRole("dialog", { name: "Replace existing match results?" });
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveFocus();
+    expect(dialog).toHaveTextContent("recorded review decisions, field resolutions, and merge rules");
+    expect(dialog).toHaveTextContent("Original source files stay the same");
+    expect(requested).toEqual([]);
+    fireEvent.click(cancel);
+    await waitFor(() => expect(requestMatch).toHaveFocus());
+    expect(requested).toEqual([]);
+
+    fireEvent.click(requestMatch);
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Replace existing match results?" }), { key: "Escape" });
+    await waitFor(() => expect(requestMatch).toHaveFocus());
+    expect(requested).toEqual([]);
+
+    fireEvent.click(requestMatch);
+    const confirm = screen.getByRole("button", { name: "Replace results and run matching" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(requested).toEqual(["PUT /api/runs/run-1/mappings"]);
+    finishMapping(new Response(JSON.stringify(mapped)));
+    await screen.findByRole("heading", { name: "Matching complete." });
+    expect(requested).toEqual(["PUT /api/runs/run-1/mappings", "POST /api/runs/run-1/match"]);
+  });
+
+  it("does not keep stale results after confirmed mapping replacement followed by a match failure", async () => {
+    const prior = readyExportRun();
+    const mapped = runView({ ...prior, stage: "mapping", summary: null, matcherVersion: null,
+      matcherProvenance: null, reviewProgress: { total: 0, reviewed: 0, remaining: 0, deferred: 0 } });
+    let matchAttempts = 0;
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/mappings")) return new Response(JSON.stringify(mapped));
+      if (url.endsWith("/match")) {
+        return ++matchAttempts === 1
+          ? new Response(JSON.stringify({ error: { message: "Matcher interrupted." } }), { status: 503 })
+          : new Response(JSON.stringify(runView()));
+      }
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={prior} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm setup & run matching" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replace results and run matching" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Matcher interrupted.");
+    expect(requests).toHaveLength(2);
+
+    // The mapping acknowledgement made the cleared state authoritative; a
+    // later explicit retry should not ask to replace old results again.
+    fireEvent.click(screen.getByRole("button", { name: "Confirm setup & run matching" }));
+    expect(screen.queryByRole("dialog", { name: "Replace existing match results?" })).not.toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Matching complete." });
+    expect(requests).toHaveLength(4);
+  });
+
+  it("runs first-time matching directly without a replacement confirmation", async () => {
+    const initial = runView({ stage: "mapping", summary: null, matcherVersion: null, matcherProvenance: null });
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/results?")) return new Response(JSON.stringify(resultsPage()));
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/mappings")) return new Response(JSON.stringify(initial));
+      if (url.endsWith("/match")) return new Response(JSON.stringify(runView()));
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<App initialRun={initial} initialScreen="mapping" />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm setup & run matching" }));
+    expect(screen.queryByRole("dialog", { name: "Replace existing match results?" })).not.toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Matching complete." });
+    expect(requests).toEqual(["PUT /api/runs/run-1/mappings", "POST /api/runs/run-1/match"]);
+  });
+
   it("presents matching and merge participation as independent choices", () => {
     render(<App initialRun={runView()} initialScreen="mapping" />);
     expect(screen.getByText(/A field can do both/)).toBeInTheDocument();
