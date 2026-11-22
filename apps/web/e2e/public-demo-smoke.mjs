@@ -230,6 +230,67 @@ try {
   await page.getByRole("heading", { name: "Set up matching." }).waitFor();
   check("matching setup can continue on the recovered source pair", true);
 
+  // Use controlled synthetic proposal responses to exercise the navigation
+  // race without sending sample records or configuration to an AI service.
+  function syntheticProposal(id, reason) {
+    return {
+      contractVersion: "3.0.0", confirmedMappings: [],
+      proposal: {
+        contractVersion: "3.0.0", proposalId: "browser-scope-proposal", runId: id,
+        provenance: {
+          provider: "openai", model: "synthetic-browser-fixture", promptVersion: "semantic-mapping-prompt-v3",
+          schemaVersion: "3.0.0", requestVersion: "metadata-first-v3", responseId: "browser-scope-response",
+        },
+        suggestions: [{
+          suggestionId: "sample-name", leftColumn: "company_name", rightColumn: "supplier_name",
+          relation: "equivalent", useForMatching: true, includeInMerge: true, sourceSpecific: false,
+          semanticFamily: "name_or_title", confidence: 0.9, reason, normalizationHints: ["casefold"],
+          status: "pending", finalMapping: null,
+        }],
+        unmappedLeft: [], unmappedRight: [], createdAt: "2026-08-31T12:00:00.000Z",
+      },
+    };
+  }
+  async function holdRecommendation(id, reason) {
+    const endpoint = `**/api/runs/${id}/mapping-suggestions`;
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    let intercepted;
+    const received = new Promise((resolve) => { intercepted = resolve; });
+    await page.route(endpoint, async (route) => {
+      intercepted();
+      await gate;
+      await route.fulfill({ status: 201, json: syntheticProposal(id, reason) });
+    });
+    return { release, received };
+  }
+  const oldRecommendation = await holdRecommendation(committedB.id, "Old synthetic recommendation.");
+  await page.getByRole("button", { name: "Get recommended setup" }).click();
+  await oldRecommendation.received;
+  await page.getByRole("button", { name: "New reconciliation" }).click();
+  await page.getByRole("button", { name: "Start new reconciliation" }).click();
+  await page.getByRole("heading", { name: "Upload datasets" }).waitFor();
+  const newUpload = page.waitForResponse((response) => response.request().method() === "POST" && /\/datasets\/B$/.test(response.url()));
+  await page.getByRole("button", { name: "Try sample data" }).click();
+  const nextId = new URL((await newUpload).url()).pathname.split("/")[3];
+  await page.getByRole("button", { name: "Set up matching" }).click();
+  const newRecommendation = await holdRecommendation(nextId, "New synthetic recommendation.");
+  await page.getByRole("button", { name: "Get recommended setup" }).click();
+  await newRecommendation.received;
+  const oldFinished = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/runs/${committedB.id}/mapping-suggestions`);
+  oldRecommendation.release();
+  await (await oldFinished).finished();
+  // Let the browser consume the obsolete response and render any ensuing state.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  check("obsolete recommendation cannot replace or stop the next reconciliation's request",
+    await page.getByText("Old synthetic recommendation.").count() === 0 &&
+    await page.getByText("Reviewing schema metadata…").isVisible());
+  newRecommendation.release();
+  await page.getByText("New synthetic recommendation.").waitFor();
+  check("only the new reconciliation's recommendation is offered",
+    await page.getByRole("button", { name: "Use recommended setup" }).isEnabled() &&
+    await page.getByText("Reviewing schema metadata…").count() === 0);
+
   console.log(JSON.stringify({ status: "PASS", runId, checks }, null, 2));
 } finally {
   await browser.close();
